@@ -42,8 +42,11 @@ The first line is `#!score v1`, then `key=value` pairs.
 | `start` | `boot`, or `save:<sha256>` | `boot` |
 | `render` | free text, for example `800x600/low` | unset |
 | `keymap` | free text | unset |
+| `save_ms` | a whole number, milliseconds | `clock.save_ms`, then a documented backend estimate (pysim: 900, an unmeasured guess for a quicksave stall; see `DEFAULT_SAVE_MS` in `kptas/backend/pysim.py`) |
 
 Other lowercase keys are kept as written. The header's `tier` and `hz` win over `telos.toml`.
+
+`save_ms` is how much virtual time (the clock every `timeGetTime`/`QueryPerformanceCounter`/`GetSystemTimeAsFileTime` read sees) one in-game save advances by, while zero score ticks elapse -- the engine's own MainLoop is stalled for the save, so nothing in the score counts it. In real play the first frame after a save sees a large wall-clock delta; runners use that (including the "save teleport" trick). Under a virtual clock a save is otherwise free, so `save_ms` must be set explicitly to keep that behavior. `save_ms=0` is allowed, but only as an explicit choice, never a silent default.
 
 `start=save:...` is recorded in the bundle header, but no backend can reload a save yet, so every run starts from boot for now. `score check` accepts any value after `save:`; `run` wants the full 64-digit sha256.
 
@@ -59,7 +62,7 @@ Other lowercase keys are kept as written. The header's `tier` and `hz` win over 
 | `m@X,Y` | cursor held at X,Y |
 | `mdX,Y` | cursor moved by X,Y every tick |
 | `wh+N`, `wh-N` | wheel, first tick only |
-| `!altf4`, `!focus`, `!blur` | an OS event, first tick only |
+| `!altf4`, `!focus`, `!blur`, `!close` | an OS event, first tick only |
 | `"text"` | types the text on a US layout, each character for COUNT ticks; it must be the only input |
 | `$name` | an alias from `@alias` |
 
@@ -111,6 +114,7 @@ Sugar needs to know the held set, so the first note after an `@include` must be 
 | `@expect OUTCOME [timeout=N]` | `exit`: the game must exit within the timeout. `alive`: it must still be running. `exit\|alive`: either. |
 | `@relaunch [if=C]` | starts the game again. `if=exit` does it only when the game has exited; the default is `always`. |
 | `@mark NAME` | names the current tick in the bundle. Names are unique. |
+| `@save ms=N` | overrides `save_ms` for the single next in-game save only, then reverts to the header value. For save-length variance and the save-teleport trick without changing every save in the score. |
 | `@assert EXPR` | parsed and kept, but not evaluated yet. The runner logs a line and moves on. |
 | `@repeat N` ... `@end` | repeats the lines between them |
 

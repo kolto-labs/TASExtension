@@ -390,7 +390,7 @@ class RunResult:
     ticks: int = 0              # last global tick, -1 when nothing ran
     epochs: int = 0
     reports: int = 0
-    stopped: str = "end"        # end | max_ticks | halted
+    stopped: str = "end"        # end | max_ticks | halted | exit
 
 
 def merge_oneshots(pending: Any, note: Any) -> Any:
@@ -583,6 +583,13 @@ class Supervisor:
             self.alive = False
         return out
 
+    def save_length(self, ms: int, once: bool) -> None:
+        """How much virtual time an in-game save takes: every save, or only the next one (`@save ms=`)."""
+        fn = getattr(self._live(), "set_next_save_ms" if once else "set_save_ms", None)
+        if fn is None:
+            raise RunError(f"the {self.name} backend cannot set how long a save takes yet")
+        fn(ms)
+
     def set_clock(self, hz: int, scale: int) -> None:
         if (hz, scale) != (self.hz, self.scale):
             self.hz, self.scale = hz, scale
@@ -598,7 +605,7 @@ class Supervisor:
         `start` (a kptas.holo.seek Cursor) resumes a live game that a seek left at the cursor's tick:
         from item start.i with start.j of its ticks already played, at the cursor's clock rate.
         """
-        from kptas.score import Assert, Expect, Mark, Note, Relaunch, Segment, Sync
+        from kptas.score import Assert, Expect, Mark, Note, Relaunch, SaveMs, Segment, Sync
 
         res = RunResult()
         default_timeout = self.cfg["score"]["default_timeout_ticks"]
@@ -613,6 +620,8 @@ class Supervisor:
             rep = self.open()
             if on_report:
                 on_report(rep, None)
+        if compiled.header.get("save_ms") is not None:
+            self.save_length(int(compiled.header["save_ms"]), once=False)
         pace, wall0, pending = "gate", None, None
         first, played = (start.i, start.j) if start is not None else (0, 0)
         if start is not None:
@@ -682,10 +691,14 @@ class Supervisor:
             elif isinstance(item, Mark):
                 if self.sink is not None:
                     self.sink.mark(item.name, self.tick)
+            elif isinstance(item, SaveMs):
+                self.save_length(item.ms, once=True)
             elif isinstance(item, Assert):
                 self.log(f"{_where(item)}: @assert {item.expr} is not evaluated by this runner")
         if pending is not None:
             self.log("a trailing count-0 note had nothing to attach to; its one-shots were dropped")
+        if not self.alive and res.stopped == "end":
+            res.stopped = "exit"            # the game quit (!close, !altf4 or a crash) and nothing relaunched it
         res.ticks, res.epochs = self.tick, self.epoch + 1
         return res
 

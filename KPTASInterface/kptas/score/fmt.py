@@ -1,7 +1,7 @@
 """Canonical score text."""
 
 from .ast import (Alias, Assert, Expect, Include, Line, Mark, Note, NoteLine, Relaunch,
-                  Repeat, Segment, Sync)
+                  Repeat, SaveMs, Segment, Sync)
 from .lexer import quote
 from .parser import HEADER_ORDER, parse
 
@@ -56,6 +56,8 @@ def render(node) -> str:
             return _join("@relaunch", _opt("if", node.cond))
         case Mark():
             return f"@mark {node.name}"
+        case SaveMs():
+            return f"@save ms={node.ms}"
         case Assert():
             return f"@assert {node.expr}"
         case Repeat():

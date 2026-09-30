@@ -87,6 +87,18 @@ class Mark:
 
 
 @dataclass(frozen=True, slots=True)
+class SaveMs:
+    """One-shot override: the next in-game save takes exactly this much virtual time.
+
+    Applies to the single next save.begin the runner sees, then reverts to the
+    header default (save_ms) for every save after it.
+    """
+    ms: int
+    source: str = _loc()
+    line: int = _line()
+
+
+@dataclass(frozen=True, slots=True)
 class Assert:
     expr: str
     source: str = _loc()

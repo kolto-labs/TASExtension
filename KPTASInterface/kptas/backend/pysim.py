@@ -61,6 +61,10 @@ FLAG_AREA_READY, FLAG_EXITED = 1, 2
 LOAD_TICKS, LOAD_SUBTICKS = 12, 3
 WORLD_W, WORLD_H = 800, 600
 AI_BUDGET_US, THINK_US = 10_000, 1_500
+# Estimate, not measured: an in-game quicksave (StallEventSaveGame equivalent) blocking the
+# main thread on period HDD/SSD storage. Documented default per docs/score.md `save_ms`;
+# score.save_ms or a one-shot `@save ms=N` overrides it. 0 is allowed only as an explicit choice.
+DEFAULT_SAVE_MS = 900
 
 # stand-in return addresses of rand() call sites, journalled per site
 SITE_SPAWN, SITE_THINK, SITE_ATTACK, SITE_EMITTER = 0x004C5900, 0x004B0C10, 0x005A1234, 0x004A89F0
@@ -150,8 +154,30 @@ class PySim:
         guard = clock.get("budget_guard", {})
         self.site_reads = int(guard.get("site_reads", 100_000))
         self.step_us = int(guard.get("step_us", 1))
+        # clock.save_ms from config; a score header `save_ms` replaces it (set_save_ms) and a
+        # one-shot `@save ms=N` covers only the next save (set_next_save_ms).
+        self.save_ms = int(clock.get("save_ms", DEFAULT_SAVE_MS))
+        self._next_save_ms: int | None = None
         if not 1 <= self.hz <= 1000 or self.qpf_hz < 1 or self.step_us < 1:
             raise BackendError("clock.hz must be 1..1000, qpf_hz >= 1 and budget_guard.step_us >= 1")
+        if self.save_ms < 0:
+            raise BackendError("clock.save_ms must be >= 0")
+
+    def set_save_ms(self, ms: int) -> None:
+        """Default virtual length of every save (the score header `save_ms`)."""
+        if ms < 0:
+            raise BackendError("save ms must be >= 0")
+        self.save_ms = ms
+
+    def set_next_save_ms(self, ms: int) -> None:
+        """One-shot override for the very next save.begin (a compiled `@save ms=N` item).
+
+        Consumed by the caller that drives the score timeline against a save.begin
+        @sync or an in-game save trigger; reverts to self.save_ms after one use.
+        """
+        if ms < 0:
+            raise BackendError("save ms must be >= 0")
+        self._next_save_ms = ms
 
     @property
     def caps(self) -> Caps:
@@ -542,13 +568,28 @@ class PySim:
         self._set("area_ticks", at + 1)
 
     def _save(self, tick: int) -> None:
-        """StallEventSaveGame: blocks the main thread and writes the save through stdio."""
+        """StallEventSaveGame: blocks the main thread and writes the save through stdio.
+
+        The save itself advances zero score ticks (the engine loop is stalled, so no
+        MainLoop pass runs), but real wall time does pass. We model that the way the
+        real clock() rebase does: bump the virtual-time baseline (seg_v/seg_start) by
+        save_ms, so the very next timeGetTime/QPC/GetSystemTimeAsFileTime read after
+        this tick sees a large delta -- the same shape as the real save-teleport frame,
+        without moving the tick counter. save_ms is self._next_save_ms (a one-shot
+        `@save ms=N`) if set, else self.save_ms (header save_ms, else DEFAULT_SAVE_MS).
+        """
         self._tick_events.append(EngineEvent("save.begin", tick))
         n = self._get("saves") + 1
         self._set("saves", n)
         body = self._peek(OBJ_TABLE, PAGE_SIZE) + self._peek(CB, 0x100)
         self._files[f"SAVES:/{n:06d} - QuickSave/savegame.sav"] = (body, self._get("v") * 10)
         self._saving = True
+        ms = self._next_save_ms if self._next_save_ms is not None else self.save_ms
+        self._next_save_ms = None
+        if ms:
+            self._set("seg_v", self._v_at(tick) + ms * 1000)
+            self._set("seg_start", tick)
+            self._set("v", self._get("seg_v"))
         self._tick_events.append(EngineEvent("save.done", tick))
 
     # ------------------------------------------------------------------ gate and capture

@@ -4,21 +4,21 @@ import re
 
 from . import keys as K
 from .ast import (Alias, Assert, Expect, Include, Line, Mark, NoteLine, Relaunch,
-                  Repeat, ScoreAST, ScoreError, Segment, Sync)
+                  Repeat, SaveMs, ScoreAST, ScoreError, Segment, Sync)
 from .lexer import Token, split_comment, tokenize, unquote
 
 MAGIC = "#!score"
-HEADER_ORDER = ("game", "build", "tier", "hz", "start", "render", "keymap")
+HEADER_ORDER = ("game", "build", "tier", "hz", "start", "render", "keymap", "save_ms")
 TIERS = ("lab", "tas", "hands-off")
 GAMES = ("k1", "k2")
 SYNC_EVENTS = ("main_menu", "area.ready", "load.done", "save.begin", "save.done",
                "dialog.open", "dialog.close", "gui.open", "proc.down", "proc.up")
 SYNC_WITH_ARG = ("gui.open",)
 OUTCOMES = {"exit": "exit", "alive": "alive", "exit|alive": "exit|alive", "alive|exit": "exit|alive"}
-OSEVENTS = ("altf4", "focus", "blur")
+OSEVENTS = ("altf4", "focus", "blur", "close")
 PACES = ("gate", "realtime")
 DIRECTIVES = ("include", "alias", "segment", "sync", "expect", "relaunch",
-              "mark", "assert", "repeat", "end")
+              "mark", "assert", "repeat", "end", "save")
 
 _NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 _LABEL = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.\-]*\Z")
@@ -240,6 +240,13 @@ class _Parser:
             if not rest:
                 raise self.err("@assert needs an expression", lineno, head.col + len(head.text))
             return Assert(rest, **loc)
+
+        if name == "save":
+            opts = self.options(toks[1:], ("ms",), lineno)
+            if "ms" not in opts:
+                raise self.err("@save needs ms=N", lineno, head.col + len(head.text))
+            ms, col = opts["ms"]
+            return SaveMs(self.int_arg(ms, "ms", lineno, col, minimum=0), **loc)
 
         # repeat; @end is handled by the caller
         n = self.need(toks, "a count", lineno)

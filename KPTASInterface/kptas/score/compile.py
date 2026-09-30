@@ -13,8 +13,11 @@ from .include import IncludeStack, read, resolve
 from .parser import HEADER_ORDER, parse
 
 # tier and hz stay unset unless the score says so; the run config fills them in.
+# save_ms: how much virtual time (winmm/QPC) one in-game save advances the clock by, with
+# zero score ticks elapsing. Unset means the backend's own default (see docs/score.md).
 DEFAULTS = {"game": "k1", "build": "auto", "tier": None, "hz": None,
-            "start": None, "render": None, "keymap": None}
+            "start": None, "render": None, "keymap": None, "save_ms": None}
+_INT_HEADER_KEYS = ("hz", "save_ms")
 DEFAULT_SCALE = 100
 DEFAULT_PACE = "gate"
 MAX_ITEMS = 5_000_000
@@ -84,7 +87,7 @@ class _Compiler:
     def __init__(self, header: dict[str, str], include_dirs: list[Path]):
         self.header = dict(DEFAULTS)
         for k, v in header.items():
-            self.header[k] = int(v) if k == "hz" else v
+            self.header[k] = int(v) if k in _INT_HEADER_KEYS else v
         self.include_dirs = include_dirs
         self.items: list[Item] = []
         self.aliases: dict[str, str] = {}
