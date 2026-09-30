@@ -1,0 +1,10 @@
+// Static-assets Worker for the InputInterfaceTelos browser prototype.
+// No Worker script: every request is served from ./public.
+{
+  "name": "kptas-demo",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "single-page-application"
+  }
+}

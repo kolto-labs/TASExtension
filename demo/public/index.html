@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InputInterfaceTelos prototype</title>
+<meta name="description" content="Try the KPTASInterface TAS tools on a small stand-in scene in your browser.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#05070a">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script type="module" src="js/app.js"></script>
+</head>
+<body>
+<a class="skip" href="#stage">Skip to the game view</a>
+<header class="top">
+  <div class="brand">
+    <h1>InputInterfaceTelos prototype</h1>
+    <p class="honest">Prototype. The game here is a small stand-in so the tools can be tried in a browser.</p>
+  </div>
+  <p class="keys-hint" id="keys-hint">Space plays or pauses. Period steps one tick. Comma steps back.</p>
+</header>
+
+<main class="grid">
+  <section class="panel score" aria-labelledby="score-h">
+    <div class="panel-head">
+      <h2 id="score-h">Edit the score</h2>
+      <span class="status" id="score-status" role="status"></span>
+    </div>
+    <div class="editor">
+      <div class="gutter" id="gutter" aria-hidden="true"></div>
+      <div class="edit-wrap">
+        <div class="backdrop" id="backdrop" aria-hidden="true"></div>
+        <textarea id="score" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-label="Score text" aria-describedby="score-help score-errors"></textarea>
+      </div>
+    </div>
+    <ul class="errors" id="score-errors" aria-live="polite"></ul>
+    <p class="help" id="score-help">One note per line: a tick count, then the keys held (w a s d lmb rmb, or . for none). Lines that start with @ are directives. A # starts a comment.</p>
+  </section>
+
+  <section class="stage" id="stage" aria-labelledby="stage-h" tabindex="-1">
+    <h2 class="sr-only" id="stage-h">Game view</h2>
+    <div class="canvas-wrap">
+      <canvas id="view" width="640" height="360" role="img" aria-label="Stand-in game view. The HUD shows the tick, virtual time, held inputs and tier. The corner watermark reads TAS, with a line of glyphs that reads tool assisted."></canvas>
+    </div>
+    <div class="transport" role="toolbar" aria-label="Transport">
+      <button type="button" class="btn icon" id="b-start" aria-label="Go to start" aria-keyshortcuts="Home" title="Go to start (Home)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM13 3v10L6 8z" fill="currentColor"/></svg>
+      </button>
+      <button type="button" class="btn" id="b-back" aria-keyshortcuts="," title="Step back one tick (,)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3v10L4 8z" fill="currentColor"/><path d="M12 3h2v10h-2z" fill="currentColor"/></svg>
+        <span>Step back</span>
+      </button>
+      <button type="button" class="btn primary" id="b-play" aria-keyshortcuts="Space" title="Play or pause (Space)">
+        <svg viewBox="0 0 16 16" aria-hidden="true" id="i-play"><path d="M4 3v10l9-5z" fill="currentColor"/></svg>
+        <svg viewBox="0 0 16 16" aria-hidden="true" id="i-pause" hidden><path d="M4 3h3v10H4zM9 3h3v10H9z" fill="currentColor"/></svg>
+        <span id="play-label">Play</span>
+      </button>
+      <button type="button" class="btn" id="b-step" aria-keyshortcuts="." title="Step one tick (.)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h2v10H2zM5 3v10l7-5z" fill="currentColor"/></svg>
+        <span>Step</span>
+      </button>
+      <button type="button" class="btn icon" id="b-end" aria-label="Go to end" aria-keyshortcuts="End" title="Go to the end of the score (End)">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3h2v10h-2zM3 3v10l7-5z" fill="currentColor"/></svg>
+      </button>
+      <label class="speed">
+        <span>Speed</span>
+        <select id="speed">
+          <option value="0.25">0.25x</option>
+          <option value="0.5">0.5x</option>
+          <option value="1" selected>1x</option>
+          <option value="2">2x</option>
+          <option value="4">4x</option>
+        </select>
+      </label>
+      <span class="readout" id="readout" aria-live="off"></span>
+    </div>
+
+    <div class="timeline">
+      <div class="tl-head">
+        <h2 id="tl-h">Scrub the holorecord</h2>
+        <label class="zoom">
+          <span>View</span>
+          <select id="zoom">
+            <option value="0" selected>Whole run</option>
+            <option value="600">600 ticks</option>
+            <option value="120">120 ticks</option>
+          </select>
+        </label>
+      </div>
+      <canvas id="timeline" height="64" tabindex="0" role="slider" aria-labelledby="tl-h" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></canvas>
+      <p class="legend">
+        <span class="sw sw-green"></span>stored state
+        <span class="sw sw-load"></span>mid-load, not a restore point
+        <span class="sw sw-mark"></span>@mark
+        <span class="sw sw-empty"></span>not played yet
+      </p>
+      <p class="status line" id="stage-status" role="status"></p>
+    </div>
+  </section>
+
+  <section class="panel inspect" aria-labelledby="ins-h">
+    <h2 id="ins-h">Inspect the state</h2>
+    <dl class="kv">
+      <dt>Tick</dt><dd id="i-tick"></dd>
+      <dt>Virtual time</dt><dd id="i-vt"></dd>
+      <dt>Rate</dt><dd id="i-hz"></dd>
+      <dt>Area</dt><dd id="i-area"></dd>
+      <dt>Input</dt><dd id="i-in"></dd>
+      <dt>Score line</dt><dd id="i-line"></dd>
+      <dt>RNG state</dt><dd id="i-rng"></dd>
+      <dt>Draws this tick</dt><dd id="i-draws"></dd>
+      <dt>Events</dt><dd id="i-ev"></dd>
+      <dt>Door</dt><dd id="i-door"></dd>
+      <dt>Path search</dt><dd id="i-path"></dd>
+      <dt>Last message</dt><dd id="i-msg"></dd>
+      <dt>State hash</dt><dd id="i-hash" class="hash"></dd>
+      <dt>Hash chain</dt><dd id="i-chain" class="hash"></dd>
+    </dl>
+    <table class="ents">
+      <caption class="sr-only">Entities at this tick</caption>
+      <thead><tr><th scope="col">id</th><th scope="col">x</th><th scope="col">y</th><th scope="col">facing</th><th scope="col">hp</th><th scope="col">action</th></tr></thead>
+      <tbody id="i-ents"></tbody>
+    </table>
+
+    <h2 class="sub">Set the path budget</h2>
+    <div class="row">
+      <label class="field">
+        <span>Nodes per search</span>
+        <select id="budget">
+          <option value="8">8</option>
+          <option value="32" selected>32</option>
+          <option value="128">128</option>
+        </select>
+      </label>
+      <label class="check"><input type="checkbox" id="show-path" checked> <span>Show the search</span></label>
+    </div>
+    <p class="help">The thug plans a path in one tick and may expand only this many nodes. With a small budget it walks toward the best node it saw, so it can get stuck in the pocket. In the real game the budget is 10 ms of wall time. A busy machine searches less, and the path changes from run to run. Here it is a node count, so every run matches.</p>
+  </section>
+</main>
+
+<footer class="foot">
+  <p>Part of KPHarness by Kolto Labs. Not affiliated with Lucasfilm, Disney, BioWare, Obsidian or Aspyr.</p>
+</footer>
+<div class="tip" id="tip" role="tooltip" hidden></div>
+</body>
+</html>
