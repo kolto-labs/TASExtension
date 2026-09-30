@@ -9,7 +9,6 @@
  *                  mode=virtual|wall  hz=60  qpf_hz=10000000  uptime0_ms=3600000
  *                  initial_ft=<FILETIME, 100 ns since 1601, decimal>
  *   KPTAS_SESSION  Windows path of the session directory (log file). Optional.
- *   KPTAS_CONTEXT  "fiber" (default) or "inline".
  *   KPTAS_WATCHDOG seconds without a gate before the watchdog logs a stall.
  *                  0 or unset = off (the default; diagnostics only).
  *   KPTAS_WATCHDOG_CTX 1 = on a stall, suspend the main thread and log its
@@ -35,7 +34,7 @@ typedef int32_t i32;
 typedef int64_t i64;
 
 #define SHIM_NAME "kptas-shim"
-#define SHIM_VERSION "m1.0"
+#define SHIM_VERSION "m2.0"
 #define PROTO "kptas-wire/1"
 
 /* ---- K1 GOG 1.03 constants (contract section 2, verified by disassembly) ---- */
@@ -159,7 +158,7 @@ typedef struct {
     u64 extra;          /* budget-guard micro-advance within the tick */
     u64 last_u;
 } vclock_t;
-extern vclock_t g_clk;
+void clock_defaults(void);
 int clock_parse_env(const char *s);
 void clock_set_tick(u64 tick);
 u64 clock_u(void);
@@ -170,13 +169,15 @@ void clock_tick_reset(void);
 extern u32 g_guard_trips, g_guard_site_reads, g_guard_step_us;
 extern u32 g_guard_first_site;
 
-/* ---- threads.c ---- */
+/* ---- threads.c (slots, serial scheduler, virtual TLS and sync) ---- */
 void threads_install(void);
-void threads_join_pending(void);
+void threads_join_pending(void);        /* at the gate (harness context) */
 u32 vtid_current(void);
-extern u32 g_joins, g_hang_trips, g_workers_n;
+void threads_harness_wait_main(void);   /* harness loop: wait for the baton to come back */
+u32 threads_tls_main(u32 idx);          /* slot 0's virtual TLS value (journal) */
 extern u32 g_main_rtid;
 extern u32 g_hang_ms;
+extern u32 g_exe_stack_reserve;
 static inline u32 cur_rtid(void) {
     u32 v;
     __asm__ volatile("movl %%fs:0x24,%0" : "=r"(v));
@@ -194,7 +195,7 @@ typedef struct {
 } input_t;
 void di_stage(const input_t *in, int first_tick, u32 time_ms, u8 hash_out[16]);
 void di_set_cursor(int x, int y);
-extern int g_vcur_x, g_vcur_y;
+void di_init_objects(void);
 extern u32 g_di_reads_kbd, g_di_reads_mouse;
 
 /* ---- msg.c ---- */
@@ -218,13 +219,10 @@ typedef struct {
     u32 client_passes, server_passes, subticks, us_max_depth;
     u32 load_done;
 } gate_state_t;
-extern gate_state_t g_gate;
 extern volatile u32 g_client_count, g_server_count, g_us_count, g_us_depth, g_load_done_count;
 void gate_install(void);
 void gate_enter_from_game(void);
-void fiber_init(void);
 void entry_work(void);
-extern int g_use_fiber;
 extern volatile LONG g_last_gate_ms;
 
 /* ---- journal.c ---- */
@@ -253,3 +251,114 @@ extern HMODULE g_self;
 extern u32 g_watchdog_s, g_watchdog_ctx;
 extern u32 g_profile_ms;
 extern u32 g_present_every, g_presents, g_presents_skipped;
+
+/* ---- vmem.c: heap, VirtualAlloc and critical sections into the arena ---- */
+void vmem_install(void);
+extern u32 g_va_calls, g_va_reserved, g_heap_creates;
+
+/* ---- vhandle.c: virtual handles (files, finds, events, mutexes, threads) ---- */
+void vhandle_install(void);
+u32 vh_alloc(u8 type);
+void vh_free(u32 h);
+void vhandle_reconcile(void);          /* after a restore: close real handles T does not own */
+BOOL vhandle_close(HANDLE h, int *handled);
+
+/* ---- gl.c: GL virtual names ---- */
+void gl_install(void);
+void gl_log_resolved(void);
+extern u32 g_gl_retired;
+
+/* ---- state.c: kst glue (capture, scrub, restore) ---- */
+int state_init_early(void);
+void state_capture(u64 tick, const char *journal, u32 jlen);
+int state_restore(u64 tick, const u8 root[32], const char *winpath, buf_t *out);
+void state_stats_json(buf_t *b);
+void state_audit_json(buf_t *b);
+extern int g_capture_on;
+extern u8 g_root[32];
+extern int g_root_valid;
+
+/* ================================================================
+ * harness_game state of the shim (sim class 3): every harness value that is
+ * game-visible or journaled lives here, so a restore rewinds it with memory.
+ * It sits in the engine's harness_game region at a fixed address.
+ * ================================================================ */
+#include "../../state/kst_int.h"
+
+#define SHG_OFF 0x10000u
+#define SHG_MAGIC 0x4D485348u
+
+typedef struct { u32 ofs, data, ts, seq, app; } didod_t;
+#define QCAP 1024
+typedef struct {
+    void **vtbl;
+    LONG ref;
+    int kind;       /* 1 keyboard, 2 mouse */
+    u32 fmt_size;
+    didod_t q[QCAP];
+    u32 qh, qn;
+} didev_t;
+typedef struct { void **vtbl; LONG ref; } di_t;
+typedef struct { HWND h; UINT m; WPARAM w; LPARAM l; } posted_t;
+
+enum { W_RUNNING = 0, W_PARK_SUSPEND = 1, W_PARK_WAIT = 2, W_EXITED = 3 };
+typedef struct {
+    u32 used, vtid, vh, start, arg, suspend, state, wait_vh, exit_code, pending, cs_depth;
+    u32 stack, stack_size;
+    u32 tls[64];
+} vslot_t;
+
+enum { VH_FREE = 0, VH_FILE = 1, VH_FIND = 2, VH_EVENT = 3, VH_MUTEX = 4, VH_THREAD = 5 };
+typedef struct {
+    u8 type, manual, signaled, written;
+    u32 serial, access, share, flags, slot, find_n, exit_code;
+    u64 pos;
+    char path[264];
+} vh_t;
+#define NVH 512
+#define VH_BASE 0x00F00000u
+
+typedef struct { u32 vbase, n, rbase; } vrange_t;
+#define GL_TEXMAX 65536u
+#define GL_PROGMAX 4096u
+#define GL_BUFMAX 4096u
+
+typedef struct shim_hg {
+    u32 magic, version;
+    gate_state_t gate;
+    vclock_t clk;
+    u32 joins, hang_trips;
+    /* DirectInput objects and state */
+    di_t di;
+    didev_t kbd, mouse;
+    u8 keys[256];
+    u8 btn[4];
+    i32 acc_x, acc_y, acc_z;
+    u32 seq;
+    int vcur_x, vcur_y;
+    /* messages */
+    MSG synth[64];
+    u32 synth_h, synth_n;
+    posted_t posted[64];
+    u32 posted_n;
+    /* threads */
+    vslot_t slot[KST_MAX_SLOTS];
+    u32 nthreads, pending_any, main_cs_depth;
+    /* handles */
+    vh_t vh[NVH];
+    u32 vh_serial;
+    /* GL virtual names */
+    u32 gl_tex_next, gl_list_next, gl_prog_next, gl_ati_next, gl_buf_next;
+    u32 gl_listbase, gl_attr_sp;
+    u32 gl_attr_stack[32][2];
+    u32 nlist, nati;
+    vrange_t list[1024];
+    vrange_t ati[256];
+    u32 prog[GL_PROGMAX];
+    u32 buf[GL_BUFMAX];
+    u32 tex[GL_TEXMAX];
+} shim_hg;
+
+extern shim_hg *SH;
+#define g_gate (SH->gate)
+#define g_clk (SH->clk)

@@ -1,16 +1,22 @@
 #!/bin/sh
-# Build the M1 shim: build/dinput8.dll (x86-windows-gnu, freestanding, no CRT).
+# Build the shim: build/dinput8.dll (x86-windows-gnu, freestanding, no CRT),
+# with the kst savestate engine (../state) linked in statically.
 # Compile with the mingw headers, then link with -nostdlib so no CRT is pulled in.
 set -e
 Z="${Z:-$HOME/.local/share/kptas-zig/bin/python -m ziglang}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
+STATE="$HERE/../state"
 OUT="$HERE/build"
 OBJ="$OUT/obj"
 mkdir -p "$OBJ"
-CFLAGS="-target x86-windows-gnu -O2 -g0 -std=gnu11 -ffreestanding -fno-builtin -mno-stack-arg-probe \
+CFLAGS="-target x86-windows-gnu -O2 -g0 -std=gnu11 -ffreestanding -fno-builtin -msse2 -mno-stack-arg-probe \
  -fno-stack-protector -fno-asynchronous-unwind-tables -Wall -Wextra -Wno-unused-parameter -Wno-cast-function-type"
 OBJS=""
-for f in rt alloc hash json patch clock threads dinput msg gate journal wire main; do
+for f in kst_rt kst_hash kst_arena kst_capture kst_ctx kst_restore; do
+    $Z cc $CFLAGS -DKST_NO_CRT_HELPERS -c "$STATE/$f.c" -o "$OBJ/$f.o"
+    OBJS="$OBJS $OBJ/$f.o"
+done
+for f in rt alloc hash json patch clock threads vmem vhandle gl state dinput msg gate journal wire main; do
     $Z cc $CFLAGS -c "$HERE/src/$f.c" -o "$OBJ/$f.o"
     OBJS="$OBJS $OBJ/$f.o"
 done

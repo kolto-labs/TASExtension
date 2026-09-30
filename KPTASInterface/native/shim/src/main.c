@@ -97,28 +97,35 @@ static void attach(void) {
         slog("blake2s self-test failed: passive");
         return;
     }
+    if (!core_init(32u << 20)) {
+        slog("harness_core reserve failed: passive");
+        return;
+    }
+    /* the sim set: arena, harness_game and image_data, reserved before the CRT runs */
+    if (!state_init_early()) {
+        slog("state init failed: passive");
+        return;
+    }
     if (GetEnvironmentVariableA("KPTAS_CLOCK", tmp, sizeof tmp)) clock_parse_env(tmp);
     else clock_parse_env(0);
-    if (GetEnvironmentVariableA("KPTAS_CONTEXT", tmp, sizeof tmp) && k_streq(tmp, "inline")) g_use_fiber = 0;
     if (GetEnvironmentVariableA("KPTAS_WATCHDOG", tmp, sizeof tmp)) g_watchdog_s = (u32)k_parse_u64(tmp, 0);
     if (GetEnvironmentVariableA("KPTAS_WATCHDOG_CTX", tmp, sizeof tmp)) g_watchdog_ctx = (u32)k_parse_u64(tmp, 0);
     if (GetEnvironmentVariableA("KPTAS_HANG_MS", tmp, sizeof tmp)) g_hang_ms = (u32)k_parse_u64(tmp, 0);
     if (GetEnvironmentVariableA("KPTAS_PROFILE", tmp, sizeof tmp)) g_profile_ms = (u32)k_parse_u64(tmp, 0);
     if (GetEnvironmentVariableA("KPTAS_PRESENT", tmp, sizeof tmp))
         g_present_every = k_streq(tmp, "skip") ? 0 : k_streq(tmp, "draw") ? 1 : (u32)k_parse_u64(tmp, 0);
-    if (!core_init(32u << 20)) {
-        slog("harness_core reserve failed: passive");
-        return;
-    }
     g_active = 1;
     clock_install_exe();
     clock_install_module(GetModuleHandleA("mss32.dll"), "mss32:time");
     clock_install_module(GetModuleHandleA("binkw32.dll"), "binkw32:time");
     threads_install();
+    vmem_install();
+    vhandle_install();
+    gl_install();
     msg_install();
     gate_install();
-    slog("attach done: clock mode=%d hz=%u qpf=%u uptime0=%u context=%s hooks=%u",
-         g_clk.mode, g_clk.hz, (u32)g_clk.qpf, (u32)g_clk.uptime0_ms, g_use_fiber ? "fiber" : "inline", g_hooks_n);
+    slog("attach done: clock mode=%d hz=%u qpf=%u uptime0=%u hooks=%u",
+         g_clk.mode, g_clk.hz, (u32)g_clk.qpf, (u32)g_clk.uptime0_ms, g_hooks_n);
     slog("hooks: %s", g_hooks_list);
 }
 

@@ -80,25 +80,65 @@ static const char *apply_one(const rec_hdr *h, const u8 *data, kst_restore_stats
     return 0;
 }
 
-int kst_restore_records(const u8 *buf, u32 len, u64 target, const u8 expect_root[32], kst_restore_stats *st) {
-    memset(st, 0, sizeof *st);
-    st->target = target;
-    if (!K->in_gate) kst_fatal("restore outside the gate");
-    u64 t0 = kst_qpc();
+/* Apply the records in buf; returns the bytes consumed (whole records only). */
+static u32 apply_buf(const u8 *buf, u32 len, kst_restore_stats *st, int final) {
     u32 off = 0;
     const char *err = 0;
     while (off < len && !err) {
-        if (len - off < 40) { err = "truncated record header"; break; }
+        if (len - off < 40) { if (final) err = "truncated record header"; break; }
         const rec_hdr *h = (const rec_hdr *)(buf + off);
         if (h->magic[0] != 'S' || h->magic[1] != 'R') { err = "bad record magic"; break; }
         u32 size = 40 + ((h->dlen + 7) & ~7u);
-        if (size > len - off) { err = "truncated record data"; break; }
+        if (size > len - off) { if (final) err = "truncated record data"; break; }
         if (h->kind == KST_REC_PAGE) err = apply_one(h, buf + off + 40, st);
         else if (h->kind != KST_REC_JOURNAL && h->kind != KST_REC_TICK_END && h->kind != KST_REC_WRAP)
             err = "unknown record kind";
         off += size;
     }
     if (err) kst_fatal(err);   /* memory is partly written: never continue */
+    return off;
+}
+
+static int restore_finish(u64 target, const u8 expect_root[32], kst_restore_stats *st, u64 t0);
+
+int kst_restore_records(const u8 *buf, u32 len, u64 target, const u8 expect_root[32], kst_restore_stats *st) {
+    memset(st, 0, sizeof *st);
+    st->target = target;
+    if (!K->in_gate) kst_fatal("restore outside the gate");
+    u64 t0 = kst_qpc();
+    apply_buf(buf, len, st, 1);
+    return restore_finish(target, expect_root, st, t0);
+}
+
+/* Streaming variant: the set is read through a fixed 1 MiB buffer, so a large
+ * write set never needs one contiguous allocation in the 2 GB address space. */
+int kst_restore_file(const WCHAR *path, u64 target, const u8 expect_root[32], kst_restore_stats *st) {
+    memset(st, 0, sizeof *st);
+    st->target = target;
+    if (!K->in_gate) kst_fatal("restore outside the gate");
+    u64 t0 = kst_qpc();
+    HANDLE h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, 0, OPEN_EXISTING,
+                           FILE_ATTRIBUTE_NORMAL, 0);
+    if (h == INVALID_HANDLE_VALUE) return -1;
+    const u32 CAP = 1u << 20;
+    static u8 *buf;
+    if (!buf) buf = (u8 *)kst_core_alloc(CAP);
+    u32 have = 0;
+    for (;;) {
+        DWORD got = 0;
+        if (!ReadFile(h, buf + have, CAP - have, &got, 0)) { CloseHandle(h); kst_fatal("restore set read failed"); }
+        have += got;
+        int final = got == 0;
+        u32 used = apply_buf(buf, have, st, final);
+        memmove(buf, buf + used, have - used);
+        have -= used;
+        if (final) break;
+    }
+    CloseHandle(h);
+    return restore_finish(target, expect_root, st, t0);
+}
+
+static int restore_finish(u64 target, const u8 expect_root[32], kst_restore_stats *st, u64 t0) {
     /* image shadows follow the written bytes */
     for (u32 i = 0; i < K->nreg; i++) {
         region *r = &K->reg[i];
@@ -131,7 +171,7 @@ int kst_restore_records(const u8 *buf, u32 len, u64 target, const u8 expect_root
         K->mark_lo = KST_NONE;
         K->mark_hi = 0;
     }
-    kst__emit_close(target, KST_F_RESTORE_POINT);
+    kst__emit_close(target, KST_F_RESTORE_POINT | KST_F_RESTORE);
     kst__compute_root();
     st->root_ok = expect_root ? !memcmp(K->root, expect_root, 32) : 1;
     kst_audit(&st->audit);
@@ -142,11 +182,4 @@ int kst_restore_records(const u8 *buf, u32 len, u64 target, const u8 expect_root
                                                st->audit.prot_mismatch);
 }
 
-int kst_restore_file(const WCHAR *path, u64 target, const u8 expect_root[32], kst_restore_stats *st) {
-    u8 *buf;
-    u32 len;
-    if (!kst_read_file(path, &buf, &len)) kst_fatal("cannot read the restore set file");
-    int ok = kst_restore_records(buf, len, target, expect_root, st);
-    VirtualFree(buf, 0, MEM_RELEASE);
-    return ok;
-}
+

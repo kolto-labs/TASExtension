@@ -386,6 +386,20 @@ void kst__gate(void) {
     if (K->host.on_tick) K->host.on_tick(K->host.ud, t, K->root, &K->st);
 }
 
+/* Host-numbered capture (the shim owns the tick counter): capture the sim set
+ * as the state at the gate of `tick`. The first capture is a full sweep. */
+void kst_capture_tick(u64 tick, int sweep) {
+    kst_hg *hg = K->hg;
+    if (!K->captured_once) sweep = 1;
+    K->captured_once = 1;
+    hg->tick_cur = tick;
+    hg->tick_next = tick + 1;
+    capture(tick, sweep);
+    if (K->host.on_tick) K->host.on_tick(K->host.ud, tick, K->root, &K->st);
+}
+
+void kst_set_in_gate(int on) { K->in_gate = on; }
+
 u64 kst_tick(void) { return K->hg->tick_cur; }
 
 /* ---------------------------------------------------------------- audit (full sweep) */

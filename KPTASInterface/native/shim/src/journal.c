@@ -134,7 +134,7 @@ void journal_tick(buf_t *b, u8 digest_out[16]) {
 
     int ok = 1;
     u32 idx = rd32(ADDR_TLS_INDEX, &ok);
-    u32 ptd = (u32)(uintptr_t)TlsGetValue(idx);
+    u32 ptd = threads_tls_main(idx);   /* the main slot's virtual TLS (CRT _tiddata) */
     u32 holdrand = ptd ? rd32(ptd + 0x14, &ok) : 0;
     u32 exob = rd32(ADDR_EXOBASE, &ok);
     u32 crand = exob ? rd32(exob + 0x10, &ok) : 0;
@@ -146,10 +146,10 @@ void journal_tick(buf_t *b, u8 digest_out[16]) {
     b_str(b, "{\"cl\":"); b_u64(b, g_gate.client_passes);
     b_str(b, ",\"cxr\":\""); b_hex(b, cxr, 16);
     b_str(b, "\",\"data\":\""); b_hex(b, root, 16);
-    b_str(b, "\",\"hg\":"); b_u64(b, g_hang_trips);
+    b_str(b, "\",\"hg\":"); b_u64(b, SH->hang_trips);
     b_str(b, ",\"hr\":"); b_u64(b, holdrand);
     b_str(b, ",\"in\":\""); b_hex(b, g_input_hash, 16);
-    b_str(b, "\",\"joins\":"); b_u64(b, g_joins);
+    b_str(b, "\",\"joins\":"); b_u64(b, SH->joins);
     msg_tick_digest(d);
     b_str(b, ",\"msg\":{\"d\":\""); b_hex(b, d, 16);
     b_str(b, "\",\"n\":"); b_u64(b, g_msg_int_n);

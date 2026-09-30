@@ -15,30 +15,20 @@
 #define DIERR_OBJECTNOTFOUND ((HRESULT)0x80070002u)
 #define DIGDD_PEEK 1
 
-typedef struct { u32 ofs, data, ts, seq, app; } didod_t;
-#define QCAP 1024
-
-typedef struct {
-    void **vtbl;
-    LONG ref;
-    int kind;       /* 1 keyboard, 2 mouse */
-    u32 fmt_size;
-    didod_t q[QCAP];
-    u32 qh, qn;
-} didev_t;
-
-typedef struct {
-    void **vtbl;
-    LONG ref;
-} di_t;
-
-static didev_t g_kbd, g_mouse;
-static di_t g_di;
-static u8 g_keys[256];
-static u8 g_btn[4];
-static i32 g_acc_x, g_acc_y, g_acc_z;
-static u32 g_seq;
-int g_vcur_x = 400, g_vcur_y = 300;
+/* The device objects and every input state value live in harness_game
+ * (shim_hg): the game holds pointers to the objects and sees their reference
+ * counts, queue contents and sequence numbers, so a restore rewinds them. */
+#define g_kbd (SH->kbd)
+#define g_mouse (SH->mouse)
+#define g_di (SH->di)
+#define g_keys (SH->keys)
+#define g_btn (SH->btn)
+#define g_acc_x (SH->acc_x)
+#define g_acc_y (SH->acc_y)
+#define g_acc_z (SH->acc_z)
+#define g_seq (SH->seq)
+#define g_vcur_x (SH->vcur_x)
+#define g_vcur_y (SH->vcur_y)
 u32 g_di_reads_kbd, g_di_reads_mouse;
 
 static void q_push(didev_t *d, u32 ofs, u32 data, u32 ts) {
@@ -220,13 +210,17 @@ static void *g_dev_vtbl[] = {
     (void *)dv_SetActionMap, (void *)dv_GetImageInfo,
 };
 
-HRESULT di_create(void **out) {
+void di_init_objects(void) {
     g_di.vtbl = g_di_vtbl;
-    g_di.ref = 1;
+    g_di.ref = 0;
     g_kbd.vtbl = g_dev_vtbl;
     g_kbd.kind = 1;
     g_mouse.vtbl = g_dev_vtbl;
     g_mouse.kind = 2;
+}
+
+HRESULT di_create(void **out) {
+    g_di.ref = 1;
     *out = &g_di;
     slog("DirectInput8Create -> virtual IDirectInput8A");
     return DI_OK;

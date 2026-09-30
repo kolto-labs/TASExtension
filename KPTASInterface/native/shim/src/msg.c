@@ -23,10 +23,13 @@ static ATOM (WINAPI *r_RegisterClassA)(const WNDCLASSA *);
 static BOOL (WINAPI *r_PostMessageA)(HWND, UINT, WPARAM, LPARAM);
 static BOOL (WINAPI *r_GetMessageA)(LPMSG, HWND, UINT, UINT);
 
-/* Messages the game posted itself; matched and passed through by the gate pump. */
-typedef struct { HWND h; UINT m; WPARAM w; LPARAM l; } posted_t;
-static posted_t g_posted[64];
-static u32 g_posted_n;
+/* Messages the game posted itself; matched and passed through by the gate pump.
+ * The list and the synthesized score queue live in harness_game (shim_hg). */
+#define g_posted (SH->posted)
+#define g_posted_n (SH->posted_n)
+#define g_synth (SH->synth)
+#define g_synth_h (SH->synth_h)
+#define g_synth_n (SH->synth_n)
 
 void msg_tick_reset(void) {
     blake2s_init(&g_msg_h, 16);
@@ -104,8 +107,6 @@ static BOOL WINAPI hk_PostMessageA(HWND h, UINT m, WPARAM w, LPARAM l) {
 /* Synthesized score messages (contract 5.3 step 8): the gate PeekMessageA
  * returns the head without removing it, and WinMain's GetMessageA serves
  * the same message, which DispatchMessageA hands to the game WndProc. */
-static MSG g_synth[64];
-static u32 g_synth_h, g_synth_n;
 
 void msg_synth_push(UINT m, WPARAM w, LPARAM l) {
     if (g_synth_n >= 64) return;

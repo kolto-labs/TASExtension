@@ -126,7 +126,9 @@ void kst__arena_init(void) {
         GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlCreateHeap");
 }
 
-int kst_init(const kst_config *cfg, const kst_host *host) {
+/* Split init for hosts that must reserve the sim set early (a proxy DLL's
+ * DllMain) and start threads and the ring later (outside the loader lock). */
+int kst_init_mem(const kst_config *cfg, const kst_host *host) {
     K = &k_core;
     K->cfg = *cfg;
     if (host) K->host = *host;
@@ -138,12 +140,30 @@ int kst_init(const kst_config *cfg, const kst_host *host) {
     if (!K->cfg.nslots) K->cfg.nslots = 4;
     if (K->cfg.nslots > KST_MAX_SLOTS) K->cfg.nslots = KST_MAX_SLOTS;
     if (!K->cfg.main_stack) K->cfg.main_stack = 1u << 20;
-    K->jcap = 64 * 1024;
+    K->jcap = 256 * 1024;
     K->jbuf = (u8 *)kst_core_alloc(K->jcap);
     kst__arena_init();
+    kst_b2s_init(&K->batch, 16);
+    return 1;
+}
+
+int kst_init_threads(void) {
+    kst__threads_init();
+    return 1;
+}
+
+int kst_ring_attach(const WCHAR *path, u32 mb) {
+    if (K->ring_base) return 1;
+    K->cfg.ring_path = path;
+    if (mb) K->cfg.ring_mb = mb;
+    kst__ring_open();
+    return K->ring_base != 0;
+}
+
+int kst_init(const kst_config *cfg, const kst_host *host) {
+    kst_init_mem(cfg, host);
     kst__ring_open();
     kst__threads_init();
-    kst_b2s_init(&K->batch, 16);
     return 1;
 }
 

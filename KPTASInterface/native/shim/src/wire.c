@@ -3,8 +3,15 @@
  * read on the harness fiber: before start, and at the gate. The game is never
  * blocked outside the gate.
  *
- * M1 verbs: hello, tier.lock, clock, subscribe, start, step, input, wait,
- * digest, mem.read, semantic.read, gate, bye (and quit). Others: unsupported. */
+ * Verbs: hello, tier.lock, clock, subscribe, ring.attach, capture, start,
+ * step, input, wait, digest, mem.read, semantic.read, gate, restore, verify,
+ * stats, bye (and quit). Others: unsupported.
+ *
+ * Tiers: an unlocked session behaves like tas. Verbs whose verbclass writes
+ * game state outside the game's own recorded states (mem.write,
+ * semantic.apply) are refused unless tier.lock chose lab. restore rewinds to
+ * one of the game's own recorded states (verbclass restore) and is allowed in
+ * tas. */
 #include "shim.h"
 
 int g_wire_ok;
@@ -155,9 +162,14 @@ static void step_report(buf_t *b, int waited) {
     if (g_events_step & 1) b_str(b, "\"load.done\"");
     b_str(b, "],\"journal\":\"");
     b_hex(b, g_last_jdig, 16);
-    b_str(b, "\",\"outcome\":\"alive\",\"reason\":1,\"restore_point\":false,\"server_passes\":");
+    b_str(b, "\",\"outcome\":\"alive\",\"reason\":1,\"restore_point\":");
+    b_str(b, (g_capture_on && g_root_valid) ? "true" : "false");
+    b_str(b, ",\"server_passes\":");
     b_u64(b, g_gate.server_passes);
-    b_str(b, ",\"state_root\":null,\"subticks\":");
+    b_str(b, ",\"state_root\":");
+    if (g_capture_on && g_root_valid) { b_ch(b, '"'); b_hex(b, g_root, 32); b_ch(b, '"'); }
+    else b_str(b, "null");
+    b_str(b, ",\"subticks\":");
     b_u64(b, g_gate.subticks);
     b_str(b, ",\"tick\":");
     b_u64(b, g_gate.tick);
@@ -226,9 +238,9 @@ static void do_hello(i64 id) {
     static char mods[4096];
     modules_now(mods, sizeof mods);
     reply_begin(&b, id);
-    b_str(&b, "{\"build\":\"k1_gog_103\",\"caps\":{\"capture\":false,\"clock\":[\"virtual\"],\"context\":");
-    b_jstr(&b, g_use_fiber ? "fiber" : "inline");
-    b_str(&b, ",\"dinput\":\"virtual_device\",\"messages\":\"interpose\",\"restore\":false,\"threads\":\"join\"}");
+    b_str(&b, "{\"build\":\"k1_gog_103\",\"caps\":{\"capture\":true,\"clock\":[\"virtual\"],\"context\":\"fiber\"");
+    b_str(&b, ",\"dinput\":\"virtual_device\",\"gl_names\":\"virtual\",\"handles\":\"virtual\",\"heap\":\"arena\"");
+    b_str(&b, ",\"messages\":\"interpose\",\"restore\":true,\"threads\":\"slots_serial\"}");
     b_str(&b, ",\"epoch\":1,\"exe_sha256\":\"");
     if (ok2) b_hex(&b, exe_sha, 32);
     b_str(&b, "\",\"hooks\":");
@@ -346,6 +358,44 @@ static void do_memread(i64 id, jnode *args) {
     g_verbclass_tick |= VC_READ;
 }
 
+static int b64v(char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+/* mem.write (lab only, see verb_allowed): raw bytes at addr. */
+static void do_memwrite(i64 id, jnode *args) {
+    static u8 data[65536];
+    u64 a = (u64)jint(jget(args, "addr"), 0);
+    const char *s = jstr(jget(args, "data_b64"), "");
+    u32 n = 0, acc = 0, bits = 0;
+    for (; *s && *s != '='; s++) {
+        int v = b64v(*s);
+        if (v < 0) { reply_err(id, "bad_args", "data_b64"); return; }
+        acc = (acc << 6) | (u32)v;
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            if (n >= sizeof data) { reply_err(id, "bad_args", "more than 65536 bytes"); return; }
+            data[n++] = (u8)(acc >> bits);
+        }
+    }
+    if (!a || !n) { reply_err(id, "bad_args", "addr and data_b64"); return; }
+    if (IsBadWritePtr((void *)(uintptr_t)a, n)) { reply_err(id, "bad_args", "unwritable range"); return; }
+    memcpy((void *)(uintptr_t)a, data, n);
+    slog("mem.write %x+%u (lab)", (u32)a, n);
+    buf_t b;
+    reply_begin(&b, id);
+    b_str(&b, "{\"written\":");
+    b_u64(&b, n);
+    b_ch(&b, '}');
+    reply_end(&b);
+}
+
 static int event_fired(void) {
     if (k_streq(g_wait_event, "load.done")) return g_load_done_count != g_wait_base;
     if (k_streq(g_wait_event, "tick")) return 0;
@@ -354,8 +404,11 @@ static int event_fired(void) {
 
 /* ---- dispatch ---- */
 static int verb_allowed(const char *v) {
-    if (!g_tier_locked || !k_streq(g_tier, "tas")) return 1;
-    return !(k_streq(v, "mem.write") || k_streq(v, "semantic.apply"));
+    /* writes outside the game's own recorded states need an explicit lab lock;
+     * an unlocked session behaves like tas */
+    if (k_streq(v, "mem.write") || k_streq(v, "semantic.apply"))
+        return g_tier_locked && k_streq(g_tier, "lab");
+    return 1;
 }
 
 static void handle(char *line, u32 len, int phase) {
@@ -376,7 +429,9 @@ static void handle(char *line, u32 len, int phase) {
         memcpy(g_tier, t, strlen(t) + 1);
         g_tier_locked = 1;
         reply_begin(&b, id);
-        b_str(&b, "{\"allow\":[\"hello\",\"tier.lock\",\"clock\",\"subscribe\",\"start\",\"step\",\"input\",\"wait\",\"digest\",\"mem.read\",\"semantic.read\",\"gate\",\"bye\"],\"tier\":");
+        b_str(&b, "{\"allow\":[\"hello\",\"tier.lock\",\"clock\",\"subscribe\",\"ring.attach\",\"capture\",\"start\",\"step\",\"input\",\"wait\",\"digest\",\"mem.read\",\"semantic.read\",\"gate\",\"restore\",\"verify\",\"stats\",\"bye\"");
+        if (k_streq(t, "lab")) b_str(&b, ",\"mem.write\",\"semantic.apply\"");
+        b_str(&b, "],\"tier\":");
         b_jstr(&b, g_tier);
         b_ch(&b, '}');
         reply_end(&b);
@@ -446,7 +501,7 @@ static void handle(char *line, u32 len, int phase) {
         if (phase != 1) { reply_err(id, "state", "step and wait run at the gate after start"); return; }
         parse_input(args, &g_input);
         set_note(args);
-        g_first_tick = 1;
+        g_first_tick = jget(args, "first") ? (jget(args, "first")->type == J_BOOL ? (int)jget(args, "first")->num : 1) : 1;
         g_events_step = 0;
         g_verbclass_acc = 0;
         if (k_streq(verb, "step")) {
@@ -483,8 +538,72 @@ static void handle(char *line, u32 len, int phase) {
         reply_end(&b);
         return;
     }
+    if (k_streq(verb, "ring.attach")) {
+        const char *path = jstr(jget(args, "path"), "");
+        i64 mb = jint(jget(args, "mb"), 0);
+        static WCHAR wpath[520];
+        if (!*path || MultiByteToWideChar(CP_ACP, 0, path, -1, wpath, 520) <= 0) { reply_err(id, "bad_args", "path"); return; }
+        if (!kst_ring_attach(wpath, (u32)mb)) { reply_err(id, "internal", "ring attach failed"); return; }
+        reply_begin(&b, id);
+        b_str(&b, "{\"capacity\":");
+        b_u64(&b, K->ring_cap);
+        b_str(&b, ",\"write_pos\":");
+        b_u64(&b, K->ring_wpos);
+        b_ch(&b, '}');
+        reply_end(&b);
+        return;
+    }
+    if (k_streq(verb, "capture")) {
+        if (g_gate.started) { reply_err(id, "state", "capture must be set before start"); return; }
+        jnode *en = jget(args, "enabled");
+        g_capture_on = en ? (int)en->num : 1;
+        reply_begin(&b, id);
+        b_str(&b, "{\"classes\":[{\"name\":\"game_arena\",\"ranges\":[[\"0x31000000\",\"0x71000000\"]]},");
+        b_str(&b, "{\"name\":\"image_data\",\"ranges\":[[\"0x0078d000\",\"0x00836000\"]]},");
+        b_str(&b, "{\"name\":\"harness_game\",\"ranges\":[[\"0x0e000000\",\"0x0e400000\"]]}],\"enabled\":");
+        b_str(&b, g_capture_on ? "true" : "false");
+        b_str(&b, ",\"ring\":");
+        b_str(&b, kst_ring_attached() ? "true" : "false");
+        b_ch(&b, '}');
+        reply_end(&b);
+        return;
+    }
+    if (k_streq(verb, "restore")) {
+        if (phase != 1) { reply_err(id, "state", "restore runs at the gate after start"); return; }
+        if (!g_capture_on) { reply_err(id, "state", "capture is off"); return; }
+        i64 t = jint(jget(args, "tick"), -1);
+        const char *rh = jstr(jget(args, "root"), "");
+        const char *path = jstr(jget(args, "path"), "");
+        u8 root[32];
+        if (t < 0 || strlen(rh) != 64 || !*path) { reply_err(id, "bad_args", "tick, root (64 hex) and path"); return; }
+        for (int i = 0; i < 32; i++) {
+            u32 v = 0;
+            for (int j = 0; j < 2; j++) {
+                char c = rh[i * 2 + j];
+                v = (v << 4) | (u32)(c >= 'a' ? c - 'a' + 10 : c >= 'A' ? c - 'A' + 10 : c - '0');
+            }
+            root[i] = (u8)v;
+        }
+        buf_t rb;
+        static char rbuf[4096];
+        b_init(&rb, rbuf, sizeof rbuf);
+        int ok = state_restore((u64)t, root, path, &rb);
+        b_term(&rb);
+        reply_begin(&b, id);
+        b_raw(&b, rb.p, rb.n);
+        reply_end(&b);
+        if (ok) g_verbclass_tick |= VC_CAPTURE;
+        return;
+    }
+    if (k_streq(verb, "verify") || k_streq(verb, "stats")) {
+        reply_begin(&b, id);
+        state_audit_json(&b);
+        reply_end(&b);
+        return;
+    }
     if (k_streq(verb, "digest")) { do_digest(id, args); return; }
     if (k_streq(verb, "mem.read")) { do_memread(id, args); return; }
+    if (k_streq(verb, "mem.write")) { do_memwrite(id, args); return; }
     if (k_streq(verb, "semantic.read")) {
         buf_t j;
         u8 d[16];
@@ -565,6 +684,7 @@ void wire_gate_hook(void) {
     QueryPerformanceCounter(&t1);
     u32 jr_us = (u32)((t1.QuadPart - t0.QuadPart) * 1000000 / g_qpf_real.QuadPart);
     b_term(&j);
+    state_capture(g_gate.tick, j.p, j.n);
     g_verbclass_acc |= g_verbclass_tick;
     if (g_load_done_count != g_last_load_done) { g_events_step |= 1; g_last_load_done = g_load_done_count; }
 
@@ -583,6 +703,12 @@ void wire_gate_hook(void) {
             b_str(&b, ",\"trip_site\":\"");
             b_hexu32(&b, g_guard_first_site);
             b_ch(&b, '"');
+        }
+        if (g_capture_on && g_root_valid) {
+            b_str(&b, ",\"root\":\"");
+            b_hex(&b, g_root, 32);
+            b_str(&b, "\",\"cap\":");
+            state_stats_json(&b);
         }
         b_str(&b, ",\"entry\":");
         b_raw(&b, j.p, j.n);

@@ -58,6 +58,37 @@ __attribute__((naked)) void kst_switch(kst_ctx *save, kst_ctx *load) {
 
 static void thread_exit(void);
 
+/* Public slot setup for hosts with their own entry trampolines: the slot's first
+ * switch-in "returns" into entry(arg) (cdecl) on the given stack. */
+void kst_slot_init(u32 k, void *stack, u32 size, void (*entry)(void *), void *arg, u32 state) {
+    hg_slot *s = &K->hg->slot[k];
+    u32 hi = ((u32)stack + size) & ~15u, lo = (u32)stack;
+    u32 *sp = (u32 *)(hi - 16);
+    *--sp = (u32)arg;                   /* entry's argument */
+    *--sp = 0;                          /* entry's return address (entry never returns) */
+    *--sp = (u32)entry;                 /* ret */
+    *--sp = 0;                          /* ebp */
+    *--sp = 0;                          /* ebx */
+    *--sp = 0;                          /* esi */
+    *--sp = 0;                          /* edi */
+    *--sp = 0x202;                      /* eflags */
+    *--sp = 0x1F80;                     /* mxcsr */
+    *--sp = 0x027F;                     /* x87 control word */
+    s->ctx.esp = (u32)sp;
+    s->ctx.seh = 0xFFFFFFFFu;
+    s->ctx.stack_base = hi;
+    s->ctx.stack_limit = lo;
+    s->ctx.dealloc = lo;
+    s->ctx.last_error = 0;
+    s->entry = (u32)entry;
+    s->arg = (u32)arg;
+    s->stack_lo = lo;
+    s->stack_hi = (u32)stack + size;
+    s->wait_ev = KST_NONE;
+    s->vtid = 0;
+    s->state = state;
+}
+
 /* First code a slot runs on its arena stack. */
 static void __cdecl slot_trampoline(void) {
     hg_slot *s = &K->hg->slot[K->cur];

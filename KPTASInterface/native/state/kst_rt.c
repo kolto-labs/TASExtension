@@ -1,5 +1,9 @@
-/* Freestanding runtime for kst: mem*, 64-bit division, text buffers, output, files. */
+/* Freestanding runtime for kst: mem*, 64-bit division, text buffers, output, files.
+ * Build with -DKST_NO_CRT_HELPERS when the host (the shim) already defines mem* and
+ * the 64-bit division helpers. */
 #include "kst.h"
+
+#ifndef KST_NO_CRT_HELPERS
 
 void *memcpy(void *d, const void *s, unsigned int n) {
     u8 *dp = (u8 *)d;
@@ -78,6 +82,8 @@ i64 __moddi3(i64 a, i64 b) {
     return a < 0 ? -(i64)r : (i64)r;
 }
 
+#endif /* KST_NO_CRT_HELPERS */
+
 u32 kst_strlen(const char *s) { u32 n = 0; while (s[n]) n++; return n; }
 
 void kb_init(kst_buf *b, char *mem, u32 cap) { b->p = mem; b->n = 0; b->cap = cap; }
@@ -108,10 +114,20 @@ static void write_handle(DWORD which, const char *s, u32 n) {
     DWORD w;
     if (h && h != INVALID_HANDLE_VALUE) WriteFile(h, s, n, &w, 0);
 }
-void kst_out(const char *s, u32 n) { write_handle(STD_OUTPUT_HANDLE, s, n); }
+KST_CORE static void (*g_outfn)(const char *, u32);
+void kst_set_out(void (*fn)(const char *, u32)) { g_outfn = fn; }
+void kst_out(const char *s, u32 n) {
+    if (g_outfn) { g_outfn(s, n); return; }
+    write_handle(STD_OUTPUT_HANDLE, s, n);
+}
 void kst_outs(const char *s) { kst_out(s, kst_strlen(s)); }
 
 void kst_fatal(const char *msg) {
+    if (g_outfn) {
+        g_outfn("kst fatal: ", 11);
+        g_outfn(msg, kst_strlen(msg));
+        g_outfn("\n", 1);
+    }
     write_handle(STD_ERROR_HANDLE, "kst fatal: ", 11);
     write_handle(STD_ERROR_HANDLE, msg, kst_strlen(msg));
     write_handle(STD_ERROR_HANDLE, "\n", 1);

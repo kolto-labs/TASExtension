@@ -76,6 +76,7 @@ typedef struct kst_core {
     volatile u32 cur, next, shutdown;
     volatile u32 reason[KST_MAX_SLOTS];
     int in_gate;
+    int captured_once;
     kst_tick_stats st;
     PVOID (WINAPI *RtlCreateHeap)(ULONG, PVOID, SIZE_T, SIZE_T, PVOID, PVOID);
     u32 heap_cs_off, heap_list_off;   /* arena heap lock and list entry offsets (diagnostics) */

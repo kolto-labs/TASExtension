@@ -7,7 +7,8 @@
  * Live from DllMain: the CRT cookie and the startup srand seed read it. */
 #include "shim.h"
 
-vclock_t g_clk = {0, 60, 10000000ull, 3600000ull, 0, 0, 0, 0, 0, 0};
+/* g_clk is SH->clk (harness_game): a restore rewinds the clock with memory,
+ * including last_u, the monotonic clamp. */
 u32 g_guard_trips, g_guard_site_reads = 100000, g_guard_step_us = 1, g_guard_first_site;
 
 /* 2004-02-12T00:00:00Z as FILETIME */
@@ -19,6 +20,14 @@ static DWORD (WINAPI *r_GTC)(void);
 static void (WINAPI *r_GSTAFT)(LPFILETIME);
 static void (WINAPI *r_Sleep)(DWORD);
 static FARPROC (WINAPI *r_GetProcAddress)(HMODULE, LPCSTR);
+
+void clock_defaults(void) {
+    memset(&g_clk, 0, sizeof g_clk);
+    g_clk.mode = 0;
+    g_clk.hz = 60;
+    g_clk.qpf = 10000000ull;
+    g_clk.uptime0_ms = 3600000ull;
+}
 
 int clock_parse_env(const char *s) {
     g_clk.initial_ft = DEFAULT_FT;

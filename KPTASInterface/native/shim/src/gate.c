@@ -1,28 +1,29 @@
-/* Tick gate (contract 5.2, 5.3) and the harness fiber.
+/* Tick gate (contract 5.2, 5.3), the main slot on an arena stack, and the
+ * harness loop.
  *
  * The gate is the exe's PeekMessageA IAT hook. It fires when the return
  * address is WinMain's loop-head call site (0x404592, returning to 0x404598)
  * and UpdateScreen depth is 0. Every other exe PeekMessageA returns FALSE.
- * Tick n closes at gate n: journal, wire, then V(n+1) and the input for
- * tick n+1 are staged and the game is released.
+ * Tick n closes at gate n: journal, capture, wire, then V(n+1) and the input
+ * for tick n+1 are staged and the game is released.
+ *
+ * M2: at the exe entry the process main thread becomes the harness. The CRT
+ * and WinMain run as slot 0 on an arena stack whose context record lives in
+ * harness_game, and the gate switches with that record (kst_switch). After a
+ * restore the switch back loads T's record, so the main slot resumes where it
+ * was at T. The Wine main stack is slot 0's harness stack.
  *
  * Counters come from detours: client MainLoop 0x602eb0 (one per tick),
  * server MainLoop 0x4babb0, UpdateScreen 0x401c10 (depth, via a
  * return-address swap), LoadModuleFinish 0x4c5880 (exit count), rand
- * 0x6fc447 and srand 0x6fc43a (draws per call site).
- *
- * The harness fiber is the M0 context switch (esi, edi, ebx, ebp, esp, x87
- * CW, MXCSR, and TEB fs:[0], [4], [8], [0xE0C]). Pre-start wire traffic and
- * all gate work run on it, so the game stack is not touched by harness code. */
+ * 0x6fc447 and srand 0x6fc43a (draws per call site). */
 #include "shim.h"
 
-gate_state_t g_gate;
 volatile u32 g_client_count, g_server_count, g_us_count, g_us_depth, g_load_done_count;
 u32 g_us_shadow[256];
 u32 g_us_sp;
 u32 g_lf_ret;
 void *t_client, *t_server, *t_us, *t_lf, *t_rand, *t_srand, *t_entry;
-int g_use_fiber = 1;
 volatile LONG g_last_gate_ms;
 volatile LONG g_in_gate;
 
@@ -104,67 +105,6 @@ __attribute__((naked, used)) void st_entry(void) {
                      "jmp *_t_entry\n\t");
 }
 
-/* ---- fiber ---- */
-typedef struct { void *sp; u32 exc, base, limit, dealloc; } fctx_t;
-static fctx_t g_fgame, g_fharn;
-
-static inline u32 rdfs(u32 off) { u32 v; __asm__ volatile("movl %%fs:(%1),%0" : "=r"(v) : "r"(off)); return v; }
-static inline void wrfs(u32 off, u32 v) { __asm__ volatile("movl %0,%%fs:(%1)" ::"r"(v), "r"(off) : "memory"); }
-
-__attribute__((naked)) static void ctx_switch(void **save_sp, void *load_sp) {
-    __asm__ volatile("movl 4(%esp), %eax\n\t"
-                     "movl 8(%esp), %edx\n\t"
-                     "pushl %ebp\n\t pushl %ebx\n\t pushl %esi\n\t pushl %edi\n\t"
-                     "subl $8, %esp\n\t"
-                     "fnstcw (%esp)\n\t"
-                     "stmxcsr 4(%esp)\n\t"
-                     "movl %esp, (%eax)\n\t"
-                     "movl %edx, %esp\n\t"
-                     "ldmxcsr 4(%esp)\n\t"
-                     "fldcw (%esp)\n\t"
-                     "addl $8, %esp\n\t"
-                     "popl %edi\n\t popl %esi\n\t popl %ebx\n\t popl %ebp\n\t"
-                     "ret\n\t");
-}
-
-static void fiber_switch(fctx_t *from, fctx_t *to) {
-    from->exc = rdfs(0x00); from->base = rdfs(0x04); from->limit = rdfs(0x08); from->dealloc = rdfs(0xE0C);
-    wrfs(0x00, to->exc); wrfs(0x04, to->base); wrfs(0x08, to->limit); wrfs(0xE0C, to->dealloc);
-    ctx_switch(&from->sp, to->sp);
-}
-
-static void gate_body(void);
-
-static void harness_main(void) {
-    wire_service(0);           /* hello .. start */
-    fiber_switch(&g_fharn, &g_fgame);
-    for (;;) {
-        gate_body();
-        fiber_switch(&g_fharn, &g_fgame);
-    }
-}
-
-void fiber_init(void) {
-    u32 size = 1u << 20;
-    u8 *stk = (u8 *)core_alloc(size);
-    u32 top = ((u32)(uintptr_t)stk + size) & ~15u;
-    u32 *sp = (u32 *)(uintptr_t)top;
-    u16 cw;
-    u32 mx;
-    __asm__ volatile("fnstcw %0" : "=m"(cw));
-    __asm__ volatile("stmxcsr %0" : "=m"(mx));
-    *--sp = 0;                                   /* harness_main's return slot (never used) */
-    *--sp = (u32)(uintptr_t)harness_main;        /* ret target */
-    *--sp = 0; *--sp = 0; *--sp = 0; *--sp = 0;  /* ebp ebx esi edi */
-    *--sp = mx;
-    *--sp = cw;
-    g_fharn.sp = sp;
-    g_fharn.exc = 0xffffffffu;
-    g_fharn.base = (u32)(uintptr_t)stk + size;
-    g_fharn.limit = (u32)(uintptr_t)stk;
-    g_fharn.dealloc = (u32)(uintptr_t)stk;
-}
-
 /* ---- watchdog (diagnostics only; reads the main thread context on a stall) ---- */
 u32 g_profile_ms;
 
@@ -236,29 +176,67 @@ static DWORD WINAPI watchdog(LPVOID arg) {
     }
 }
 
-/* Runs once at the exe entry point, before CRT startup, outside the loader lock. */
+/* ---- entry and harness loop ---- */
+static void gate_body(void);
+
+/* Slot 0's first code on its arena stack: the original entry (CRT startup). */
+static void main_slot_entry(void *arg) {
+    (void)arg;
+    ((void (*)(void))t_entry)();
+    slog("CRT entry returned");
+    TerminateProcess(GetCurrentProcess(), 0);
+}
+
+static void harness_loop(void) {
+    for (;;) {
+        K->cur = 0;
+        K->reason[0] = R_NONE;
+        kst_switch(&K->hctx[0], &K->hg->slot[0].ctx);
+        u32 r = K->reason[0];
+        if (r == R_GATE) gate_body();
+        else if (r == R_HANDOFF) {
+            SetEvent(K->real_ev[K->next]);
+            threads_harness_wait_main();
+        } else {
+            slog("main slot switched out without a reason (%u)", r);
+            TerminateProcess(GetCurrentProcess(), 4);
+        }
+    }
+}
+
+/* Runs once at the exe entry point, before CRT startup, outside the loader
+ * lock, on the Wine main stack. When active it never returns: the Wine main
+ * stack becomes the harness loop. */
 void entry_work(void) {
     if (!g_active) return;
     g_last_gate_ms = (LONG)GetTickCount();
-    fiber_init();
+    kst_init_threads();
+    u32 size = g_exe_stack_reserve;
+    void *stk = kst_valloc(size);
+    kst_slot_init(0, stk, size, main_slot_entry, 0, KST_SLOT_RUNNING);
+    SH->slot[0].stack = (u32)(uintptr_t)stk;
+    SH->slot[0].stack_size = size;
+    slog("entry: main slot stack %x+%x, %u slot threads", (u32)(uintptr_t)stk, size, KST_MAX_SLOTS - 1);
     if (g_watchdog_s || g_profile_ms) {
         HANDLE mt = (g_watchdog_ctx || g_profile_ms)
                         ? OpenThread(THREAD_SUSPEND_RESUME | THREAD_GET_CONTEXT, FALSE, g_main_rtid) : NULL;
         CloseHandle(CreateThread(NULL, 65536, watchdog, mt, 0, NULL));
     }
-    if (g_use_fiber) fiber_switch(&g_fgame, &g_fharn);
-    else wire_service(0);
-    slog("entry: released to CRT (started=%d)", g_gate.started);
+    wire_service(0);          /* hello .. start, on the harness stack */
+    slog("entry: released to CRT on the arena stack (started=%d)", g_gate.started);
+    harness_loop();
 }
 
 /* ---- gate ---- */
 static void gate_body(void) {
     g_in_gate = 1;
+    kst_set_in_gate(1);
     threads_join_pending();
     msg_gate_pump();
     g_gate.client_passes = g_client_count;
     g_gate.server_passes = g_server_count;
     g_gate.subticks = g_us_count;
+    if (g_gate.tick == 0 || g_gate.tick == 300) gl_log_resolved();
     wire_gate_hook();       /* journal, pushes, replies, then serve requests until released */
     /* release into tick n+1 */
     g_gate.tick++;
@@ -268,6 +246,7 @@ static void gate_body(void) {
     msg_tick_reset();
     g_client_count = g_server_count = g_us_count = 0;
     g_last_gate_ms = (LONG)GetTickCount();
+    kst_set_in_gate(0);
     g_in_gate = 0;
 }
 
@@ -275,11 +254,12 @@ static int g_serving_synth;
 
 static BOOL WINAPI hk_PeekMessageA(LPMSG m, HWND h, UINT a, UINT b, UINT r) {
     u32 ret = (u32)(uintptr_t)__builtin_return_address(0);
-    if (ret == GATE_RET && g_us_depth == 0 && g_gate.started && cur_rtid() == g_main_rtid) {
+    if (ret == GATE_RET && g_us_depth == 0 && g_gate.started && cur_rtid() == g_main_rtid && K->cur == 0 &&
+        !g_in_gate) {
         DWORD le = GetLastError();
         if (!g_serving_synth) {
-            if (g_use_fiber) fiber_switch(&g_fgame, &g_fharn);
-            else gate_body();
+            K->reason[0] = R_GATE;
+            kst_switch(&K->hg->slot[0].ctx, &K->hctx[0]);
         }
         SetLastError(le);
         /* staged score messages first; this pass only dispatches and is not a tick */

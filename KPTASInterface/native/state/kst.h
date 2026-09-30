@@ -33,7 +33,7 @@ enum { KST_GAME_ARENA = 1, KST_IMAGE_DATA = 2, KST_HARNESS_GAME = 3 };
 enum { KST_REC_PAGE = 1, KST_REC_TICK_END = 2, KST_REC_WRAP = 3, KST_REC_JOURNAL = 4 };
 enum {
     KST_F_DATA = 0x1, KST_F_ZERO = 0x2, KST_F_DECOMMIT = 0x4, KST_F_SWEEP = 0x8,
-    KST_F_RESTORE_POINT = 0x100, KST_F_FULL = 0x200,
+    KST_F_RESTORE_POINT = 0x100, KST_F_FULL = 0x200, KST_F_RESTORE = 0x400,   /* RESTORE: batch written by a restore */
 };
 
 /* ---- runtime (kst_rt.c) ---- */
@@ -148,6 +148,16 @@ typedef struct kst_restore_stats {
 
 /* ---- engine (harness side) ---- */
 int kst_init(const kst_config *cfg, const kst_host *host);
+/* Split init: kst_init_mem reserves the sim set (safe in DllMain); threads and
+ * the ring follow later. */
+int kst_init_mem(const kst_config *cfg, const kst_host *host);
+int kst_init_threads(void);
+int kst_ring_attach(const WCHAR *path, u32 mb);
+void kst_set_out(void (*fn)(const char *, u32));
+/* Host-numbered capture at a gate (harness stack, every game slot parked). */
+void kst_capture_tick(u64 tick, int sweep);
+void kst_set_in_gate(int on);
+void kst_slot_init(u32 k, void *stack, u32 size, void (*entry)(void *), void *arg, u32 state);
 /* Runs game_main on the main slot (arena stack) until it returns. */
 void kst_run(void (*game_main)(void *), void *arg);
 void kst_root(u8 out[32]);
