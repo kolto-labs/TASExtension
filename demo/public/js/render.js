@@ -3,9 +3,10 @@
 import { TILE, COLS, ROWS, W, H, MAPS, BIT, DOOR_US, LOAD_US, toPx } from './sim.js';
 
 export const C = {
-  void: '#05070a', panel: '#0b1016', floor: '#0d141b', grid: '#121c25', wall: '#1a2733',
-  kolto: '#19e3c1', bacta: '#5ad8ff', ok: '#7dff9a', warn: '#ffb000', accent: '#ff4fd8',
-  text: '#d7e3ea', dim: '#7f93a0',
+  void: '#05070a', panel: '#0b1016', kolto: '#19e3c1', bacta: '#5ad8ff', ok: '#7dff9a',
+  warn: '#ffb000', accent: '#ff4fd8', text: '#d7e3ea', dim: '#7f93a0',
+  // Tints of the nine palette colours. Magenta (accent) marks divergence only.
+  floor: 'rgba(127, 147, 160, 0.07)', grid: 'rgba(127, 147, 160, 0.10)', wall: 'rgba(127, 147, 160, 0.22)',
 };
 const MONO = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace';
 const SANS = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
@@ -211,7 +212,7 @@ function panel(ctx, x, y, w, h) {
 }
 
 function key(ctx, x, y, w, label, on) {
-  ctx.fillStyle = on ? C.kolto : 'rgba(13, 20, 27, 0.9)';
+  ctx.fillStyle = on ? C.kolto : 'rgba(5, 7, 10, 0.9)';
   ctx.fillRect(x, y, w, 15);
   ctx.strokeStyle = on ? C.kolto : 'rgba(127, 147, 160, 0.5)';
   ctx.strokeRect(x + 0.5, y + 0.5, w - 1, 14);
@@ -221,7 +222,7 @@ function key(ctx, x, y, w, label, on) {
   ctx.fillText(label, x + w / 2, y + 11);
 }
 
-const TIER_COLOR = { lab: C.accent, tas: C.kolto, 'hands-off': C.ok };
+export const TIER_COLOR = { lab: C.warn, tas: C.kolto, 'hands-off': C.ok };
 
 // Returns the watermark box so the page can show its hover text.
 function drawHud(ctx, g, o) {
@@ -306,7 +307,7 @@ export function drawScene(ctx, g, o = {}) {
   return drawHud(ctx, g, o);
 }
 
-// Holorecord strip. info: {b, head, span, t, hover, marks, split, v0, v1}
+// Holorecord strip. info: {recs, t, hover, marks, div, v0, v1, captured}
 export function drawTimeline(ctx, w, h, info) {
   const { recs, t, marks, v0, v1 } = info;
   const head = recs.length - 1;
@@ -337,11 +338,11 @@ export function drawTimeline(ctx, w, h, info) {
     }
   }
   // Track and greenzone.
-  ctx.fillStyle = '#081016';
+  ctx.fillStyle = 'rgba(5, 7, 10, 0.7)';
   ctx.fillRect(8, trackY, w - 16, trackH);
   if (head >= v0) {
     const g1 = Math.min(head, v1);
-    ctx.fillStyle = 'rgba(25, 227, 193, 0.22)';
+    ctx.fillStyle = info.captured === false ? 'rgba(127, 147, 160, 0.14)' : 'rgba(25, 227, 193, 0.22)';
     ctx.fillRect(X(Math.max(v0, 0)), trackY, Math.max(1, X(g1 + 1) - X(Math.max(v0, 0))), trackH);
     // Mid-load ticks are not restore points: shade them amber.
     ctx.fillStyle = 'rgba(255, 176, 0, 0.25)';
@@ -372,14 +373,14 @@ export function drawTimeline(ctx, w, h, info) {
   for (const m of marks) {
     if (m.tick < v0 || m.tick > v1 || m.tick < 0) continue;
     const x = Math.round(X(m.tick)) + 0.5;
-    ctx.strokeStyle = C.bacta;
+    ctx.strokeStyle = 'rgba(255, 176, 0, 0.7)';
     ctx.beginPath();
     ctx.moveTo(x, trackY);
     ctx.lineTo(x, trackY + trackH);
     ctx.stroke();
-    ctx.fillStyle = C.bacta;
+    ctx.fillStyle = C.warn;
     ctx.beginPath();
-    ctx.moveTo(x, trackY); ctx.lineTo(x + 5, trackY + 3); ctx.lineTo(x, trackY + 6);
+    ctx.moveTo(x, trackY - 1); ctx.lineTo(x + 4, trackY + 3); ctx.lineTo(x, trackY + 7); ctx.lineTo(x - 4, trackY + 3);
     ctx.fill();
     ctx.font = `9px ${MONO}`;
     const mw = ctx.measureText(m.name).width;
@@ -387,9 +388,9 @@ export function drawTimeline(ctx, w, h, info) {
     ctx.textAlign = right ? 'right' : 'left';
     ctx.fillText(m.name, right ? x - 3 : x + 3, trackY + 16);
   }
-  // Split highlight.
-  if (info.split != null && info.split >= v0 && info.split <= v1) {
-    const x = Math.round(X(info.split)) + 0.5;
+  // First divergence: the only use of magenta.
+  if (info.div != null && info.div >= 0 && info.div >= v0 && info.div <= v1) {
+    const x = Math.round(X(info.div)) + 0.5;
     ctx.strokeStyle = C.accent;
     ctx.lineWidth = 2;
     ctx.beginPath();
@@ -410,7 +411,7 @@ export function drawTimeline(ctx, w, h, info) {
   // Playhead.
   if (t >= v0 && t <= v1) {
     const x = Math.round(X(t)) + 0.5;
-    ctx.strokeStyle = C.kolto;
+    ctx.strokeStyle = C.ok;
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(x, bandY);
@@ -421,11 +422,22 @@ export function drawTimeline(ctx, w, h, info) {
     ctx.font = `600 9px ${MONO}`;
     const lw = ctx.measureText(label).width + 8;
     const lx = Math.min(Math.max(x - lw / 2, 2), w - lw - 2);
-    ctx.fillStyle = C.kolto;
+    ctx.fillStyle = C.ok;
     ctx.fillRect(lx, trackY + trackH + 5, lw, 12);
     ctx.fillStyle = C.void;
     ctx.textAlign = 'center';
     ctx.fillText(label, lx + lw / 2, trackY + trackH + 14);
   }
   return { X, tickAt: (x) => Math.round(v0 + ((x - 8) / (w - 16)) * n) };
+}
+
+// Small picture of one state, for branch thumbnails. Returns a data: URL.
+export function thumbnail(g, o, w = 320) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = Math.round(w * H / W);
+  const x = c.getContext('2d');
+  x.setTransform(w / W, 0, 0, w / W, 0, 0);
+  drawScene(x, g, { ...o, reduced: true });
+  return c.toDataURL('image/png');
 }

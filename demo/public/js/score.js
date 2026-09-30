@@ -1,14 +1,62 @@
 // Score parser for the browser prototype. A subset of the real score format:
 // notes (`count keys`), comments, a header line, @sync, @mark, @segment,
-// @repeat/@end. Errors are collected per line so the editor can show them.
+// @repeat/@end, @alias with $name keys, and m@x,y mouse positions.
+// Errors are collected per line so the editor can show them.
 
 import { BIT, EVENTS, KEYS } from './sim.js';
 
 const LABEL = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
+const ANAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const INT = /^[0-9]+$/;
+const MOUSE = /^m@([0-9]{1,4}),([0-9]{1,4})$/;
 const MAX_INS = 50000;
 
 export const HZ_MIN = 10, HZ_MAX = 240;
+
+// Keys the roll shows but the stand-in scene does not read. They reach the
+// score and the roll, never the sim: only `bits` is passed to step().
+export const XKEYS = ['q', 'e', 'space', 'tab', 'esc', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
+export const XBIT = Object.fromEntries(XKEYS.map((k, i) => [k, 1 << i]));
+export const KEY_ORDER = ['w', 'a', 's', 'd', ...XKEYS];
+export const BUTTONS = ['lmb', 'rmb'];
+const SYN = { escape: 'esc' };
+
+export const isKey = (k) => k in BIT || k in XBIT;
+export const heldIn = (inp, k) => (k in BIT ? (inp.bits & BIT[k]) !== 0 : (inp.xbits & XBIT[k]) !== 0);
+
+export function setKey(inp, k, on) {
+  const out = { bits: inp.bits, xbits: inp.xbits, mouse: inp.mouse, al: inp.al };
+  if (k in BIT) out.bits = on ? out.bits | BIT[k] : out.bits & ~BIT[k];
+  else out.xbits = on ? out.xbits | XBIT[k] : out.xbits & ~XBIT[k];
+  if (!on && out.al && out.al[k]) { out.al = { ...out.al }; delete out.al[k]; }
+  return out;
+}
+
+export const EMPTY = Object.freeze({ bits: 0, xbits: 0, mouse: null, al: null });
+export const inputOf = (it) => ({ bits: it.bits, xbits: it.xbits || 0, mouse: it.mouse || null, al: it.al || null });
+
+export function sameInput(a, b) {
+  if (a.bits !== b.bits || (a.xbits || 0) !== (b.xbits || 0)) return false;
+  const ma = a.mouse, mb = b.mouse;
+  if (!ma || !mb) return !ma && !mb;
+  return ma[0] === mb[0] && ma[1] === mb[1];
+}
+
+// Tokens for one held set, in roll order: keys, mouse, buttons, then $aliases.
+export function inputTokens(inp) {
+  const toks = [], als = [];
+  const push = (k) => { const a = inp.al && inp.al[k]; if (a) als.push('$' + a); else toks.push(k); };
+  for (const k of KEY_ORDER) if (heldIn(inp, k)) push(k);
+  if (inp.mouse) toks.push(`m@${inp.mouse[0]},${inp.mouse[1]}`);
+  for (const k of BUTTONS) if (heldIn(inp, k)) push(k);
+  const all = toks.concat(als);
+  return all.length ? all.join(' ') : '.';
+}
+
+export function noteText(count, inp) {
+  const c = String(count);
+  return (c.length >= 4 ? c + ' ' : c.padEnd(4)) + inputTokens(inp);
+}
 
 function intOpt(tok, key, min, max, errs, line) {
   const v = tok.slice(key.length + 1);
@@ -27,6 +75,8 @@ export function parseScore(text) {
   const root = [];
   const stack = [{ body: root, line: 0, n: 1 }];
   const marks = [];
+  const aliases = {};
+  const repeats = [];
 
   for (let i = 0; i < lines.length; i++) {
     const ln = i + 1;
@@ -50,23 +100,44 @@ export function parseScore(text) {
     const head = toks[0];
     const body = stack[stack.length - 1].body;
     const inRep = stack.length > 1;
+    const rl = inRep ? stack[1].line : 0;
 
     if (INT.test(head)) {
       const count = +head;
       if (count < 1 || count > 100000) { errors.push({ line: ln, msg: 'tick count must be 1 to 100000' }); continue; }
       const keys = toks.slice(1);
       if (!keys.length) { errors.push({ line: ln, msg: "a note needs keys, or '.' for no input" }); continue; }
-      let bits = 0, bad = false;
-      if (keys.length === 1 && keys[0] === '.') bits = 0;
-      else {
-        for (const k of keys) {
-          if (k === '.') { errors.push({ line: ln, msg: "'.' means no input, so it stands alone" }); bad = true; break; }
-          if (!(k in BIT)) { errors.push({ line: ln, msg: `unknown key '${k}'. This scene reads ${KEYS.join(' ')}` }); bad = true; break; }
-          if (bits & BIT[k]) { errors.push({ line: ln, msg: `key '${k}' is listed twice` }); bad = true; break; }
-          bits |= BIT[k];
+      let bits = 0, xbits = 0, mouse = null, al = null, bad = false;
+      if (!(keys.length === 1 && keys[0] === '.')) {
+        for (const tok of keys) {
+          if (tok === '.') { errors.push({ line: ln, msg: "'.' means no input, so it stands alone" }); bad = true; break; }
+          const mm = MOUSE.exec(tok);
+          if (mm) {
+            if (mouse) { errors.push({ line: ln, msg: 'a note holds one mouse position' }); bad = true; break; }
+            mouse = [+mm[1], +mm[2]];
+            continue;
+          }
+          let k = tok, alias = '';
+          if (tok[0] === '$') {
+            alias = tok.slice(1);
+            if (!(alias in aliases)) { errors.push({ line: ln, msg: `undefined alias '${tok}'. Define it first: @alias ${alias} = key` }); bad = true; break; }
+            k = aliases[alias];
+          } else k = SYN[tok] || tok;
+          if (!isKey(k)) {
+            errors.push({ line: ln, msg: `unknown key '${tok}'. The scene reads ${KEYS.join(' ')}. The roll also takes ${XKEYS.join(' ')} and m@x,y` });
+            bad = true; break;
+          }
+          if (k in BIT) {
+            if (bits & BIT[k]) { errors.push({ line: ln, msg: `key '${k}' is listed twice` }); bad = true; break; }
+            bits |= BIT[k];
+          } else {
+            if (xbits & XBIT[k]) { errors.push({ line: ln, msg: `key '${k}' is listed twice` }); bad = true; break; }
+            xbits |= XBIT[k];
+          }
+          if (alias) { al = al || {}; al[k] = alias; }
         }
       }
-      if (!bad) body.push({ op: 'note', count, bits, line: ln, rep: inRep });
+      if (!bad) body.push({ op: 'note', count, bits, xbits, mouse, al, line: ln, rep: inRep, rl });
       continue;
     }
     if (head === '@sync') {
@@ -77,13 +148,27 @@ export function parseScore(text) {
         if (t.startsWith('timeout=')) { const n = intOpt(t, 'timeout', 1, 100000, errors, ln); if (n === null) ok = false; else timeout = n; }
         else { errors.push({ line: ln, msg: `unknown @sync option '${t}'` }); ok = false; }
       }
-      if (ok) body.push({ op: 'sync', ev, timeout, line: ln, rep: inRep });
+      if (ok) body.push({ op: 'sync', ev, timeout, line: ln, rep: inRep, rl });
       continue;
     }
     if (head === '@mark') {
       if (inRep) { errors.push({ line: ln, msg: 'put @mark outside @repeat' }); continue; }
       if (!toks[1] || !LABEL.test(toks[1]) || toks.length > 2) { errors.push({ line: ln, msg: '@mark takes one name' }); continue; }
       marks.push({ name: toks[1], line: ln, at: root.length });
+      continue;
+    }
+    if (head === '@alias') {
+      if (inRep) { errors.push({ line: ln, msg: 'put @alias outside @repeat' }); continue; }
+      const m = /^@alias\s+([^=\s]+)\s*=\s*(\S+)$/.exec(code);
+      if (!m || !ANAME.test(m[1])) { errors.push({ line: ln, msg: '@alias takes a name and a key: @alias name = key' }); continue; }
+      let v = m[2];
+      if (v[0] === '$') {
+        if (!(v.slice(1) in aliases)) { errors.push({ line: ln, msg: `undefined alias '${v}'` }); continue; }
+        v = aliases[v.slice(1)];
+      } else v = SYN[v] || v;
+      if (!isKey(v)) { errors.push({ line: ln, msg: `this prototype has no column for '${m[2]}'. Use one of ${KEYS.join(' ')} ${XKEYS.join(' ')}` }); continue; }
+      if (aliases[m[1]] && aliases[m[1]] !== v) { errors.push({ line: ln, msg: `alias $${m[1]} is already ${aliases[m[1]]} and cannot become ${v}` }); continue; }
+      aliases[m[1]] = v;
       continue;
     }
     if (head === '@segment') {
@@ -93,7 +178,7 @@ export function parseScore(text) {
         if (t.startsWith('hz=')) { const n = intOpt(t, 'hz', HZ_MIN, HZ_MAX, errors, ln); if (n === null) ok = false; else hz = n; }
         else { errors.push({ line: ln, msg: `unknown @segment option '${t}'` }); ok = false; }
       }
-      if (ok) body.push({ op: 'seg', name: toks[1], hz, line: ln, rep: inRep });
+      if (ok) body.push({ op: 'seg', name: toks[1], hz, line: ln, rep: inRep, rl });
       continue;
     }
     if (head === '@repeat') {
@@ -102,15 +187,20 @@ export function parseScore(text) {
       const rep = { op: 'repeat', n: +n, body: [], line: ln };
       body.push(rep);
       stack.push({ body: rep.body, line: ln, n: +n });
+      repeats.push({ line: ln, end: 0, n: +n, depth: stack.length - 1 });
       continue;
     }
     if (head === '@end') {
       if (stack.length === 1) errors.push({ line: ln, msg: '@end without a matching @repeat' });
-      else stack.pop();
+      else {
+        const top = stack.pop();
+        const r = repeats.find((x) => x.line === top.line);
+        if (r) r.end = ln;
+      }
       continue;
     }
     if (head.startsWith('@')) {
-      errors.push({ line: ln, msg: `unknown directive '${head}'. This prototype reads @sync @mark @segment @repeat @end` });
+      errors.push({ line: ln, msg: `unknown directive '${head}'. This prototype reads @sync @mark @segment @repeat @end @alias` });
       continue;
     }
     errors.push({ line: ln, msg: `expected a note (tick count first) or a directive, got '${head}'` });
@@ -132,13 +222,16 @@ export function parseScore(text) {
   };
   flat(root, true);
   if (tooBig) errors.push({ line: 1, msg: `the score expands past ${MAX_INS} steps` });
-  const prog = { hz0, ins, marks: marks.map((m) => ({ name: m.name, line: m.line, at: markAt[m.at] })), header };
+  const prog = {
+    hz0, ins, header, aliases, repeats: repeats.filter((r) => r.depth === 1),
+    marks: marks.map((m) => ({ name: m.name, line: m.line, at: markAt[m.at] })),
+  };
   return { prog, errors, lineCount: lines.length };
 }
 
 export function sameIns(a, b, hz0) {
   if (!a || !b || a.op !== b.op) return false;
-  if (a.op === 'note') return a.count === b.count && a.bits === b.bits;
+  if (a.op === 'note') return a.count === b.count && sameInput(a, b);
   if (a.op === 'sync') return a.ev === b.ev && a.timeout === b.timeout;
   if (a.op === 'seg') return (a.hz || hz0) === (b.hz || hz0);
   return false;
