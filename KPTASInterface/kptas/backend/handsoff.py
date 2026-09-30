@@ -176,6 +176,8 @@ class HandsOff:
     def clock(self, mode: ClockMode, hz: int, scale: int = 100) -> None:
         if ClockMode(mode) is not ClockMode.WALL:
             raise BackendError("hands-off uses the wall clock only")
+        if self._started:       # a mid-run @segment hz= keeps the current tick's time; later ticks use the new rate
+            self._t0 += self._tick / self.hz - self._tick / hz
         self.hz = hz
 
     def start(self) -> StepReport:
