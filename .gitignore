@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+build/
+dist/
+*.egg-info/
+target/
+/tmp/
+*.holo
+*.holo.idx
+runs/
+.DS_Store
