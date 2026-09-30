@@ -125,13 +125,13 @@ int main(void) {
     RtlCreateHeap_t RtlCreateHeap = (RtlCreateHeap_t)GetProcAddress(nt,"RtlCreateHeap");
     printf("  RtlCreateHeap=%p\n",(void*)RtlCreateHeap);
     if (RtlCreateHeap) {
-        // committed variant: use a committed sub-block at arena+64MB region.
+        // committed variant: heap base in an 8 MB sub-block at arena+32MB,
+        // committed here (the arena itself is only reserved).
         SIZE_T heapRegion = 8*MB;
-        // reserve+commit tail of arena for heap base (committed)
         void *hbaseC = VirtualAlloc((char*)arena + 32*MB, heapRegion,
                             MEM_COMMIT, PAGE_READWRITE);
         printf("  heap-base(committed)=%p\n", hbaseC);
-        // HEAP_CREATE_ALIGN_16=0? use flags 0. Signature: flags,base,reserve,commit,lock,params
+        // RtlCreateHeap(flags, base, reserve, commit, lock, params), no flags.
         PVOID heapC = hbaseC ? RtlCreateHeap(0, hbaseC, heapRegion, 64*1024, NULL, NULL) : NULL;
         printf("  RtlCreateHeap(committed base) -> %p\n", heapC);
         if (heapC) {
@@ -141,7 +141,7 @@ int main(void) {
         } else {
             printf("  committed-heap FAIL err=%lu\n",(unsigned long)GetLastError());
         }
-        // reserved variant: base points into reserved (uncommitted) arena tail.
+        // reserved variant: base at arena+64MB, reserved but not committed.
         // May fault when the heap writes its header into uncommitted memory;
         // a vectored handler + setjmp lets us report the failure exactly.
         void *veh_h = AddVectoredExceptionHandler(1, veh);
@@ -177,24 +177,31 @@ int main(void) {
     // 5. Timing.
     printf("\n[5] timing:\n");
     LARGE_INTEGER freq; QueryPerformanceFrequency(&freq);
-    // commit a region large enough to dirty 100k pages (~391 MB) inside the arena
+    // dirty up to 100k pages (~391 MB) in a region above both heap sub-blocks
+    // (+32MB and +64MB, 8 MB each); skipped when the arena is too small
     ULONG_PTR counts[] = {1000,10000,100000};
     SIZE_T bigPages = 100000;
     SIZE_T bigBytes = (bigPages+16)*pg;
-    void *big = VirtualAlloc((char*)arena, bigBytes, MEM_COMMIT, PAGE_READWRITE);
-    printf("  committed %.1f MB for dirtying at %p (rc=%p)\n",(double)bigBytes/MB,arena,big);
+    SIZE_T bigOff = 80*MB;
+    char *bigBase = (char*)arena + bigOff;
+    void *big = bigOff + bigBytes <= arenaSize
+        ? VirtualAlloc(bigBase, bigBytes, MEM_COMMIT, PAGE_READWRITE) : NULL;
+    printf("  commit %.1f MB for dirtying at %p (rc=%p)\n",(double)bigBytes/MB,(void*)bigBase,big);
     static void *wb2[100000+16];
     ULONG_PTR dummy;
-    for (unsigned k=0;k<3;k++){
+    for (unsigned k=0;k<3 && big;k++){
         ULONG_PTR n=counts[k];
-        dummy=0; GetWriteWatch(WRITE_WATCH_FLAG_RESET, arena, bigBytes, wb2, &dummy, &wgran);
-        for (ULONG_PTR i=0;i<n;i++){ volatile char *pp=(char*)arena+i*pg; *pp=(char)1; }
+        dummy=0; GetWriteWatch(WRITE_WATCH_FLAG_RESET, bigBase, bigBytes, wb2, &dummy, &wgran);
+        for (ULONG_PTR i=0;i<n;i++){ volatile char *pp=bigBase+i*pg; *pp=(char)1; }
         ULONG_PTR gc=bigPages+16; double t0=now_ms(freq);
-        rc=GetWriteWatch(WRITE_WATCH_FLAG_RESET, arena, bigBytes, wb2,&gc,&wgran);
+        rc=GetWriteWatch(WRITE_WATCH_FLAG_RESET, bigBase, bigBytes, wb2,&gc,&wgran);
         double t1=now_ms(freq);
         printf("  GetWriteWatch(reset) %lu dirty pages: rc=%u returned=%lu time=%.3f ms\n",
                (unsigned long)n, rc,(unsigned long)gc, t1-t0);
     }
+    if (!big)
+        printf("  SKIPPED GetWriteWatch timing: no %.1f MB committed at +%.0f MB of a %.0f MB arena\n",
+               (double)bigBytes/MB,(double)bigOff/MB,(double)arenaSize/MB);
     // cost of a first-touch 4 KiB write fault on a fresh watched region vs a
     // fresh unwatched region (both committed, untouched).
     {

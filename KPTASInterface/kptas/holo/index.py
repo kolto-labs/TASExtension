@@ -63,10 +63,3 @@ def load(root: str | os.PathLike[str]) -> tuple[dict[str, Any], dict[bytes, Loc]
         return state, locs, rows
     except (OSError, ValueError, struct.error):
         return None
-
-
-def drop(root: str | os.PathLike[str]) -> None:
-    try:
-        os.unlink(Path(root) / "index" / INDEX_NAME)
-    except FileNotFoundError:
-        pass

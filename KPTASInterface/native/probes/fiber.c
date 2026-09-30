@@ -1,6 +1,7 @@
 // X13 fiber probe: hand-rolled cooperative context switch between the main
-// stack and a committed stack inside a reserved region, with TEB NT_TIB
-// updates, a manual SEH frame, RaiseException, stack probing and timing.
+// stack and a committed stack inside a reserved region, swapping the TEB
+// NT_TIB fields on every switch, with a manual SEH frame, RaiseException,
+// stack probing and timing.
 // Console exe, 32-bit. Touches only this process's own memory.
 
 #include <windows.h>
@@ -16,13 +17,17 @@ static inline uint32_t rdfs(uint32_t off){ uint32_t v;
 static inline void wrfs(uint32_t off,uint32_t v){
     __asm__ volatile("movl %0,%%fs:(%1)"::"r"(v),"r"(off):"memory"); }
 
-// ---- context switch: save current esp+callee regs+fpu, load the other ----
+// ---- context switch: save current esp+callee regs+NT_TIB+fpu, load the other ----
 // void ctx_switch(void** save_esp, void* load_esp)
+// Saved frame, low to high: fpucw, mxcsr, ExceptionList, StackBase, StackLimit,
+// DeallocationStack, edi, esi, ebx, ebp, return address. Each side keeps its own
+// NT_TIB fields, so SEH and stack checks always see the stack that is running.
 __attribute__((naked)) static void ctx_switch(void** save_esp, void* load_esp){
     __asm__ volatile(
         "movl 4(%esp), %eax\n\t"   // eax = save_esp
         "movl 8(%esp), %edx\n\t"   // edx = load_esp
         "pushl %ebp\n\t pushl %ebx\n\t pushl %esi\n\t pushl %edi\n\t"
+        "pushl %fs:0xE0C\n\t pushl %fs:0x08\n\t pushl %fs:0x04\n\t pushl %fs:0x00\n\t"
         "subl $8, %esp\n\t"
         "fnstcw (%esp)\n\t"
         "stmxcsr 4(%esp)\n\t"
@@ -31,9 +36,17 @@ __attribute__((naked)) static void ctx_switch(void** save_esp, void* load_esp){
         "ldmxcsr 4(%esp)\n\t"
         "fldcw (%esp)\n\t"
         "addl $8, %esp\n\t"
+        "popl %fs:0x00\n\t popl %fs:0x04\n\t popl %fs:0x08\n\t popl %fs:0xE0C\n\t"
         "popl %edi\n\t popl %esi\n\t popl %ebx\n\t popl %ebp\n\t"
         "ret\n\t"
     );
+}
+
+static void report_tib(const char *who){
+    uint32_t sp; __asm__ volatile("movl %%esp,%0":"=r"(sp));
+    uint32_t base = rdfs(0x04), limit = rdfs(0x08);
+    printf("  [%s] esp=%08x StackBase=%08x StackLimit=%08x ExcList=%08x esp inside: %s\n",
+           who, sp, base, limit, rdfs(0x00), sp < base && sp >= limit ? "YES" : "NO");
 }
 
 // ---- manual SEH handler ----
@@ -67,13 +80,9 @@ static void *g_main_sp = NULL;
 static void *g_fiber_sp = NULL;
 static volatile int g_tests_done = 0;
 
-// saved main TEB fields
-static uint32_t m_exc, m_base, m_limit, m_dealloc;
-
 static void fiber_entry(void){
     // (report from arena stack)
-    uint32_t sp_now; __asm__ volatile("movl %%esp,%0":"=r"(sp_now));
-    printf("  [fiber] entered, esp=%p\n", (void*)sp_now);
+    report_tib("fiber");
 
     // install manual SEH frame: push handler; push fs:[0]; mov fs:[0],esp
     struct seh_reg reg;
@@ -130,33 +139,28 @@ int main(void){
     __asm__ volatile("fnstcw %0":"=m"(fpucw));
     __asm__ volatile("stmxcsr %0":"=m"(mxcsr));
 
-    // build initial fiber stack image (see ctx_switch load path)
+    // build initial fiber stack image (see ctx_switch load path); its NT_TIB
+    // fields describe the arena stack and take effect on the first switch in
     uint32_t *sp = (uint32_t*)(stackBase & ~(uintptr_t)0xF);
     *--sp = (uint32_t)(uintptr_t)fiber_entry; // return address
     *--sp = 0;   // ebp
     *--sp = 0;   // ebx
     *--sp = 0;   // esi
     *--sp = 0;   // edi
+    *--sp = (uint32_t)stackLimit;  // DeallocationStack
+    *--sp = (uint32_t)stackLimit;  // StackLimit
+    *--sp = (uint32_t)stackBase;   // StackBase
+    *--sp = 0xFFFFFFFF;            // ExceptionList = end of list
     *--sp = mxcsr;               // [esp+4]
     *--sp = (uint32_t)fpucw;     // [esp+0]
     g_fiber_sp = (void*)sp;
-
-    // save main's TEB NT_TIB fields
-    m_exc=rdfs(0x00); m_base=rdfs(0x04); m_limit=rdfs(0x08); m_dealloc=rdfs(0xE0C);
-    printf("main TEB: ExcList=%08x StackBase=%08x StackLimit=%08x Dealloc=%08x\n",
-           m_exc,m_base,m_limit,m_dealloc);
-
-    // point TEB at the arena stack for the fiber run
-    wrfs(0x00, 0xFFFFFFFF);            // ExceptionList = end of list
-    wrfs(0x04, (uint32_t)stackBase);   // StackBase
-    wrfs(0x08, (uint32_t)stackLimit);  // StackLimit
-    wrfs(0xE0C,(uint32_t)stackLimit);  // DeallocationStack
-    printf("switched TEB to arena: StackBase=%08x StackLimit=%08x\n",
-           (uint32_t)stackBase,(uint32_t)stackLimit);
+    printf("fiber TEB: StackBase=%08x StackLimit=%08x\n", (uint32_t)stackBase,(uint32_t)stackLimit);
+    report_tib("main");
 
     // first switch: runs the fiber test body, returns after g_tests_done
     ctx_switch(&g_main_sp, g_fiber_sp);
     printf("back in main, tests_done=%d\n", g_tests_done);
+    report_tib("main");
 
     // (d) ping-pong 1e6 times and time it
     LARGE_INTEGER freq,t0,t1; QueryPerformanceFrequency(&freq);
@@ -172,9 +176,7 @@ int main(void){
     printf("(d) %ld ping-pong iters (%.0f switches): %.3f ms, %.1f ns/switch\n",
            N, switches, ms, ms*1e6/switches);
 
-    // restore main TEB
-    wrfs(0x00,m_exc); wrfs(0x04,m_base); wrfs(0x08,m_limit); wrfs(0xE0C,m_dealloc);
-    printf("restored main TEB\n");
+    report_tib("main");
     printf("=== X13 done ===\n");
     return 0;
 }

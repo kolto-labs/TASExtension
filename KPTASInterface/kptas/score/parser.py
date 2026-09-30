@@ -38,6 +38,9 @@ class _Parser:
         self.source = source
         # Held set of the previous note, for sugar. None after @include: unknown here.
         self.held: frozenset[str] | None = frozenset()
+        # Per open @repeat: [held set at @repeat, a full note has set the held set, sugar ran before one did,
+        # the enclosing repeats' two flags at @repeat (restored when the body never plays)].
+        self.reps: list[list] = []
 
     def err(self, msg: str, line: int, col: int = 1) -> ScoreError:
         return ScoreError(msg, self.source, line, col)
@@ -69,14 +72,29 @@ class _Parser:
                     raise self.err("@end without a matching @repeat", lineno, head.col)
                 rep = stack.pop()[0]
                 rep.end_comment, rep.end_line = comment, lineno
+                self.end_repeat(rep)
                 continue
             node = self.statement(toks, code, lineno)
             body.append(Line(node, comment, lineno))
             if isinstance(node, Repeat):
                 stack.append((node, node.body))
+                self.reps.append([self.held, False, False, [f[1:3] for f in self.reps]])
         if len(stack) > 1:
             raise self.err("@repeat without a matching @end", stack[-1][0].line)
         return ScoreAST(self.source, header, hcomment, root)
+
+    def end_repeat(self, rep: Repeat) -> None:
+        """Sugar is expanded once but the body plays rep.count times, each pass from the held set the last
+        one left."""
+        start, _anchored, entry, outer = self.reps.pop()
+        if rep.count == 0:
+            self.held = start                      # the body never plays
+            for f, saved in zip(self.reps, outer):
+                f[1:3] = saved
+        elif rep.count > 1 and entry and self.held != start:
+            raise self.err("the @repeat body begins with sugar (+k -k ~k) but ends holding a different set, so "
+                           "its second pass would mean something else; begin the body with a full note",
+                           rep.line)
 
     def header(self, line: str) -> tuple[dict[str, str], str | None]:
         off = line.index(MAGIC) + len(MAGIC)
@@ -328,6 +346,8 @@ class _Parser:
                 raise self.err("text must be the only input in its note", lineno, t.col)
             self.check_text(txt, count, lineno, t.col)
             self.held = frozenset()
+            for f in self.reps:
+                f[1] = True
             return NoteLine(count, text=txt, **loc)
 
         if sugar:
@@ -354,9 +374,13 @@ class _Parser:
                     transient.add(tok)
             self.held = frozenset(running)
             held = running | transient
+            for f in self.reps:
+                f[2] = f[2] or not f[1]
         else:
             held = {p for p, _ in plain}
             self.held = frozenset(held)
+            for f in self.reps:
+                f[1] = True
 
         return NoteLine(
             count,

@@ -828,7 +828,10 @@ class TickRecord:
         _need(res == 0, "reserved byte must be zero")
         off = cls.HEAD_SIZE
         _need(len(data) >= off + nlen + 4, "truncated note")
-        note = data[off:off + nlen].decode("utf-8")
+        try:
+            note = data[off:off + nlen].decode("utf-8")
+        except UnicodeDecodeError as e:
+            raise FormatError(f"tick record note is not UTF-8: {e}") from None
         off += nlen
         (npages,) = _U32.unpack_from(data, off)
         off += 4
@@ -882,11 +885,11 @@ class Header:
     game: str = "k1"
     build: str = "auto"
     exe_sha256: str = ""
-    tier: Tier = Tier.LAB
+    tier: Tier = Tier.TAS
     hz: int = 60
     clock: ClockMode = ClockMode.VIRTUAL
     scale: int = 100
-    seek: SeekMode = SeekMode.RESTORE
+    seek: SeekMode = SeekMode.REPLAY
     threads: str = "join"
     start: str = "boot"            # "boot" | "save:<sha256 hex>"
     keyframe_every: int = 600
@@ -1194,7 +1197,11 @@ class Receipt:
         return obj
 
     def to_payload(self) -> bytes:
-        return canonical_json(self.to_obj())
+        """The chained RCPT body. micros is wall time, so it stays out (Bundle.receipt keeps it in meta.json)
+        and identical runs give identical journals."""
+        obj = self.to_obj()
+        del obj["micros"]
+        return canonical_json(obj)
 
     @classmethod
     def from_payload(cls, payload: bytes) -> Receipt:

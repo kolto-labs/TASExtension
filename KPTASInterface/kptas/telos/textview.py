@@ -137,7 +137,7 @@ def tick_differs(a: TickRecord, b: TickRecord, compare_roots: bool = True) -> st
     """Name of the first field that differs, or None.
 
     state_root is compared only when both ticks were captured and compare_roots
-    holds (same determinism key); M1 ticks are identified by journal digest alone.
+    holds (same determinism key); otherwise ticks are compared by journal digest only.
     """
     if a.epoch != b.epoch:
         return "epoch"

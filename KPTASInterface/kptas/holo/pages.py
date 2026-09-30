@@ -504,7 +504,9 @@ class Store:
         os.replace(tmp, path)
         if fsync:
             fsync_dir(path.parent)
-        self._read.pop((AREA_KF, tick), None)
+        stale = self._read.pop((AREA_KF, tick), None)
+        if stale is not None:
+            stale.close()
         with open(path, "rb") as f:
             end = 0
             for off, kind, key, _b, _raw, end in iter_frames(f, len(blob)):

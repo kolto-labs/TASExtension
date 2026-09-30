@@ -76,6 +76,7 @@ def compile_score(src: str | Path, *, include_dirs: Sequence[Path] = ()) -> Comp
         c.files.append(source)
     c.walk(ast.lines, path.parent if path is not None else Path.cwd())
     c.check_marks()
+    c.check_oneshots()
     return CompiledScore(c.header, c.items, c.aliases, c.files)
 
 
@@ -115,6 +116,21 @@ class _Compiler:
                 self.add(dataclasses.replace(node, cond=node.cond or "always"))
             else:
                 self.add(node)
+
+    def check_oneshots(self) -> None:
+        """A count-0 note's one-shots fire on the next note's first tick (supervisor.merge_oneshots), which
+        holds one os event."""
+        pending = None
+        for it in self.items:
+            if not isinstance(it, Note):
+                continue
+            if pending is not None and it.osev:
+                raise ScoreError(f"!{it.osev} lands on the tick that already fires !{pending.osev} "
+                                 f"(line {pending.line}); one os event per tick", it.source, it.line, 1)
+            if it.count:
+                pending = None
+            elif it.osev:
+                pending = it
 
     def note(self, n: NoteLine) -> None:
         if n.text is not None:

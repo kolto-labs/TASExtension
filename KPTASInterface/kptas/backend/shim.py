@@ -19,6 +19,8 @@ from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from pathlib import Path
 from typing import Any, Literal
 
+from kptas.config import DEFAULTS
+from kptas.supervisor import clock_env, filetime
 from kptas.types import (VERB_ALLOW, WIRE_MAX_LINE, WIRE_PROTO, BackendError, Caps, ClockMode,
                          EngineEvent, EnvPin, OsEvent, ProcOutcome, Receipt, RefusedError, SeekMode,
                          StagingRecord, StepReport, Tier, VerifyLevel)
@@ -147,22 +149,6 @@ def win_path(path: str | os.PathLike[str], wine: bool = True) -> str:
     return "Z:" + p.replace("/", "\\") if wine else p
 
 
-def filetime(iso: str) -> int:
-    from .pysim import _filetime
-    return _filetime(iso)
-
-
-def clock_env(clock: Mapping[str, Any], mode: str | None = None) -> str:
-    """KPTAS_CLOCK: semicolon-separated key=decimal pairs (same keys as kptas.supervisor)."""
-    parts = {
-        "mode": mode or clock.get("mode", "virtual"), "hz": int(clock.get("hz", 60)),
-        "qpf_hz": int(clock.get("qpf_hz", 10_000_000)),
-        "uptime0_ms": int(clock.get("uptime0_ms", 3_600_000)),
-        "initial_realtime": filetime(str(clock.get("initial_realtime", "2004-02-12T00:00:00Z"))),
-    }
-    return ";".join(f"{k}={v}" for k, v in parts.items())
-
-
 def note_to_wire(note: Any) -> dict[str, Any]:
     """A score Note in the input verb's shape: DIK codes, buttons, mouse, wheel, msgs."""
     from kptas.score.keys import dik
@@ -281,7 +267,7 @@ class ShimBackend:
         """The launch environment; matches kptas.supervisor.game_environ."""
         game, clock = self.cfg.get("game", {}), self.cfg.get("clock", {})
         env = {"KPTAS_PORT": str(port), "KPTAS_SESSION": str(self.session_dir),
-               "KPTAS_CLOCK": clock_env(clock)}
+               "KPTAS_CLOCK": clock_env({"clock": {**DEFAULTS["clock"], "mode": "virtual", **clock}})}
         if game.get("pinned_env", True):
             for k in ("PATH", "HOME", "USER", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
                 if k in os.environ:
@@ -362,7 +348,10 @@ class ShimBackend:
               ) -> dict[str, Any]:
         if self.wire is None:
             raise BackendError("not attached")
-        if self._tier is not None and self._tier not in VERB_ALLOW.get(verb, frozenset()):
+        allowed = VERB_ALLOW.get(verb, frozenset())
+        if self._tier is None and Tier.TAS not in allowed:
+            raise RefusedError(f"{verb} is lab only; lock the tier at lab first")
+        if self._tier is not None and self._tier not in allowed:
             raise RefusedError(f"{verb} is refused in tier {self._tier.label}")
         # drain the ring while waiting: the shim's gate waits for space, never the reverse
         res = self.wire.request(verb, args, timeout_s, idle=self._drain_ring)
@@ -519,7 +508,7 @@ class ShimBackend:
         self._seq += 1
         path = self.session_dir / f"files-{self._seq:06d}.bin"
         if op == "put":
-            if self._started and self._tier is not None and self._tier is not Tier.LAB:
+            if self._started and self._tier is not Tier.LAB:
                 raise RefusedError("files put after start is lab only")
             path.write_bytes(blob or b"")
             self._call("files", {"op": "put", "path": win_path(path, self._wine)})

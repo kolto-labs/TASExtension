@@ -60,10 +60,10 @@ static void dump_modules(void){
     int i=0;
     logline("[peb] module list (InLoadOrder):");
     while(cur!=head && i<64){
-        // LDR_DATA_TABLE_ENTRY: +0x18 DllBase, +0x1C EntryPoint, +0x24 FullDllName(UNICODE_STRING len@+0x24 buf@+0x28... actually +0x24 base? )
+        // LDR_DATA_TABLE_ENTRY: +0x18 DllBase, +0x1C EntryPoint,
+        // +0x24 FullDllName.Length, +0x28 FullDllName.Buffer
         uint32_t dllbase=*(uint32_t*)(cur+0x18);
         uint32_t entry  =*(uint32_t*)(cur+0x1C);
-        // FullDllName is at +0x24 (UNICODE_STRING: USHORT Length,MaxLen; PWSTR Buffer@+0x28)
         uint16_t len=*(uint16_t*)(cur+0x24);
         uint32_t bufp=*(uint32_t*)(cur+0x28);
         char name[260]; int k=0;
@@ -122,7 +122,7 @@ static void iat_hook_exe(void){
     int hooked=0;
     for(;imp->Name;imp++){
         const char *dll=(const char*)(base+imp->Name);
-        if(lstrcmpiA(dll,"KERNEL32.dll")!=0 && lstrcmpiA(dll,"KERNEL32.DLL")!=0) continue;
+        if(lstrcmpiA(dll,"KERNEL32.dll")!=0) continue;
         IMAGE_THUNK_DATA *oft=(IMAGE_THUNK_DATA*)(base+(imp->OriginalFirstThunk?imp->OriginalFirstThunk:imp->FirstThunk));
         IMAGE_THUNK_DATA *ft =(IMAGE_THUNK_DATA*)(base+imp->FirstThunk);
         for(; oft->u1.AddressOfData; oft++,ft++){

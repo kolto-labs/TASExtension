@@ -22,11 +22,14 @@ from kptas import __version__
 from kptas.config import ConfigError, resolve
 from kptas.score import ScoreError, compile_score, fmt
 from kptas.score.compile import CompiledScore
-from kptas.supervisor import BundleSink, RunError, Supervisor, TelosError, note_text, require
+from kptas.supervisor import PKG_ROOT, BundleSink, RunError, Supervisor, TelosError, note_text, require
 from kptas.telos import textview as tv
-from kptas.types import (BackendError, EngineEvent, EnvPin, FormatError, Header, Receipt, SeekMode, Tier)
+from kptas.types import (SEEK_ALIASES, BackendError, EngineEvent, EnvPin, FormatError, Header, Receipt, SeekMode,
+                         Tier)
 
 CONFIG_NAME = "telos.toml"
+FRESH_JUDGE = "KPTAS_FRESH_JUDGE"      # set in the child that verify.fresh_process starts
+SEEK_CHOICES = (*(m.value for m in SeekMode), *sorted(SEEK_ALIASES))
 
 
 def out(line: str = "") -> None:
@@ -322,6 +325,10 @@ def cmd_seek(ctx: Ctx, a: argparse.Namespace) -> int:
 
 def cmd_branch(ctx: Ctx, a: argparse.Namespace) -> int:
     b = open_bundle(a.bundle)
+    try:
+        b.link_at(a.tick)
+    except KeyError:
+        raise TelosError(f"{a.bundle} has no tick {a.tick}") from None
     dest = Path(a.out) if a.out else fresh_path(
         Path(a.bundle).with_name(f"{Path(a.bundle).stem}@{a.tick}.holo"))
     child = holo("create_branch").create_branch(b, a.tick, dest)
@@ -427,10 +434,29 @@ def cmd_verify(ctx: Ctx, a: argparse.Namespace) -> int:
     b = open_bundle(a.bundle)
     cfg = bundle_cfg(ctx, b, verify__fresh_process=True if a.fresh else None,
                      verify__compare=a.compare, run__backend=a.backend)
+    if cfg["verify"]["fresh_process"] and not os.environ.get(FRESH_JUDGE):
+        b.close()
+        return verify_in_child(ctx, a, cfg)
     r: Receipt = tier_mod("judge").judge(b, cfg)
     for line in tv.receipt_lines(r):
         out(line)
     return 0 if r.result in ("pass", "best_effort") else 1
+
+
+def verify_in_child(ctx: Ctx, a: argparse.Namespace, cfg: Mapping[str, Any]) -> int:
+    """Judge from a new interpreter in the pinned environment, so nothing this process loaded or
+    set can reach the replay."""
+    if cfg["game"]["pinned_env"]:
+        keep = ("PATH", "HOME", "USER", "DISPLAY", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR")
+        env = {k: os.environ[k] for k in keep if k in os.environ}
+        env.update(LANG="C", LC_ALL="C", TZ="UTC", PYTHONHASHSEED="0")
+    else:
+        env = dict(os.environ)
+    env["PYTHONPATH"] = str(PKG_ROOT)
+    env[FRESH_JUDGE] = "1"
+    argv = [sys.executable, "-m", "kptas", *(["--config", ctx.config] if ctx.config else []), "verify", a.bundle]
+    argv += [*(["--compare", a.compare] if a.compare else []), *(["--backend", a.backend] if a.backend else [])]
+    return subprocess.run(argv, env=env, stdin=subprocess.DEVNULL, check=False).returncode
 
 
 def cmd_tier_show(ctx: Ctx, a: argparse.Namespace) -> int:
@@ -564,7 +590,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--from", dest="start", metavar="BUNDLE@TICK",
                    help="seek to a recorded tick and record a branch that plays the rest of the score; "
                         "the score must play what the bundle recorded up to that tick")
-    s.add_argument("--mode", help="seek mode for --from: replay, restore or hybrid (default seek.mode)")
+    s.add_argument("--mode", choices=SEEK_CHOICES, metavar="MODE",
+                   help="seek mode for --from: replay, restore, hybrid or semantic (default seek.mode)")
     backend_opts(s)
 
     s = cmd("play", cmd_play, "play a score or a bundle's score without recording")
@@ -575,7 +602,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = cmd("seek", cmd_seek, "bring a live game to a recorded tick and print the receipt")
     s.add_argument("bundle")
     s.add_argument("tick", type=int)
-    s.add_argument("--mode", help="replay, restore, hybrid or semantic (default seek.mode)")
+    s.add_argument("--mode", choices=SEEK_CHOICES, metavar="MODE",
+                   help="replay, restore, hybrid or semantic (default seek.mode)")
     backend_opts(s)
 
     s = cmd("branch", cmd_branch, "start a new bundle from a recorded tick")
@@ -670,6 +698,12 @@ def dispatch(argv: Sequence[str], ctx: Ctx | None = None) -> int:
     except KeyboardInterrupt:
         err("interrupted")
         return 130
+    except RuntimeError as e:
+        hb = sys.modules.get("kptas.holo.bundle")    # loaded whenever it could have raised
+        if hb is None or not isinstance(e, hb.BudgetError):
+            raise
+        err(str(e))
+        return 1
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -6,7 +6,8 @@ usage: check.py REF_A [REF_B] [--vanilla VANILLA]
 REF_A, REF_B  output of `golden ref` from two builds (for example i386 under
               Wine and x86_64-linux). They must be byte-identical after CRLF
               is stripped. The sha256 of the normalized text is the refmath
-              golden digest.
+              golden digest, and it must equal the one golden/digests.txt
+              records for the REFMATH_VERSION in refmath.h.
 
 For every result the script also reports
   - the ulp distance to the correctly rounded value, computed with decimal
@@ -21,9 +22,13 @@ For every result the script also reports
 import decimal
 import hashlib
 import math
+import re
 import struct
 import sys
 from decimal import Decimal
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
 
 D = decimal.Context(prec=80, Emax=999999, Emin=-999999)
 decimal.setcontext(D)
@@ -221,6 +226,16 @@ def parse(path):
     return text, rows
 
 
+def expected_digest():
+    """(REFMATH_VERSION from refmath.h, the digest golden/digests.txt records for it or None)."""
+    version = re.search(r'#define REFMATH_VERSION "([^"]+)"', (HERE.parent / "refmath.h").read_text())[1]
+    for line in (HERE / "digests.txt").read_text().splitlines():
+        p = line.split()
+        if len(p) == 2 and p[0] == version:
+            return version, p[1]
+    return version, None
+
+
 def main(argv):
     args, vanilla = [], None
     it = iter(argv[1:])
@@ -233,6 +248,15 @@ def main(argv):
     digest = hashlib.sha256(text_a).hexdigest()
     print(f"golden digest (sha256, LF): {digest}  lines={len(rows)}")
     status = 0
+    version, want = expected_digest()
+    if want is None:
+        status = 1
+        print(f"expected digest: NONE for {version} in golden/digests.txt; record one when the version changes")
+    elif want != digest:
+        status = 1
+        print(f"expected digest: MISMATCH, {version} is {want}; a result changed without a REFMATH_VERSION bump")
+    else:
+        print(f"expected digest: MATCH ({version})")
     if len(args) > 1:
         text_b, _ = parse(args[1])
         if text_a == text_b:

@@ -18,7 +18,10 @@ import sys
 
 if os.environ.get("CAPSTONE_PATH"):
     sys.path.insert(0, os.environ["CAPSTONE_PATH"])
-import capstone  # noqa: E402
+try:
+    import capstone  # noqa: E402  (a dev tool; the runtime stays standard library only)
+except ImportError:
+    raise SystemExit("audit_refmath.py needs capstone (pip install capstone, or set CAPSTONE_PATH)") from None
 
 X87_EXACT = {"fld", "fstp", "fst", "fld1", "fldz", "fchs", "fabs", "fxch"}
 BANNED = {"cpuid", "rdtsc", "rdtscp", "rcpss", "rcpps", "rsqrtss", "rsqrtps"}

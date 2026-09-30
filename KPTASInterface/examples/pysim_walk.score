@@ -1,4 +1,4 @@
-#!score v1 game=k1 build=auto tier=lab hz=60 start=boot
+#!score v1 game=k1 build=auto hz=60 start=boot
 # Short PySim run: walk, run, turn and pause, with no game install needed.
 @segment walk
 10  w

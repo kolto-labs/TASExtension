@@ -29,7 +29,7 @@ class ConfigError(ValueError):
 
 DEFAULTS: dict[str, Any] = {
     "run": {
-        "tier": "lab",
+        "tier": "tas",                # lab, which writes memory and engine fields, is opt-in
         "game": "k1",
         "build": "auto",
         "backend": "auto",

@@ -30,6 +30,7 @@ except ImportError:  # not POSIX; meta.json updates are then unlocked
 
 META_NAME = "meta.json"
 EVICT_MARK = "evicted:"
+EVENT_MARK = "event:"       # one MARK per engine event; @mark labels cannot contain ':'
 _CAP, _KF, _MAT = TickFlag.CAPTURED, TickFlag.KEYFRAME, TickFlag.MATERIALIZED
 
 
@@ -185,7 +186,7 @@ class Bundle:
                 for area, pack, n in b.store.truncate_tails():
                     b.budget_log.append({"step": "recover", "pack": f"{AREA_DIRS[area]}/{pack}", "bytes_cut": n})
             b._ready = True
-            if not fresh:
+            if not fresh and writable:
                 b.save_index()
         except BaseException:
             b.close()
@@ -799,7 +800,10 @@ class Bundle:
     def receipt(self, r: Receipt) -> bytes:
         """RCPT is the one chunk allowed after SEAL (seeks and verification of a sealed run)."""
         self._check_writable(allow_sealed=True)
-        return self._append(b"RCPT", r.to_payload(), sync=True)
+        link = self._append(b"RCPT", r.to_payload(), sync=True)
+        if r.micros:
+            meta_append(self.root, "receipt_micros", {"link": link.hex(), "micros": r.micros})
+        return link
 
     def seal(self, computed_tier: str | Tier, publishable: bool) -> bytes:
         self._check_writable()

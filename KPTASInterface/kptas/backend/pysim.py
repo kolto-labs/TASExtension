@@ -19,9 +19,9 @@ import time
 import zlib
 from collections import deque
 from collections.abc import Iterable, Iterator, Mapping
-from datetime import datetime, timezone
 from typing import Any, Literal
 
+from kptas.supervisor import filetime
 from kptas.types import (PAGE_SIZE, VERB_ALLOW, BackendError, Caps, ClockMode, EngineEvent, EnvPin,
                          MemClass, OsEvent, PageRef, PointReason, ProcOutcome, Receipt,
                          RecordFlag, RecordKind, RefusedError, SeekMode, StagingRecord, StepReport,
@@ -76,14 +76,6 @@ def _dik(name: str) -> int:
         from kptas.score.keys import dik
         _DIK = dik
     return _DIK(name)
-
-
-def _filetime(iso: str) -> int:
-    dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    delta = dt - datetime(1601, 1, 1, tzinfo=timezone.utc)
-    return (delta.days * 86400 + delta.seconds) * 10_000_000 + delta.microseconds * 10
 
 
 class _Note:
@@ -153,7 +145,7 @@ class PySim:
         self.hz = int(clock.get("hz", 60))
         self.qpf_hz = int(clock.get("qpf_hz", 10_000_000))
         self.uptime0_ms = int(clock.get("uptime0_ms", 3_600_000))
-        self.realtime0 = _filetime(str(clock.get("initial_realtime", "2004-02-12T00:00:00Z")))
+        self.realtime0 = filetime(str(clock.get("initial_realtime", "2004-02-12T00:00:00Z")))
         self.budget_model = str(clock.get("budget_model", "frozen"))
         guard = clock.get("budget_guard", {})
         self.site_reads = int(guard.get("site_reads", 100_000))
@@ -180,7 +172,10 @@ class PySim:
         return self._caps
 
     def _allow(self, verb: str) -> None:
-        if self._tier is not None and self._tier not in VERB_ALLOW.get(verb, frozenset()):
+        allowed = VERB_ALLOW.get(verb, frozenset())
+        if self._tier is None and Tier.TAS not in allowed:
+            raise RefusedError(f"{verb} is lab only; lock the tier at lab first")
+        if self._tier is not None and self._tier not in allowed:
             raise RefusedError(f"{verb} is refused in tier {self._tier.label}")
 
     def _alive(self) -> None:
@@ -740,13 +735,6 @@ class PySim:
         if self._ring is not None:
             yield from self._ring.read()
 
-    def page_map(self) -> dict[int, PageRef]:
-        """The captured map at the last gate (what the ring records describe)."""
-        return dict(self._refs)
-
-    def live_pages(self) -> dict[int, bytes]:
-        return {v: bytes(b) for v, b in self._pages.items()}
-
     def restore(self, tick: int, root: bytes, pages: Iterable[StagingRecord]) -> Receipt:
         """Write W at the held gate, rebuild caches, verify the full root."""
         self._allow("restore")
@@ -795,22 +783,6 @@ class PySim:
                        mode=SeekMode.RESTORE, verify_level=VerifyLevel.FULL_ROOT, write_pages=n,
                        micros=us, state_root=live.hex(),
                        first_divergence=None if ok else live_tick, verifier="pysim")
-
-    def write_set(self, target: Mapping[int, bytes | None]) -> list[StagingRecord]:
-        """W for a target image {vaddr: page bytes}: pages that differ, plus DECOMMITs."""
-        tick = self._get("tick")
-        out = []
-        for v in sorted(set(target) | set(self._pages)):
-            want = target.get(v)
-            have = self._pages.get(v)
-            if want is None:
-                if have is not None:
-                    out.append(StagingRecord.decommit(tick, v, self.mclass(v)))
-            elif have is None or bytes(have) != want:
-                out.append(StagingRecord.page(tick, v, want, self.mclass(v), PROT_RW))
-        return out
-
-    # ------------------------------------------------------------------ reads, writes, semantic
 
     def read(self, addr: int, length: int) -> bytes:
         self._allow("mem.read")
@@ -867,7 +839,7 @@ class PySim:
                     for p, (d, vt) in sorted(self._files.items())]
             return canonical_json({"entries": ents})
         if op == "put":
-            if self._started and self._tier is not None and self._tier is not Tier.LAB:
+            if self._started and self._tier is not Tier.LAB:
                 raise RefusedError("files put after start is lab only")
             ents = json.loads(blob or b'{"entries":[]}')["entries"]
             files = {}
@@ -881,10 +853,6 @@ class PySim:
                 self._pending_vc |= VerbClass.FILES_WRITE
             return None
         raise BackendError(f"files op must be snap or put, not {op!r}")
-
-    def files_root(self) -> bytes:
-        tree = [[p, hashlib.sha256(d).hexdigest(), len(d), vt] for p, (d, vt) in sorted(self._files.items())]
-        return sha256(canonical_json({"entries": tree}))
 
     # ------------------------------------------------------------------ events, watches, os, frame
 
@@ -1008,24 +976,4 @@ def _png_gray(w: int, h: int, pix: bytes) -> bytes:
             + chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
 
 
-def map_from_records(records: Iterable[StagingRecord], base: dict[int, PageRef] | None = None
-                     ) -> dict[int, PageRef]:
-    """Fold PAGE records into a page map (a FULL batch replaces the map). Helper for callers."""
-    m = dict(base or {})
-    batch: list[StagingRecord] = []
-    for rec in records:
-        if rec.kind is RecordKind.PAGE:
-            batch.append(rec)
-        elif rec.kind is RecordKind.TICK_END:
-            if rec.flags & RecordFlag.FULL:
-                m = {}
-            for r in batch:
-                if r.flags & RecordFlag.DECOMMIT:
-                    m.pop(r.vaddr, None)
-                else:
-                    m[r.vaddr] = r.page_ref()
-            batch = []
-    return m
-
-
-__all__ = ["PySim", "map_from_records"]
+__all__ = ["PySim"]

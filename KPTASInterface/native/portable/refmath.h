@@ -20,7 +20,7 @@
  *    MXCSR = 0x1F80 whatever the caller had. They do not touch the x87
  *    control word. They are i386 only.
  *
- *    Opcode stubs (inline sites in game code, see sites.h):
+ *    Opcode stubs (inline sites in game code, listed in math_sites.toml):
  *      refmath_x87_fsin         st0 = sin(st0)
  *      refmath_x87_fcos         st0 = cos(st0)
  *      refmath_x87_fptan        st0 = tan(st0), then push 1.0 (as fptan)
@@ -29,10 +29,11 @@
  *      refmath_x87_fyl2x_lg     st1 = log10(st0), pop (site loaded st1 by fldlg2)
  *      refmath_x87_fyl2x_l2     st1 = log2(st0), pop  (site loaded st1 by fld1)
  *      refmath_x87_fyl2x        st1 = st1 * log2(st0), pop (constant unknown)
- *    The fyl2x variant is chosen per site from the static site table, never
- *    by inspecting st1 at run time: an x87 emulator may hold the fldln2 and
- *    fldlg2 constants with fewer bits, and a run-time match would then fall
- *    through to a different path on that host only.
+ *    The fyl2x variant is chosen per site from its fyl2x field in
+ *    math_sites.toml (ln, lg, l2 or generic), never by inspecting st1 at
+ *    run time: an x87 emulator may hold the fldln2 and fldlg2 constants
+ *    with fewer bits, and a run-time match would then fall through to a
+ *    different path on that host only.
  *
  *    MSVC CRT intrinsic stubs (_CIxxx convention: arguments on the x87
  *    stack, first argument deepest, result in st0, arguments popped):
@@ -53,8 +54,9 @@
 extern "C" {
 #endif
 
-/* Identity of the algorithm set. Bump when any result bit can change; the
- * golden vector digest in golden/README records the matching output. */
+/* Identity of the algorithm set. Bump when any result bit can change, and
+ * record the new golden vector digest in golden/digests.txt; golden/check.py
+ * fails while the digest for this version is missing or different. */
 #define REFMATH_VERSION "refmath/1"
 
 double refmath_sin(double x);

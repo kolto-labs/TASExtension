@@ -23,7 +23,7 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from kptas.holo import verify as hv
-from kptas.holo.bundle import Bundle
+from kptas.holo.bundle import EVENT_MARK, Bundle
 from kptas.holo.pages import PageMap
 from kptas.score import Expect, Note, Relaunch, Segment, Sync, compile_score
 from kptas.supervisor import PROCESS_BACKENDS, RunError, TelosError, merge_oneshots
@@ -47,7 +47,7 @@ class Cursor:
     pending: Any = None          # count-0 one-shots waiting for the next note
     hz: int = 60
     scale: int = 100
-    carry: tuple[tuple[str, str | None], ...] = ()   # syncs the recording met from the last report's events
+    carry: tuple[tuple[str, str | None], ...] = ()   # events a @sync right after this point is met from
 
 
 @dataclasses.dataclass
@@ -58,6 +58,20 @@ class _Session:
 
 def _held(note: Any) -> Any:
     return dataclasses.replace(note, wheel=0, osev=None) if note.wheel or note.osev else note
+
+
+def recorded_events(b: Bundle) -> dict[int, list[tuple[str, str | None]]]:
+    """Engine events by tick, from the event marks of b and of its ancestors up to each branch tick."""
+    out: dict[int, list[tuple[str, str | None]]] = {}
+    upto = None
+    while b is not None:
+        for m in b.marks:
+            if m["name"].startswith(EVENT_MARK) and (upto is None or m["tick"] <= upto):
+                name, sep, arg = m["name"][len(EVENT_MARK):].partition(":")
+                out.setdefault(m["tick"], []).append((name, arg if sep else None))
+        upto = b.header.parent.tick if b.header.parent is not None else None
+        b = b.parent
+    return out
 
 
 class _Seek:
@@ -110,8 +124,10 @@ class _Seek:
 
         A @sync or @expect exit consumes the recorded run of WAIT ticks; a @sync that consumed none was
         met from the previous report's events. Two waits in a row cannot be told apart, so placement
-        stops there. Ticks inside a wait are not resume points.
+        stops there. Ticks inside a wait are not resume points. A cursor inside a note carries the
+        events recorded on the note's ticks so far, which the rest of the note's report would have held.
         """
+        evs = recorded_events(self.b)
         t = self.first_tick()
         pending, hz, scale, alive, prev_wait = None, self.base_hz, self.base_scale, True, False
         at = {t: Cursor(0, 0, None, hz, scale)}
@@ -126,8 +142,13 @@ class _Seek:
                     pending = merge_oneshots(pending, it)
                     continue
                 n = min(it.count, end - t)
-                for j in range(1, n):
-                    at[t + j] = Cursor(i, j, None, hz, scale)
+                seen: tuple[tuple[str, str | None], ...] = ()
+                for j in range(1, n + 1):
+                    seen += tuple(evs.get(t + j, ()))
+                    if j < it.count:
+                        at[t + j] = Cursor(i, j, None, hz, scale, seen)
+                if n < it.count:
+                    return at          # the note runs on past `end`
                 pending, prev_wait = None, False
                 alive = alive and it.osev not in ("altf4", "close")
             elif isinstance(it, (Sync, Expect)):
@@ -168,10 +189,17 @@ class _Seek:
                 live.tick, live.journal = sup.tick, None
                 self.compare(sup.tick, None, rep, strict)
             return
+        first = None
         for t, journal in live.feed(recs, sup.offset):
-            self.compare(t, journal, None, strict)
+            try:
+                self.compare(t, journal, None, strict)
+            except _Mismatch as e:        # keep folding: records already drained must reach live.map
+                first = first or e
         if live.tick > sup.tick:          # an in-process relaunch reports its boot tick with the next step
             sup.tick = live.tick
+        if first is not None:
+            live.ok = False
+            raise first
 
     def compare(self, t: int, journal: bytes | None, rep: Any, strict: bool) -> None:
         want, live = self.rec(t), self.live
@@ -275,10 +303,10 @@ class _Seek:
                         pending = merge_oneshots(pending, it)
                         continue
                     note, pending = merge_oneshots(pending, it), None
-                    n = it.count
-                    if i == cur.i and cur.j:
+                    n, resumed = it.count, i == cur.i and cur.j > 0
+                    if resumed:
                         note, n = _held(note), n - cur.j
-                    self.absorb(sup.step(min(n, target - sup.tick), note))
+                    self.absorb(sup.step(min(n, target - sup.tick), note, keep_carry=resumed))
                 elif isinstance(it, Sync):
                     if hit(sup.carry, it):
                         sup.carry = []
@@ -338,6 +366,8 @@ class _Seek:
             return None if self.map_at(T) is not None else f"map({T}) is not in the store"
         if mode is SeekMode.SEMANTIC and (hv.journal_of(want) is None or not want.flags & TickFlag.CAPTURED):
             return f"tick {T} keeps no semantic journal or was not captured"
+        if mode is SeekMode.SEMANTIC and self.map_at(T) is None:
+            return f"map({T}) is not in the store"
         if self.anchor(T, at, need_cursor=mode is SeekMode.HYBRID) is None:
             return f"no restore point at or before tick {T} in epoch {want.epoch}"
         return None
@@ -590,4 +620,4 @@ def resume_cursor(b: Bundle, tick: int, score: Any, cfg: Mapping[str, Any]) -> C
     return dataclasses.replace(cur, i=i + 1, j=0) if it.count == cur.j else dataclasses.replace(cur, i=i)
 
 
-__all__ = ["Cursor", "resume_cursor", "seek"]
+__all__ = ["Cursor", "recorded_events", "resume_cursor", "seek"]

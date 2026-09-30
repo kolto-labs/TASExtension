@@ -10,8 +10,8 @@ from typing import Any, BinaryIO, Iterator
 
 from kptas.types import (CHAINED_TYPES, CHUNK_HEAD_SIZE, CHUNK_MAGIC, CHUNK_TRAILER_SIZE, CHUNK_TYPES,
                          MAX_CHUNK_PAYLOAD, NULL_DIGEST, EnvPin, FormatError, Header, Receipt, Tier,
-                         TickRecord, canonical_json, chain_genesis, chain_link, chained_payload,
-                         frame_chunk, read_chunk, split_chained)
+                         TickRecord, canonical_json, chain_genesis, chain_link, frame_chunk, read_chunk,
+                         split_chained)
 
 GENESIS = (b"HOLO", b"SCOR", b"ENVP")
 EPOCH_REASONS = ("altf4", "close", "relaunch", "crash")
@@ -253,11 +253,6 @@ class Journal:
         self.f.write(frame)
         self.f.flush()
         return off, off + len(frame)
-
-    def append_chained(self, prev: bytes, fourcc: bytes, body: bytes) -> tuple[int, int, bytes]:
-        payload, link = chained_payload(prev, fourcc, body)
-        off, end = self.append_raw(fourcc, payload)
-        return off, end, link
 
     def fsync(self) -> None:
         self.f.flush()

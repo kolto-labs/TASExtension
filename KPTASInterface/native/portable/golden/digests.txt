@@ -1,0 +1,3 @@
+# Expected golden digest per REFMATH_VERSION: sha256 of `golden ref` output with LF line ends.
+# check.py fails when the digest for the version in refmath.h is missing or differs.
+refmath/1 2a77e2f6ab63aac2e48a87e125619562a7be85ce8eb69e824b5523ab4bda9ff8

@@ -274,6 +274,7 @@ class BundleSink:
 
     def tick(self, report: StepReport, note: Any, records: list[StagingRecord]) -> None:
         from kptas.backend.staging import batches
+        from kptas.holo.bundle import EVENT_MARK
         from kptas.holo.pages import PageMap
         from kptas.types import NULL_DIGEST, PointReason, RecordFlag, TickFlag, TickRecord, sha256
 
@@ -329,6 +330,8 @@ class BundleSink:
                                f" but its records give {root.hex()[:16]}")
             self.bundle.append_tick(rec, payload)
             self.ticks += 1
+        for e in report.events:     # a seek that resumes inside a note gets the events of its first ticks here
+            self.bundle.mark(EVENT_MARK + (e.name if e.arg is None else f"{e.name}:{e.arg}"), e.tick)
 
     def mark(self, name: str, tick: int) -> None:
         self.bundle.mark(name, max(tick, 0))
@@ -394,6 +397,8 @@ def merge_oneshots(pending: Any, note: Any) -> Any:
     """Carry a count-0 note's one-shots (wheel, os event) onto the next note's first tick."""
     if pending is None:
         return note
+    if pending.osev and note.osev:     # the compiler refuses this; never drop one silently
+        raise RunError(f"!{pending.osev} and !{note.osev} land on the same tick; one os event per tick")
     return dataclasses.replace(note, wheel=pending.wheel + note.wheel,
                                osev=note.osev or pending.osev)
 
@@ -426,7 +431,7 @@ class Supervisor:
         self.alive = False
         self.epoch_closed = True
         self.last_osev: str | None = None
-        self.carry: list[Any] = []       # events of the last report, not yet used by a @sync
+        self.carry: list[Any] = []       # events of the last report (of the whole note when resumed inside it)
 
     # lifecycle
     def open(self) -> StepReport:
@@ -528,11 +533,11 @@ class Supervisor:
             else:
                 self.sink.epoch(self.epoch, self.tick, reason, status, files=files)
 
-    def _emit(self, rep: StepReport, note: Any) -> StepReport:
+    def _emit(self, rep: StepReport, note: Any, keep_carry: bool = False) -> StepReport:
         rep = dataclasses.replace(rep, tick=rep.tick + self.offset, epoch=self.epoch,
                                   events=self._shift(rep.events))
         self.tick = rep.tick
-        self.carry = list(rep.events)
+        self.carry = (self.carry if keep_carry else []) + list(rep.events)
         if rep.outcome is ProcOutcome.EXITED:
             self.alive = False
         if self.sink is not None:
@@ -561,11 +566,12 @@ class Supervisor:
         return self.backend
 
     # ticks
-    def step(self, n: int, note: Any) -> StepReport:
+    def step(self, n: int, note: Any, keep_carry: bool = False) -> StepReport:
+        """keep_carry: this step finishes a note resumed inside it, so the note's earlier events still count."""
         b = self._live()
         if note.osev:
             self.last_osev = note.osev
-        return self._emit(b.step(n, note), note)
+        return self._emit(b.step(n, note), note, keep_carry)
 
     def wait(self, event: str, arg: str | None, timeout: int, note: Any = None) -> StepReport:
         return self._emit(self._live().wait(event, arg, timeout, note), note)
@@ -642,7 +648,7 @@ class Supervisor:
                     n = min(n, max_ticks - self.tick)
                 if pace == "realtime":
                     wall0 = wall0 or (time.monotonic(), self.tick)
-                emit(self.step(n, note), note)
+                emit(self.step(n, note, keep_carry=idx == first and played > 0), note)
                 if pace == "realtime":
                     ahead = wall0[0] + (self.tick - wall0[1]) / self.hz - time.monotonic()
                     if ahead > 0:
@@ -702,13 +708,6 @@ def _where(item: Any) -> str:
     return f"{item.source}:{item.line}"
 
 
-def open_for(cfg: Mapping[str, Any], **kw: Any) -> Supervisor:
-    """A Supervisor with the first epoch already started."""
-    sup = Supervisor(cfg, **kw)
-    sup.open()
-    return sup
-
-
 def note_text(note: Any) -> str:
     """Canonical note text without its count, e.g. 'w lmb'."""
     from kptas.score.fmt import render
@@ -726,4 +725,4 @@ def parse_note(text: str, count: int = 1) -> Any:
 
 __all__ = ["BundleSink", "GameLink", "RunError", "RunResult", "Sink", "Supervisor", "TelosError", "clock_env",
            "default_factory", "filetime", "game_command", "game_environ", "merge_oneshots",
-           "note_text", "open_for", "open_link", "parse_note", "require", "session_dir"]
+           "note_text", "open_link", "parse_note", "require", "session_dir"]

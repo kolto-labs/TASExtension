@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import dataclasses
+import os
 import sys
 import time
 from collections.abc import Callable, Iterator, Mapping
@@ -329,12 +330,13 @@ def judge(b: Bundle, cfg: Mapping[str, Any], log: Callable[[str], None] | None =
         kind="judge", result=("best_effort" if backend == "handsoff" else "pass") if ok else "fail",
         from_tick=min(recorded), to_tick=last, mode=SeekMode.REPLAY,
         verify_level=(VerifyLevel.FRAMES if backend == "handsoff" else
-                      VerifyLevel.SIM_ROOT if roots else VerifyLevel.JOURNAL),
+                      VerifyLevel.FULL_ROOT if roots else VerifyLevel.JOURNAL),
         micros=us, state_root=hv.root_hex(tail.state_root) if tail else "",
         journal_sha256=hv.root_hex(tail.journal_sha256) if tail else "",
         first_divergence=first[0][0] if first else None,
         restore_points=hv.restore_ranges((t, bool(x.flags & TickFlag.RESTORE_POINT)) for t, x in fresh.items()),
-        verifier=(f"judge {backend} fresh {'process' if backend in PROCESS_BACKENDS else 'instance'}; "
+        verifier=(f"judge {backend} fresh {'process' if backend in PROCESS_BACKENDS else 'instance'}"
+                  f"{' in a fresh interpreter' if os.environ.get('KPTAS_FRESH_JUDGE') else ''}; "
                   f"compare {compare}; {len(points & set(fresh))} of {len(points)} ticks compared"),
         env_key=have.key())
     dest = _fresh_path(b.root.with_name(f"{b.root.name[:-5]}@judge.holo"))

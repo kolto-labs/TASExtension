@@ -214,8 +214,6 @@ class HandsOff:
         if note is not None and note.mouse_abs is not None and (first or note.mouse_abs != self._mouse):
             chain += ["mousemove", "--window", self.wid or "0", str(note.mouse_abs[0]), str(note.mouse_abs[1])]
             self._mouse = tuple(note.mouse_abs)
-        if note is not None and note.mouse_rel is not None:
-            chain += ["mousemove_relative", "--", str(note.mouse_rel[0]), str(note.mouse_rel[1])]
         for b in sorted(self._buttons - buttons):
             chain += ["mouseup", _BUTTON[b]]
         for b in sorted(buttons - self._buttons):
@@ -239,23 +237,31 @@ class HandsOff:
         if delay > 0:
             time.sleep(delay)
 
+    def _ticks(self, n: int, note: Any) -> VerbClass:
+        """n ticks of wall time. A relative mouse move repeats every tick, as the Note contract says."""
+        _, vc = self._apply(note, first=True)
+        for _i in range(n):
+            if note is not None and note.mouse_rel is not None:
+                self.xdo("mousemove_relative", "--", str(note.mouse_rel[0]), str(note.mouse_rel[1]))
+                vc |= VerbClass.OS_INPUT
+            self._tick += 1
+            self._sleep_to(self._tick)
+        return vc
+
     def step(self, n: int, note: Any = None) -> StepReport:
         self._alive()
-        _, vc = self._apply(note, first=True)
-        self._tick += n
-        self._sleep_to(self._tick)
-        return self._report(vc, ())
+        return self._report(self._ticks(n, note), ())
 
     def wait(self, event: str, arg: str | None, timeout_ticks: int, note: Any = None) -> StepReport:
-        """No engine events are observable: hold for the timeout, then hash a frame (best effort)."""
+        """No engine events are observable: hold for the timeout, report the wait as met, and hash a frame
+        (best effort) into a separate "frame" event."""
         self._alive()
-        _, vc = self._apply(note, first=True)
-        self._tick += max(1, timeout_ticks)
-        self._sleep_to(self._tick)
+        vc = self._ticks(max(1, timeout_ticks), note)
         png = self.frame()
-        ev = EngineEvent("sync", self._tick, hashlib.sha256(png or b"").hexdigest())
-        self._events.append(ev)
-        return self._report(vc | VerbClass.WAIT | VerbClass.SCREEN, (ev,))
+        evs = (EngineEvent(event, self._tick, arg),
+               EngineEvent("frame", self._tick, hashlib.sha256(png or b"").hexdigest()))
+        self._events.extend(evs)
+        return self._report(vc | VerbClass.WAIT | VerbClass.SCREEN, evs)
 
     def _alive(self) -> None:
         if not self._started:
