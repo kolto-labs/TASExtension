@@ -37,7 +37,7 @@ The first line is `#!score v1`, then `key=value` pairs.
 |---|---|---|
 | `game` | `k1`, `k2` | `k1` |
 | `build` | `auto`, or a build id | `auto` (from the exe's sha256) |
-| `tier` | `lab`, `tas`, `hands-off` | `run.tier` in `telos.toml`, then `lab` |
+| `tier` | `lab`, `tas`, `hands-off` | `run.tier` in `telos.toml`, then `tas` |
 | `hz` | a whole number | `clock.hz`, then 60 |
 | `start` | `boot`, or `save:<sha256>` | `boot` |
 | `render` | free text, for example `800x600/low` | unset |
@@ -163,4 +163,4 @@ Rebinding keys in the game makes this file wrong. Check it again first.
 
 ## A score for the game
 
-[examples/taris_amg.score](../examples/taris_amg.score) is written for KotOR I: a save teleport on Taris, then an AMG. It compiles. It has not run anywhere, since exact replay in the game is still M1. Its own comments say the menu positions are placeholders, and its `start=save:9f3c41d2` is short, so `run` would refuse it as written. It shows the shape a real route takes: `@sync` on engine events, `!altf4` during `save.begin`, `@expect exit|alive` and `@relaunch if=exit`.
+[examples/taris_amg.score](../examples/taris_amg.score) is written for KotOR I: a save teleport on Taris, then an AMG. It compiles. It has not run anywhere; M1's first game run used a different score. Its own comments say the menu positions are placeholders, and its `start=save:9f3c41d2` is short, so `run` would refuse it as written. It shows the shape a real route takes: `@sync` on engine events, `!altf4` during `save.begin`, `@expect exit|alive` and `@relaunch if=exit`.

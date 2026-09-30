@@ -17,7 +17,7 @@ Commands here are written as `telos`. From the repo root that is `PYTHONPATH=KPT
 | Memory writes | any | only recorded bytes, through restore | none |
 | What gets published | the holorecord, marked lab | the score, after a clean judge replay | the score and a capture, best effort |
 
-The default tier is lab.
+The default tier is tas, and it is read-only: it sends inputs, runs the virtual clock, captures state, and restores only states the game was already in. Its default seek is checkpoint plus replay. lab is for work that writes memory, and you have to ask for it.
 
 ## How the tier is computed
 

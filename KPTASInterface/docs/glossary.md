@@ -20,11 +20,11 @@
 
 **Desync.** Two runs of one score that stop matching. `telos diff` and `telos bisect` name the first tick and field where they split, and a judge replay fails on it.
 
-**Tier.** How much the tool touched the game: lab, tas or hands-off. It is computed from the run, not taken from the header. See [tiers.md](tiers.md).
+**Tier.** How much the tool touched the game: lab, tas or hands-off. tas, the read-only one, is the default. The tier is computed from the run, not taken from the header. See [tiers.md](tiers.md).
 
 **Virtual clock.** The time the game is shown, computed from the tick count instead of read from the machine. At 60 Hz each tick is 1/60 s with the remainder carried, so 60 ticks are exactly 1,000,000 µs. QueryPerformanceCounter, GetTickCount and the system time all read from it. PySim runs on it today; in the game it is part of M1.
 
-**Reference math.** Software sin, cos, tan, atan2, exp, log and pow built only from operations SSE2 performs exactly, so the same input bits give the same output bits on every x86 CPU. The game's own x87 math can differ between CPUs. The KotOR I exe has 105 x87 math sites, and the portable profile will point them at the reference versions.
+**Reference math.** Software sin, cos, tan, atan2, exp, log and pow built only from operations SSE2 performs exactly, so the output shouldn't depend on the CPU. Checked so far: an i386 build under Wine and an x86_64 build give the same bytes, on one host. The game's own x87 math can differ between CPUs. The KotOR I exe has 105 x87 math sites, and the portable profile will point them at the reference versions. Whether that changes any result in the game is not measured yet.
 
 **Epoch.** One game process, from launch to exit. Alt-F4 ends one, and a relaunch starts the next.
 

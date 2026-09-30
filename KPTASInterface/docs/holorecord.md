@@ -85,7 +85,7 @@ PySim captures every tick. It also simulates a load, so ticks 11 to 23 of the ex
 12    0   IGCP   ch     recorded  1   3    c8653c86  c1ec3f0d  w lmb rmb
 ```
 
-In the game, M1 records the journal digest per tick only. Capturing pages every tick is M2.
+In the game, M1 records a journal per tick only: a digest of the exe's writable data, engine fields and rand call counts. Capturing pages every tick, the full heap included, is M2.
 
 ## Seeking
 
@@ -116,7 +116,7 @@ telos: seek 15: restore is not possible: tick 15 is not a restore point (other)
 
 (Receipt trimmed.) A plain restore to tick 40 wrote 27 pages, checked the full root and passed its canary.
 
-All four modes run on PySim today. In the game, replay is the M1 target, restore and hybrid need M2 and M3, and semantic stays lab only. Replay starts from boot for now, because no backend can reload a save yet.
+All four modes run on PySim today. In the game, replay is M1, which has its first identical pair; restore and hybrid need M2 and M3, and semantic stays lab only. Replay starts from boot for now, because no backend can start a run from a save file yet. A score can still load a save the way a player does, through the Load Game menu. The M1 pair did.
 
 ## Branches
 

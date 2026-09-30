@@ -1,6 +1,6 @@
 # KPTASInterface
 
-The TAS toolkit in KPHarness. Codename InputInterfaceTelos. The import package is `kptas`, the command line is `telos`, and the design lives in [docs/design/contract.md](docs/design/contract.md). Where the code and the contract disagree, the contract says the code is wrong.
+The TAS toolkit in KPHarness. KPTASInterface is the project; InputInterfaceTelos is the package (`inputinterfacetelos`) and the name on the demo. It imports as `kptas`, the command line is `telos`, and the design lives in [docs/design/contract.md](docs/design/contract.md). Where the code and the contract disagree, the contract says the code is wrong.
 
 Python 3.11 or newer. The Python side is standard library only.
 
@@ -65,11 +65,11 @@ Every command in the table except `edit`, `gym serve` and `repl` has been run on
 
 ## Config
 
-One file, `telos.toml`, read from the current directory or from `--config`. Every key is optional. With no file at all, a run is lab tier at 60 Hz on PySim.
+One file, `telos.toml`, read from the current directory or from `--config`. Every key is optional. With no file at all, a run is tas tier at 60 Hz on PySim. tas is read-only, and its default seek is checkpoint plus replay. lab, which can write memory, has to be asked for:
 
 ```toml
 [run]
-tier = "tas"
+tier = "lab"
 
 [game]
 dir = "~/games/kotor"    # the folder holding swkotor.exe; unset means PySim
@@ -102,7 +102,7 @@ A score header's `tier` and `hz` win over `run.tier` and `clock.hz`.
 | Backend | What it is | Tier ceiling | Status |
 |---|---|---|---|
 | `pysim` | A deterministic stand-in game in pure Python. It emits the same records and page keys as the shim. | tas | works; every example in these docs ran on it |
-| `shim` | The real game, driven through the `dinput8.dll` shim | tas, or lab if a module outside the allowlist is loaded | M1, in progress |
+| `shim` | The real game, driven through the `dinput8.dll` shim | tas, or lab if a module outside the allowlist is loaded | M1: first identical pair in, being re-verified |
 | `simgame` | SimGame.exe under Wine, running the real shim core | tas | planned; not in the tree yet |
 | `handsoff` | OS-level input through xdotool, frames through ffmpeg x11grab, no code in the game process | hands-off | code exists; the hands-off tier in the game is M5, planned |
 
@@ -124,9 +124,9 @@ It starts no threads, no Winsock, and calls no `LoadLibrary`. If the hash does n
 
 The entry detour runs next, outside the loader lock. It connects to Python on loopback (`KPTAS_PORT`, `KPTAS_SESSION`), answers `hello`, and holds until `start`. From then on the gate at the top of each `WinMain` pass owns input, the clock and capture.
 
-The source is in `native/shim/src/`. `native/shim/build.sh` builds freestanding C with `zig cc` for `x86-windows-gnu`, with no C runtime. It calls `$Z cc`, so set `Z` to your zig command. There is no install step yet, because M1 is not done.
+The source is in `native/shim/src/`. `native/shim/build.sh` builds freestanding C with `zig cc` for `x86-windows-gnu`, with no C runtime. It calls `$Z cc`, so set `Z` to your zig command. There is no install step yet, because M1 is still being re-verified.
 
 ## Native pieces that are done
 
 - **M0 probes** (`native/probes/`). A fixed 1 GB write-watched arena at `0x10000000` reports exactly the pages written. A stack switch keeps SEH working and costs 14 ns. The proxy's `DllMain` runs before the runtime and `WinMain`. Results are in [contract §12](docs/design/contract.md).
-- **Reference math** (`native/portable/`). `refmath.c` gives sin, cos, tan, atan2, exp, log, pow and the rest, built only from operations SSE2 performs exactly, so the same input bits give the same output bits on every x86 CPU. `math_sites.toml` lists the 105 x87 transcendental sites in the K1 GOG 1.03 exe: 99 in game code, 6 in the runtime. `golden/check.py` compares the output of an i386 build under Wine with an x86_64 Linux build; they must match byte for byte.
+- **Reference math** (`native/portable/`). `refmath.c` gives sin, cos, tan, atan2, exp, log, pow and the rest, built only from operations SSE2 performs exactly, so the output should not depend on the CPU. `golden/check.py` is the check: an i386 build under Wine and an x86_64 Linux build must give the same bytes. So far they do, on one host. `math_sites.toml` lists the 105 x87 transcendental sites in the K1 GOG 1.03 exe: 99 in game code, 6 in the runtime. Whether pointing them at `refmath.c` changes any result in the game is not measured yet.
