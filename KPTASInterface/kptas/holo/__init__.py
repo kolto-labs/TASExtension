@@ -8,3 +8,7 @@ from kptas.holo.pages import EvictedError, Loc, MissingObject, PageMap, Store
 
 __all__ = ["AuditReport", "BudgetError", "Bundle", "ChainState", "EvictedError", "Journal", "Loc",
            "MissingObject", "PageMap", "Store", "TickRow", "audit_journal", "create_branch", "read_meta"]
+
+from kptas.holo.seek import seek  # noqa: E402  (last: seek imports the modules above)
+
+__all__ += ["seek"]
