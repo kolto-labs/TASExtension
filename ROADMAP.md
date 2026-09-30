@@ -14,7 +14,10 @@ Estimates are working days of focused work. They are guesses made from what the 
 | Design contract: score format, holorecord bundle, byte formats, wire verbs, tiers, all four seek modes, TOML | done | `KPTASInterface/docs/design/contract.md` |
 | Score language: parser, `fmt`, compiler, keymap from the game's own `keymap.2da` | done | Example scores compile, `fmt` is idempotent |
 | M0 probes under Wine | done | A `dinput8.dll` proxy runs before the game's startup code. A fixed 1 GB write-watched arena reports exactly the written pages. An own stack switch keeps SEH working (14 ns per switch). |
-| Portable boundary census (GPU identity, CPU math, host facts, resolution) | next | Running |
+| Portable boundary census (GPU identity, CPU math, host facts, resolution) | done | Every machine-dependent input the exe reads, listed with its address; 105 x87 math sites inventoried from the Ghidra listing |
+| Python core: holorecord bundle, seek planner (all four modes), verify, tiers, backends, `telos` CLI | done | On PySim, seeks to ticks 20, 41 and 70 reach the recorded state root in every mode; `verify --fresh` compares every tick; two recordings of the same score give byte-identical journals |
+| Reference math | done | Within 1 ulp of correctly rounded; i386 under Wine and native x86_64 give byte-identical golden output |
+| Browser prototype | done | https://kptas-demo.bocloud.workers.dev |
 
 ## Milestones
 
@@ -24,7 +27,7 @@ The shim loads as `dinput8.dll`, stops the game at the top of each WinMain pass,
 
 Done when: the same score played twice gives an identical per-tick journal.
 
-### Python core (next, ~1 day, in parallel with M1)
+### Python core (done)
 
 - holorecord bundle: journal, page store, keyframe packs, index, hash chain
 - seek planner for replay, restore, hybrid and semantic, with a finite fallback chain
@@ -34,7 +37,7 @@ Done when: the same score played twice gives an identical per-tick journal.
 - the `telos` CLI and REPL
 - a Gymnasium-style `step()` API
 
-### Portable profile (planned, ~1 day)
+### Portable profile (reference math done; hooking it into the shim is planned, ~1 day)
 
 One fixed virtual machine for every player:
 - the same GPU identity
