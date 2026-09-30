@@ -5,7 +5,10 @@
 // Manifest fields: title, source_note, video, poster, frames[] {t, src},
 // inputs[] {t, keys}. Times are in seconds from the start of the recording.
 
-const MANIFEST = 'media/swoop/manifest.json';
+const RECORDINGS = [
+  { label: 'Taris swoop race', url: 'media/swoop/manifest.json' },
+  { label: 'Ebon Hawk turret fight', url: 'media/fighter/manifest.json' },
+];
 const MONO = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace';
 const LANE_ORDER = ['w', 'a', 's', 'd', 'q', 'e', 'space', 'tab', 'esc', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'lmb', 'rmb'];
 
@@ -44,8 +47,8 @@ export function cleanManifest(m, base) {
   };
 }
 
-export async function fetchManifest() {
-  const url = new URL(MANIFEST, document.baseURI);
+export async function fetchManifest(path = RECORDINGS[0].url) {
+  const url = new URL(path, document.baseURI);
   try {
     const res = await fetch(url, { cache: 'no-cache', credentials: 'same-origin' });
     const type = res.headers.get('content-type') || '';
@@ -75,8 +78,9 @@ export class Footage {
   async open() {
     if (this.loaded) return;
     this.loaded = true;
+    this.current ??= 0;
     this.root.replaceChildren(el('p', 'status', 'Loading the capture.'));
-    this.m = await fetchManifest();
+    this.m = await fetchManifest(RECORDINGS[this.current].url);
     if (!this.m) {
       this.root.replaceChildren(el('p', 'footage-empty', 'Real game capture is on the way.'));
       return;
@@ -86,7 +90,16 @@ export class Footage {
 
   build() {
     const m = this.m;
+    this.video?.pause();
+    this.video = null;
+    this.img = null;
     const frag = document.createDocumentFragment();
+    const pick = el('label', 'footage-pick', 'Recording ');
+    const sel = document.createElement('select');
+    RECORDINGS.forEach((r, i) => sel.append(new Option(r.label, String(i), false, i === this.current)));
+    sel.addEventListener('change', () => { this.current = Number(sel.value); this.loaded = false; this.open(); });
+    pick.append(sel);
+    frag.append(pick);
     frag.append(el('h3', 'footage-title', m.title || 'Recording'));
     frag.append(el('p', 'honest', 'This is a recording of the real game. Your browser plays it back. It does not simulate it.'));
     if (m.note) frag.append(el('p', 'help', m.note));
