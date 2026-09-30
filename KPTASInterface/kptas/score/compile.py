@@ -12,7 +12,8 @@ from .fmt import header_line, render
 from .include import IncludeStack, read, resolve
 from .parser import HEADER_ORDER, parse
 
-DEFAULTS = {"game": "k1", "build": "auto", "tier": "lab", "hz": 30,
+# tier and hz stay unset unless the score says so; the run config fills them in.
+DEFAULTS = {"game": "k1", "build": "auto", "tier": None, "hz": None,
             "start": None, "render": None, "keymap": None}
 DEFAULT_SCALE = 100
 DEFAULT_PACE = "gate"
@@ -148,7 +149,7 @@ class _Compiler:
         # Options left out take the header or default value, not the previous segment's.
         hz = s.hz or self.header["hz"]
         scale = s.scale or DEFAULT_SCALE
-        if scale * 1_000_000 >= hz * 2**31:
+        if hz is not None and scale * 1_000_000 >= hz * 2**31:
             raise ScoreError(f"scale={scale} at hz={hz} overflows the engine timer "
                              "(scale*1e6/hz must stay below 2^31)", s.source, s.line, 1)
         self.add(Segment(s.name, hz, scale, s.pace or DEFAULT_PACE, source=s.source, line=s.line))
