@@ -3,7 +3,7 @@
 A score is a text file. Each line is a note: how many ticks to hold, then every input held during them.
 
 ```
-#!score v1 game=k1 build=auto tier=lab hz=60 start=boot
+#!score v1 game=k1 build=auto hz=60 start=boot
 # Short PySim run: walk, run, turn and pause, with no game install needed.
 @segment walk
 10  w
@@ -24,7 +24,7 @@ That is [examples/pysim_walk.score](../examples/pysim_walk.score). Check it (`te
 
 ```
 $ telos score check KPTASInterface/examples/pysim_walk.score
-ok KPTASInterface/examples/pysim_walk.score: 13 items, 82 note ticks, 1 files, sha256 5951ac5a9d915346  [game=k1 build=auto tier=lab hz=60 start=boot]
+ok KPTASInterface/examples/pysim_walk.score: 13 items, 82 note ticks, 1 files, sha256 ae7bf76c6d464927  [game=k1 build=auto hz=60 start=boot]
 ```
 
 Tick 0 is the first gate after the game starts, before any input. The first note starts at tick 1, so `12  a` covers ticks 37 to 48.

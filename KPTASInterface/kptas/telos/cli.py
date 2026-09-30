@@ -30,6 +30,7 @@ from kptas.types import (SEEK_ALIASES, BackendError, EngineEvent, EnvPin, Format
 CONFIG_NAME = "telos.toml"
 FRESH_JUDGE = "KPTAS_FRESH_JUDGE"      # set in the child that verify.fresh_process starts
 SEEK_CHOICES = (*(m.value for m in SeekMode), *sorted(SEEK_ALIASES))
+BACKEND_CHOICES = ("auto", "pysim", "simgame", "shim", "handsoff", "phasor")   # kptas.backend.BACKENDS
 
 
 def out(line: str = "") -> None:
@@ -568,7 +569,7 @@ def build_parser() -> argparse.ArgumentParser:
         return sp
 
     def backend_opts(sp: argparse.ArgumentParser) -> None:
-        sp.add_argument("--backend", choices=("auto", "pysim", "simgame", "shim", "handsoff"))
+        sp.add_argument("--backend", choices=BACKEND_CHOICES)
         sp.add_argument("--attach", action="store_true",
                         help="wait for an already started game on shim.port instead of launching one")
 
@@ -638,7 +639,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("bundle")
     s.add_argument("--fresh", action="store_true", help="in a new process in the pinned environment")
     s.add_argument("--compare", choices=("every_tick", "syncs", "end"))
-    s.add_argument("--backend", choices=("auto", "pysim", "simgame", "shim", "handsoff"))
+    s.add_argument("--backend", choices=BACKEND_CHOICES)
 
     t = sub.add_parser("tier", help="effective tier of a bundle")
     tsub = t.add_subparsers(dest="sub", required=True, metavar="action", parser_class=_Parser)
@@ -649,10 +650,10 @@ def build_parser() -> argparse.ArgumentParser:
     esub = e.add_subparsers(dest="sub", required=True, metavar="action", parser_class=_Parser)
     s = cmd("pin", cmd_env_pin, "hash the current environment into an ENVP pin", esub)
     s.add_argument("--out", "-o")
-    s.add_argument("--backend", choices=("auto", "pysim", "simgame", "shim", "handsoff"))
+    s.add_argument("--backend", choices=BACKEND_CHOICES)
     s = cmd("check", cmd_env_check, "compare the current environment with a pin or a bundle", esub)
     s.add_argument("pin")
-    s.add_argument("--backend", choices=("auto", "pysim", "simgame", "shim", "handsoff"))
+    s.add_argument("--backend", choices=BACKEND_CHOICES)
 
     s = cmd("caps", cmd_caps, "launch or attach a backend and print its capabilities")
     backend_opts(s)

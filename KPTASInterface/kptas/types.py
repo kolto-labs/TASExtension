@@ -1214,7 +1214,7 @@ class Receipt:
 
 @runtime_checkable
 class Backend(Protocol):
-    """One way to run a score. Implementations: pysim, simgame, shim, handsoff.
+    """One way to run a score. Implementations: pysim, simgame, shim, handsoff, phasor.
 
     Methods outside the backend's capabilities raise BackendError; methods outside
     the locked tier raise RefusedError. Every method that runs ticks returns a StepReport.

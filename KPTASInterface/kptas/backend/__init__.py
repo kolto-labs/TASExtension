@@ -1,4 +1,4 @@
-"""Backends behind kptas.types.Backend: pysim, simgame, shim and handsoff."""
+"""Backends behind kptas.types.Backend: pysim, simgame, shim, handsoff and the optional phasor."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from kptas.types import Backend, BackendError
 
 from .staging import BatchAssembler, RingFull, StagingRing, batches, read_records, write_records
 
-BACKENDS = ("pysim", "simgame", "shim", "handsoff")
+BACKENDS = ("pysim", "simgame", "shim", "handsoff", "phasor")
 
 
 def make_backend(cfg: Mapping[str, Any], **kwargs: Any) -> Backend:
@@ -24,6 +24,9 @@ def make_backend(cfg: Mapping[str, Any], **kwargs: Any) -> Backend:
     if name == "handsoff":
         from .handsoff import HandsOff
         return HandsOff(**kwargs)
+    if name == "phasor":
+        from .phasor import PhasorBackend
+        return PhasorBackend(**kwargs)
     raise BackendError(f"unknown backend {name!r}; expected one of {', '.join(BACKENDS)}")
 
 

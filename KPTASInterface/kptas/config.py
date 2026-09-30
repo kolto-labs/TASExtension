@@ -244,6 +244,9 @@ DEFAULTS: dict[str, Any] = {
     "determinism": {
         "strict_key": True,
     },
+    "phasor": {
+        "port": 0,
+    },
     "handsoff": {
         "input_tool": "xdotool",
         "capture": "x11grab",
@@ -274,7 +277,7 @@ _S = frozenset
 ENUMS: dict[str, frozenset[str]] = {
     "run.tier": _S({"lab", "tas", "hands-off"}),
     "run.game": _S({"k1", "k2"}),
-    "run.backend": _S({"auto", "pysim", "simgame", "shim", "handsoff"}),
+    "run.backend": _S({"auto", "pysim", "simgame", "shim", "handsoff", "phasor"}),
     "game.launch_wrapper": _S({"none", "setarch_R"}),
     "tick.gate": _S({"winmain_loop_head"}),
     "tick.context": _S({"auto", "inline", "fiber"}),
@@ -358,6 +361,7 @@ LIST_ENUMS: dict[str, frozenset[str]] = {
 #: Integer ranges, inclusive. Integers not listed must be >= 0.
 RANGES: dict[str, tuple[int, int]] = {
     "shim.port": (0, 65535),
+    "phasor.port": (0, 65535),
     "shim.ring_mb": (1, 512),
     "tick.max_subticks": (1, 1 << 31),
     "clock.hz": (1, 1000),
@@ -498,11 +502,12 @@ def _derive(cfg: dict[str, Any]) -> None:
 
     if run["backend"] == "auto":
         run["backend"] = "handsoff" if hands_off else ("shim" if cfg["game"]["dir"] else "pysim")
+    phasor = run["backend"] == "phasor"     # observes a running game: no gate, no restore
     if seek["mode"] == "auto":
-        seek["mode"] = "restore" if tier is Tier.LAB else "replay"
+        seek["mode"] = "restore" if tier is Tier.LAB and not phasor else "replay"
     seek["mode"] = SeekMode.parse(seek["mode"]).value
     if clock["mode"] == "auto":
-        clock["mode"] = "wall" if hands_off else "virtual"
+        clock["mode"] = "wall" if hands_off or phasor else "virtual"
     if inp["path"] == "auto":
         inp["path"] = "os" if hands_off else "dinput"
     if cfg["game"]["dll_overrides"] == "auto":
@@ -530,6 +535,16 @@ def _derive(cfg: dict[str, Any]) -> None:
             _fail("hud.watermark: the watermark is always on above lab")
     elif backend == "handsoff":
         _fail(f"run.backend: \"handsoff\" supports only tier hands-off, not {t}")
+    if phasor:
+        if tier is not Tier.LAB:
+            _fail(f"run.backend: \"phasor\" tops out at lab, because KotorPhasor cannot gate ticks and "
+                  f"sits outside the tas module allowlist; set run.tier = \"lab\" (it is {t})")
+        if mode is not SeekMode.REPLAY:
+            _fail(f"seek.mode: the phasor backend cannot capture or restore, so it seeks by replay only, "
+                  f"not {mode.value}")
+        if cmode is not ClockMode.WALL:
+            _fail(f"clock.mode: {cmode.value} is not available with the phasor backend; KotorPhasor "
+                  "runs on the wall clock")
 
     if not mode.allowed(tier):
         _fail(f"seek.mode: {mode.value} is not allowed in tier {t}"

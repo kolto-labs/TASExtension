@@ -12,7 +12,7 @@ KPTASInterface/
     score/        parser, fmt, compiler, key names
     holo/         holorecord bundles: journal, page store, keyframes, index, branches, seek, verify
     tier/         environment pin, computed tier, judge replay
-    backend/      pysim, shim and handsoff backends, the staging ring
+    backend/      pysim, shim, handsoff and phasor backends, the staging ring
     telos/        the telos command line and REPL
     config.py     telos.toml loader
     types.py      the contract's byte layouts
@@ -93,6 +93,8 @@ Values left as `auto` depend on the tier:
 | `portable.profile` | `baseline-1` | `baseline-1` | native |
 | `run.backend` | shim if `game.dir` is set, else pysim | same as lab | handsoff |
 
+`auto` never picks phasor. With `run.backend = "phasor"`, `seek.mode` resolves to replay and `clock.mode` to wall.
+
 A score header's `tier` and `hz` win over `run.tier` and `clock.hz`.
 
 `seek.mode` also takes `checkpoint` and `checkpoint_replay` (both mean replay), and `exact`, `exact_tick` and `tick_restore` (all mean restore).
@@ -105,8 +107,11 @@ A score header's `tier` and `hz` win over `run.tier` and `clock.hz`.
 | `shim` | The real game, driven through the `dinput8.dll` shim | tas, or lab if a module outside the allowlist is loaded | M1: first identical pair in, being re-verified |
 | `simgame` | SimGame.exe under Wine, running the real shim core | tas | planned; not in the tree yet |
 | `handsoff` | OS-level input through xdotool, frames through ffmpeg x11grab, no code in the game process | hands-off | code exists; the hands-off tier in the game is M5, planned |
+| `phasor` | Optional. Attaches to a game already running with KotorPhasor and watches its loopback harness port. It reads status and events. It has no input, no tick gate and no restore. | lab | code exists; checked against a local fake server, not a live game yet |
 
 Receipts from `pysim` and `simgame` carry their own determinism key, so they never count toward publishing a game run.
+
+`phasor` needs `run.tier = "lab"` and a port: `[phasor] port`, or `KOTORPHASOR_HARNESS_PORT` when that is 0. A tick there is 1/hz of wall time. Every note must hold nothing (`.`), and `@sync` matches the event name only. Each event frame lands in the bundle as an `event:` MARK.
 
 ## How the shim loads (in progress)
 

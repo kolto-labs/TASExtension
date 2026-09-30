@@ -27,7 +27,7 @@ All integers are little-endian. All addresses are for K1 GOG 1.03 (`swkotor.exe`
 | C5 | Store frames use CRC-32 (`zlib.crc32`), not CRC-32C. | CRC-32C is not in the standard library, and content keys verify decoded bytes anyway. |
 | C6 | Each tick's semantic journal entry sits inline in its TICK record. | One TICK body then describes and verifies its tick on its own. |
 | C7 | The framed TICK chunk is the commit point. The superblocks from the tick-state revision 2 layout are dropped. | A chunk with a valid digest already marks a durable end. |
-| C8 | The default tier is lab. | It matches the score compiler's default, and the tier that counts is the computed one (SEAL). |
+| C8 | The default tier is tas, with seek `replay`. lab has to be asked for. | tas writes no memory except recorded bytes put back through restore, so it only returns to states the game was already in. The compiler leaves an omitted header tier unset, so `run.tier` decides, and the tier that counts is still the computed one (SEAL). |
 | C9 | tas requires an allowlisted module set from tick 0, and every restore checks it again. | Any other in-process module can write game memory without appearing in the verbclass log. |
 | C10 | CExoRand is observed in the journal. It is never pinned above lab. | It only varies ambient sound timing, and pinning it is a memory write. |
 | C11 | Memory reads (`mem.read`, `watch`, `semantic.read`) are allowed in tas. | They observe without changing state. |
@@ -249,8 +249,8 @@ The sequence:
 - **Budgets.** `budget_model = "frozen"` means wall-clock budgets (the 10 ms creature AI budget at 0x4b0b70) always complete. A call site that reads the clock more than `budget_guard.site_reads` times in one tick gets a deterministic `step_us` micro-advance; each trip is journalled. `spin_escape` handles the `lockFrameRate` spin.
 - **`fixed` (lab, FIXED_CLOCK).** Calls `SetFixedSnapshotRate(t, 1, hz)` on the five world timers, bracketed by pause and unpause, with the guard scale·10⁶/hz < 2³¹. The timer addresses are O9. The §2 limits apply.
 - **`wall`.** No hooks.
-- **`hz` precedence.** `@segment hz`, then the score header `hz=`, then `[clock] hz`, then 60. The declared tier follows the same order: score header, then `run.tier`, then lab.
-- **Known conflict.** `kptas/score/compile.py` fills in `hz=30` and `tier=lab` when a header omits them. That masks `[clock] hz` and `run.tier`, and contradicts D5's default of 60. The compiler must leave omitted keys unset.
+- **`hz` precedence.** `@segment hz`, then the score header `hz=`, then `[clock] hz`, then 60. The declared tier follows the same order: score header, then `run.tier`, then tas.
+- **Omitted header keys.** `kptas/score/compile.py` leaves `hz` and `tier` unset when a header omits them, so `[clock] hz` and `run.tier` apply.
 
 ## 6. Native shim (D7)
 
@@ -378,10 +378,15 @@ JSON bodies are canonical: UTF-8, sorted keys, no whitespace, no NaN.
 | SCOR | the resolved canonical score text | in H_0 |
 | ENVP | `EnvPin` JSON: key inputs (binary and data hashes, render stamp, game-side modules, shim hash, clock, profile, threads model, mask registry) and the host fingerprint (C13) | in H_0 |
 | TICK | `TickRecord` (8.4) ‖ link | yes |
-| MARK | `{name, tick}` ‖ link | yes |
+| MARK | `{name, tick}` ‖ link (names below) | yes |
 | EPOC | `{epoch, tick, reason: altf4\|close\|relaunch\|crash, exit_status, files_root}` ‖ link | yes |
 | RCPT | `Receipt` JSON, including `restore_points` as half-open tick ranges ‖ link | yes |
 | SEAL | `{computed_tier, publishable, ticks, final_link}` ‖ link | yes |
+
+**MARK names.** Three kinds share the chunk, and all three are chained:
+- A score `@mark` label, at the tick the supervisor has reached. A label never contains `:`.
+- `event:<name>` or `event:<name>:<arg>`, one per engine event, at the event's global tick. The supervisor writes them from each step report. Seek reads them back (`recorded_events`), so a resume inside a note still holds the events of that note's earlier ticks. It splits on the first `:` after the prefix: a name cannot contain `:`, an arg can.
+- `evicted:<first>-<last>` or `evicted:unreferenced`, written by the store when a budget eviction drops payload. `Bundle.mark` refuses this prefix.
 
 **Chain.**
 - H_0 = sha256(sha256(HOLO) ‖ sha256(SCOR) ‖ sha256(ENVP)).
@@ -613,6 +618,7 @@ A backend raises `BackendError` for a missing capability and `RefusedError` for 
 | `simgame` | tas | SimGame.exe under Wine, running the real shim core. |
 | `shim` | tas, or lab when the module set is not allowlisted | The game. |
 | `handsoff` | hands-off | xdotool plus x11grab. No in-process code. |
+| `phasor` | lab | Optional. Attaches to a game already running with KotorPhasor, over its loopback NDJSON port. It watches status and events only: no input, no tick gate, no virtual clock, no capture or restore. |
 
 Receipts from `pysim` and `simgame` carry a different determinism key, so they never count toward publishing a game run.
 
@@ -634,14 +640,16 @@ The tier-dependent `auto` values:
 | `run.backend` | shim if `game.dir` is set, else pysim | shim if `game.dir` is set, else pysim | handsoff |
 | `game.dll_overrides` | `dinput8=n,b` when the backend is shim, else empty | same as lab | empty |
 
+`auto` never picks `phasor`. With backend `phasor`, `seek.mode` resolves to replay and `clock.mode` to wall.
+
 Every default is shown below.
 
 ```toml
 [run]
-tier = "lab"                  # "lab" | "tas" | "hands-off"; a score header tier overrides
+tier = "tas"                  # "lab" | "tas" | "hands-off"; a score header tier overrides
 game = "k1"                   # "k1" | "k2" (k2 addresses unverified)
 build = "auto"                # from the exe sha256
-backend = "auto"              # "auto" | "pysim" | "simgame" | "shim" | "handsoff"
+backend = "auto"              # "auto" | "pysim" | "simgame" | "shim" | "handsoff" | "phasor"
 score = ""                    # "" = REPL authoring
 out_dir = "~/.local/share/kptas/runs"   # bundles; local disk, never /tmp
 max_ticks = 0                 # 0 = unlimited
@@ -852,6 +860,9 @@ extra_hashed = []
 [determinism]
 strict_key = true
 
+[phasor]
+port = 0                      # KotorPhasor harness port; 0 = KOTORPHASOR_HARNESS_PORT
+
 [handsoff]
 input_tool = "xdotool"
 capture = "x11grab"
@@ -875,6 +886,7 @@ max_ticks = 0
 **Cross-key rules.**
 - **hands-off** requires all of: backend `handsoff`, seek `replay`, clock `wall`, input `os`, no `dinput8=n` override, profile `native`, and the watermark on.
 - **Backend `handsoff`** is allowed only in tier hands-off.
+- **Backend `phasor`** is allowed only in tier lab, with seek `replay` and clock `wall`.
 - **tas** requires the `virtual` clock and `dinput` input. `semantic` seeks, `fixed` clocks, `passthrough` input, `cexorand = "pin"` and `watermark = false` are all lab only.
 - **Clock scale.** `scale` ≠ 100 requires `fixed`. `fixed` requires scale·10⁶/hz < 2³¹.
 - **restore and hybrid** refuse `threads.model = "free"`, `tick.context = "inline"` and `store.pages = "digests"`.

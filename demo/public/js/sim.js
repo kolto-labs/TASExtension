@@ -1,4 +1,5 @@
-// Deterministic stand-in scene. Integer state only, no DOM, no clock reads.
+// Deterministic stand-in scene. Integer state only, no DOM, no clock reads, no
+// Math.random: the only inputs are the score and cfg.budget.
 // One call to step() is one tick. The whole state is a plain object, so any
 // tick can be serialized, hashed and restored.
 
@@ -97,6 +98,8 @@ export function initState(cfg = {}) {
       { id: 'n2', kind: 'guard', x: px(430), y: px(150), face: 4, hp: 20, max: 20, act: 'idle', wt: 0, dir: -1 },
     ],
     ps: null, ev: {}, fired: [], msg: '',
+    // No caller sets host and nothing reads it. It stays because the state is
+    // hashed: dropping it would change every tick hash and every saved holo.
     cfg: { budget: cfg.budget || 32, host: !!cfg.host },
   };
   g.cur = { ip: 0, used: 0, base: 0, end: false, src: -1, seg: 'start', wait: false, halt: '' };
@@ -289,7 +292,7 @@ export function planPath(g, from, to, budget) {
   return { path, seen, n, b: budget, full: found };
 }
 
-function stepHostile(g, h, pc, dt, ctx) {
+function stepHostile(g, h, pc, dt) {
   if (h.hp <= 0) { h.act = 'down'; return; }
   h.cd = Math.max(0, h.cd - dt);
   if (h.wt > 0) { h.wt -= dt; h.act = 'idle'; return; }
@@ -314,9 +317,7 @@ function stepHostile(g, h, pc, dt, ctx) {
   }
   h.rt -= dt;
   if (h.rt <= 0 || h.path.length === 0) {
-    let b = g.cfg.budget;
-    if (g.cfg.host) b = Math.max(2, Math.floor(b * (0.25 + (ctx.jitter ? ctx.jitter() : Math.random()))));
-    const r = planPath(g, h, pc, b);
+    const r = planPath(g, h, pc, g.cfg.budget);
     h.path = r.path;
     h.rt = 250000;
     g.ps = { seen: r.seen, n: r.n, b: r.b, full: r.full };
@@ -346,8 +347,8 @@ function enterArea2(g) {
   fire(g, 'area.ready');
 }
 
-// Advance one tick. prog is the compiled score. ctx.jitter feeds the lab-only
-// host-timing budget and is the only input that does not come from the score.
+// Advance one tick. prog is the compiled score. ctx is accepted for callers
+// that pass one, and unused.
 export function step(g, prog, ctx = {}) {
   const prev = g.in;
   g.fired = [];
@@ -374,7 +375,7 @@ export function step(g, prog, ctx = {}) {
   stepPlayer(g, pc, bits, prev, dt);
   for (const e of g.ents) {
     if (e.kind === 'droid' || e.kind === 'guard') stepWander(g, e, dt);
-    else if (e.kind === 'thug') stepHostile(g, e, pc, dt, ctx);
+    else if (e.kind === 'thug') stepHostile(g, e, pc, dt);
   }
   if (g.area === 1 && pc.hp > 0) {
     const [cx, cy] = cellOf(pc);

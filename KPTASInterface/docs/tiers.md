@@ -24,7 +24,7 @@ The default tier is tas, and it is read-only: it sends inputs, runs the virtual 
 The tier in the header is only a claim. The effective tier is the lowest of five things:
 
 1. the declared tier (score header, then `run.tier`)
-2. the backend's ceiling: tas for pysim, simgame and shim, hands-off for handsoff
+2. the backend's ceiling: tas for pysim, simgame and shim, hands-off for handsoff, lab for phasor
 3. the module set: lab if anything outside `shim.module_allowlist` is loaded in the game
 4. the verbclass of every tick
 5. the last judge receipt: a failed judge caps the run at lab
@@ -40,7 +40,7 @@ It only ratchets down. A tick can lower the tier, and only a new passing judge r
 ## Ask the bundle
 
 ```
-$ telos run walk_tas.score --out t.holo
+$ telos run KPTASInterface/examples/pysim_walk.score --out t.holo
 t.holo: ticks 0..82, 1 epoch(s), stopped at end
 $ telos tier explain t.holo
 input       ceiling    detail
@@ -55,7 +55,7 @@ check                  header tas is at or below the computed tas
 publishable no         no passing judge receipt
 ```
 
-`walk_tas.score` is [pysim_walk.score](../examples/pysim_walk.score) with `tier=lab` changed to `tier=tas`. After `telos verify t.holo --fresh` passes, the judge row reads `last judge pass in t@judge.holo` and the last line becomes `publishable yes`.
+[pysim_walk.score](../examples/pysim_walk.score) has no `tier` in its header, so the declared tier is `run.tier`, and that defaults to tas. After `telos verify t.holo --fresh` passes, the judge row reads `last judge pass in t@judge.holo` and the last line becomes `publishable yes`.
 
 That "yes" is PySim's. PySim and SimGame receipts carry their own determinism key, so they never count toward publishing a game run.
 

@@ -158,7 +158,7 @@ def pin_env(cfg: Mapping[str, Any]) -> EnvPin:
             seen = sorted({p for pat in _MODULE_GLOBS for p in gdir.glob(pat) if p.is_file()})
             modules = [f"{p.relative_to(gdir).as_posix().lower()}@{file_sha256(p)}" for p in seen
                        if backend != "handsoff" or p.name.lower() != "dinput8.dll"]
-        if "shim" in pin and backend != "handsoff":
+        if "shim" in pin and backend not in ("handsoff", "phasor"):
             dll = cfg["shim"]["dll"]
             shim = file_sha256(PKG_ROOT / "native/shim/build/dinput8.dll" if dll == "auto"
                                else Path(os.path.expanduser(dll)))
@@ -168,7 +168,7 @@ def pin_env(cfg: Mapping[str, Any]) -> EnvPin:
     if mask and Path(os.path.expanduser(mask)).is_file():
         mask = Path(os.path.expanduser(mask)).read_text(encoding="utf-8")
     threads = cfg["threads"]["model"]
-    proc = backend in ("simgame", "shim", "handsoff")
+    proc = backend in ("simgame", "shim", "handsoff", "phasor")
     prefix = Path(os.path.expanduser(g["wineprefix"] or os.environ.get("WINEPREFIX", "~/.wine")))
     return EnvPin(
         exe_sha256=exe_sha, text_sha256=text, files=files, render=render, modules=tuple(modules),

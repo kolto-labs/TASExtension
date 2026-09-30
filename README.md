@@ -21,7 +21,7 @@ PYTHONPATH=KPTASInterface python3 -m kptas diff a.holo b.holo
 What comes back (the `show` header is cut here):
 
 ```
-ok KPTASInterface/examples/pysim_walk.score: 13 items, 82 note ticks, 1 files, sha256 5951ac5a9d915346  [game=k1 build=auto tier=lab hz=60 start=boot]
+ok KPTASInterface/examples/pysim_walk.score: 13 items, 82 note ticks, 1 files, sha256 ae7bf76c6d464927  [game=k1 build=auto hz=60 start=boot]
 a.holo: ticks 0..82, 1 epoch(s), stopped at end
 b.holo: ticks 0..82, 1 epoch(s), stopped at end
 ...

@@ -24,7 +24,8 @@ from kptas.tier.envpin import PYSIM_EXE, pin_env
 from kptas.types import (AUTHORING_VERBS, NULL_DIGEST, EnvPin, FormatError, Receipt, SeekMode, Tier, TickFlag,
                          TickRecord, VerbClass, VerifyLevel, canonical_json, sha256)
 
-BACKEND_CEILING = {"pysim": Tier.TAS, "simgame": Tier.TAS, "shim": Tier.TAS, "handsoff": Tier.HANDS_OFF}
+BACKEND_CEILING = {"pysim": Tier.TAS, "simgame": Tier.TAS, "shim": Tier.TAS, "handsoff": Tier.HANDS_OFF,
+                   "phasor": Tier.LAB}
 
 
 def _label(t: Tier | None) -> str:
@@ -327,7 +328,7 @@ def judge(b: Bundle, cfg: Mapping[str, Any], log: Callable[[str], None] | None =
     tail = fresh.get(max(fresh)) if fresh else None
     ok = not first
     r = Receipt(
-        kind="judge", result=("best_effort" if backend == "handsoff" else "pass") if ok else "fail",
+        kind="judge", result=("best_effort" if backend in ("handsoff", "phasor") else "pass") if ok else "fail",
         from_tick=min(recorded), to_tick=last, mode=SeekMode.REPLAY,
         verify_level=(VerifyLevel.FRAMES if backend == "handsoff" else
                       VerifyLevel.FULL_ROOT if roots else VerifyLevel.JOURNAL),
