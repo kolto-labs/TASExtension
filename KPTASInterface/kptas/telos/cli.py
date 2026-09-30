@@ -24,7 +24,7 @@ from kptas.score import ScoreError, compile_score, fmt
 from kptas.score.compile import CompiledScore
 from kptas.supervisor import BundleSink, RunError, Supervisor, TelosError, note_text, require
 from kptas.telos import textview as tv
-from kptas.types import (BackendError, EnvPin, FormatError, Header, Receipt, SeekMode, Tier)
+from kptas.types import (BackendError, EngineEvent, EnvPin, FormatError, Header, Receipt, SeekMode, Tier)
 
 CONFIG_NAME = "telos.toml"
 
@@ -103,6 +103,11 @@ def open_bundle(path: str) -> Any:
 
 def records(b: Any) -> Iterable[Any]:
     return (b.record(t) for t in b.ticks())
+
+
+def lineage(b: Any) -> Iterable[Any]:
+    """Every tick on the bundle's ancestry: a branch's inherited ticks, then its own."""
+    return require("kptas.tier.policy", "all_records").all_records(b)
 
 
 def is_bundle(path: str) -> bool:
@@ -198,6 +203,10 @@ def cmd_score_fmt(ctx: Ctx, a: argparse.Namespace) -> int:
 
 def cmd_run(ctx: Ctx, a: argparse.Namespace) -> int:
     score = ctx.compile(a.score)
+    if a.start:
+        return run_from(ctx, a, score)
+    if a.mode:
+        raise TelosError("--mode needs --from")
     cfg = ctx.cfg(score.header, run__backend=a.backend, run__max_ticks=a.max_ticks)
     env = pin_env(cfg)
     header = build_header(cfg, score, env)
@@ -221,6 +230,57 @@ def cmd_run(ctx: Ctx, a: argparse.Namespace) -> int:
         finally:
             sink.close(seal=ok, backend_ceiling=sup.caps.tier_ceiling if sup.caps else None)
     out(f"{dest}: ticks 0..{res.ticks}, {res.epochs} epoch(s), stopped at {res.stopped}")
+    return 0 if res.stopped != "halted" else 1
+
+
+def run_from(ctx: Ctx, a: argparse.Namespace, score: CompiledScore) -> int:
+    """telos run <score> --from <bundle>@<tick>: seek a live game to the tick, then record a branch
+    that plays the rest of the score from there. The branch embeds the whole score, so the judge's
+    replay from boot reproduces the parent's ticks up to the branch tick and the branch's after it."""
+    src, sep, at = a.start.rpartition("@")
+    if not sep or not at.isdigit():
+        raise TelosError(f"--from wants <bundle>@<tick>, e.g. walk.holo@40, not {a.start!r}")
+    tick = int(at)
+    par = open_bundle(src)
+    try:
+        cfg = bundle_cfg(ctx, par, run__backend=a.backend, run__max_ticks=a.max_ticks)
+        mode = SeekMode.parse(a.mode or cfg["seek"]["mode"])
+        if not mode.allowed(Tier.parse(cfg["run"]["tier"])):
+            raise TelosError(f"seek mode {mode} is not allowed in tier {cfg['run']['tier']}")
+        cur = require("kptas.holo.seek", "resume_cursor").resume_cursor(par, tick, score, cfg)  # before any write
+        dest = Path(a.out) if a.out else fresh_path(Path(src).with_name(f"{Path(src).stem}@{tick}.holo"))
+        if dest.exists():
+            raise TelosError(f"{dest} exists")
+        sup = Supervisor(cfg, env=par.env, attach=a.attach, run_name=dest.stem, log=err)
+        sink, ok = None, False
+        try:
+            r: Receipt = holo("seek").seek(par, tick, sup, mode=mode, cfg=cfg)
+            out(f"seek {r.from_tick} -> {tick}: {r.mode} {r.result}; {r.verifier}; canary {r.canary}"
+                + (f"; fallback {r.fallback}" if r.fallback else ""))
+            if r.result != "pass":
+                raise RunError(f"the seek to tick {tick} did not verify; no branch written")
+            child = holo("create_branch").create_branch(par, tick, dest, score=score.text())
+            child.receipt(r)            # the branch records how its first state was reached
+            sink = BundleSink(child, child.header.tier)
+            sink.resume(tick, restored=r.mode is not SeekMode.REPLAY)
+            sup.sink = sink
+            if r.mode in (SeekMode.RESTORE, SeekMode.SEMANTIC):
+                sup.carry = [EngineEvent(e, tick, x) for e, x in cur.carry]
+            res = sup.run_score(score, max_ticks=cfg["run"]["max_ticks"], start=cur,
+                                on_report=stream() if a.table else None)
+            ok = True
+        finally:
+            try:
+                sup.close()
+            except BaseException:
+                ok = False
+                raise
+            finally:
+                if sink is not None:
+                    sink.close(seal=ok, backend_ceiling=sup.caps.tier_ceiling if sup.caps else None)
+    finally:
+        par.close()
+    out(f"{dest}: branch of {src} at tick {tick}, ticks {tick + 1}..{res.ticks}, stopped at {res.stopped}")
     return 0 if res.stopped != "halted" else 1
 
 
@@ -319,7 +379,7 @@ def _pair(a: argparse.Namespace) -> tuple[Any, Any, bool]:
 def cmd_diff(ctx: Ctx, a: argparse.Namespace) -> int:
     x, y, roots = _pair(a)
     n = 0
-    for d in tv.diff_ticks(records(x), records(y), compare_roots=roots):
+    for d in tv.diff_ticks(lineage(x), lineage(y), compare_roots=roots):
         if n == 0:
             out("\n".join(d.lines()))
             if a.first:
@@ -339,14 +399,14 @@ def cmd_diff(ctx: Ctx, a: argparse.Namespace) -> int:
 
 def cmd_bisect(ctx: Ctx, a: argparse.Namespace) -> int:
     x, y, roots = _pair(a)
-    ta, tb = set(x.ticks()), set(y.ticks())
+    ta, tb = {r.tick for r in lineage(x)}, {r.tick for r in lineage(y)}
     if not ta and not tb:
         out("both runs are empty")
         return 0
     lo, hi = min(ta | tb), max(ta | tb)
     if not roots:
         # journal digests are per tick, so a split can reconverge and binary search would miss it
-        d = next(tv.diff_ticks(records(x), records(y), compare_roots=False), None)
+        d = next(tv.diff_ticks(lineage(x), lineage(y), compare_roots=False), None)
         if d is None:
             out(f"runs agree at every tick {lo}..{hi} (journal only; roots not compared)")
             return 0
@@ -501,6 +561,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--out", "-o", help="bundle directory (default run.out_dir/<score>.holo)")
     s.add_argument("--max-ticks", type=int)
     s.add_argument("--table", action="store_true", help="print a row per step while running")
+    s.add_argument("--from", dest="start", metavar="BUNDLE@TICK",
+                   help="seek to a recorded tick and record a branch that plays the rest of the score; "
+                        "the score must play what the bundle recorded up to that tick")
+    s.add_argument("--mode", help="seek mode for --from: replay, restore or hybrid (default seek.mode)")
     backend_opts(s)
 
     s = cmd("play", cmd_play, "play a score or a bundle's score without recording")

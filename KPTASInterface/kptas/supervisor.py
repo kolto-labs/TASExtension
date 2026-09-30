@@ -27,7 +27,7 @@ from types import ModuleType
 from typing import Any, Protocol
 
 from kptas.types import (BackendError, Caps, ClockMode, EnvPin, OsEvent, ProcOutcome,
-                         StagingRecord, StepReport, Tier)
+                         StagingRecord, StepReport, Tier, VerbClass)
 
 PROCESS_BACKENDS = frozenset({"simgame", "shim"})
 PKG_ROOT = Path(__file__).resolve().parent.parent       # KPTASInterface
@@ -258,13 +258,28 @@ class BundleSink:
         self.epoch_seen = -1
         self.ceiling = declared
         self.ticks = 0
+        self.first_vc = VerbClass.NONE  # bits for the next tick only (see resume)
+
+    def resume(self, tick: int, restored: bool = False) -> None:
+        """Continue a branch after its branch tick: the next TICK's refs apply to map(tick), in tick's epoch.
+        `restored`: the seek wrote state back (restore, hybrid, semantic), so the first tick carries RESTORE
+        even when a hybrid seek's replay steps already reported the bit."""
+        from kptas.types import FormatError
+        self.first_vc = VerbClass.RESTORE if restored else VerbClass.NONE
+        self.epoch_seen = self.bundle.epoch_at(tick)
+        try:
+            self.pmap = self.bundle.map_at(tick)
+        except (FormatError, KeyError):
+            self.pmap = None          # uncaptured: the next captured tick must be a full sweep
 
     def tick(self, report: StepReport, note: Any, records: list[StagingRecord]) -> None:
         from kptas.backend.staging import batches
         from kptas.holo.pages import PageMap
         from kptas.types import NULL_DIGEST, PointReason, RecordFlag, TickFlag, TickRecord, sha256
 
-        self.ceiling = min(self.ceiling, report.verbclass.ceiling())
+        once = VerbClass.RESTORE | VerbClass.FILES_RESTORE   # written back at the gate before the step's first tick
+        vc0, self.first_vc = report.verbclass | self.first_vc, VerbClass.NONE
+        self.ceiling = min(self.ceiling, vc0.ceiling())
         text = note_text(note) if note is not None else "."
         held = note_text(dataclasses.replace(note, wheel=0, osev=None)) if note is not None else "."
         groups = list(batches(records)) or [(report.tick, [], None, None)]
@@ -301,7 +316,7 @@ class BundleSink:
             n = text if i == 0 else held
             inp = meta.get("input")
             rec = TickRecord(
-                tick=t, epoch=report.epoch, note=n, verbclass=report.verbclass,
+                tick=t, epoch=report.epoch, note=n, verbclass=vc0 if i == 0 else report.verbclass & ~once,
                 server_passes=meta.get("server_passes", report.server_passes if last else 1),
                 subticks=sub, flags=flags, reason=reason, state_root=root,
                 input_sha256=(bytes.fromhex(inp) if isinstance(inp, str) and len(inp) == 64
@@ -570,28 +585,42 @@ class Supervisor:
 
     # scores
     def run_score(self, compiled: Any, *, max_ticks: int = 0,
-                  on_report: Callable[[StepReport, Any], None] | None = None) -> RunResult:
-        """Drive every item of a CompiledScore. Opens the first epoch if needed."""
+                  on_report: Callable[[StepReport, Any], None] | None = None,
+                  start: Any = None) -> RunResult:
+        """Drive every item of a CompiledScore. Opens the first epoch if needed.
+
+        `start` (a kptas.holo.seek Cursor) resumes a live game that a seek left at the cursor's tick:
+        from item start.i with start.j of its ticks already played, at the cursor's clock rate.
+        """
         from kptas.score import Assert, Expect, Mark, Note, Relaunch, Segment, Sync
 
         res = RunResult()
         default_timeout = self.cfg["score"]["default_timeout_ticks"]
         header_hz = compiled.header.get("hz")
         base_hz = int(header_hz) if header_hz else self.cfg["clock"]["hz"]   # 5.5 precedence
-        if header_hz:
+        if start is not None:
+            # the seek left the game at this rate; a clock verb here would start a new segment at tick+1
+            self.hz, self.scale = start.hz, start.scale
+        elif header_hz:
             self.set_clock(base_hz, self.scale)
         if self.backend is None:
             rep = self.open()
             if on_report:
                 on_report(rep, None)
         pace, wall0, pending = "gate", None, None
+        first, played = (start.i, start.j) if start is not None else (0, 0)
+        if start is not None:
+            pending = start.pending
+            seg = next((it for it in reversed(compiled.items[:first]) if isinstance(it, Segment)), None)
+            pace = (seg.pace if seg is not None else None) or "gate"
 
         def emit(rep: StepReport, note: Any) -> None:
             res.reports += 1
             if on_report:
                 on_report(rep, note)
 
-        for item in compiled.items:
+        for idx in range(first, len(compiled.items)):
+            item = compiled.items[idx]
             if max_ticks and self.tick >= max_ticks:
                 res.stopped = "max_ticks"
                 break
@@ -606,6 +635,9 @@ class Supervisor:
                     continue
                 note, pending = merge_oneshots(pending, item), None
                 n = item.count
+                if idx == first and played:
+                    # resumed inside this note: its one-shots fired on its first tick, before the seek target
+                    note, n = dataclasses.replace(note, wheel=0, osev=None), n - played
                 if max_ticks:
                     n = min(n, max_ticks - self.tick)
                 if pace == "realtime":

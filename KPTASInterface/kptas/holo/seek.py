@@ -70,9 +70,11 @@ class _Seek:
         self.base_hz = int(hz) if hz else cfg["clock"]["hz"]
         self.base_scale = cfg["clock"]["scale"]
         self.timeout = cfg["score"]["default_timeout_ticks"]
-        s = _SESSIONS.get(sup)
+        s = _SESSIONS.get(sup) if sup is not None else None
         if s is None:
-            s = _SESSIONS[sup] = _Session(hv.Live())
+            s = _Session(hv.Live())
+            if sup is not None:          # sup None: placement only (resume_cursor)
+                _SESSIONS[sup] = s
         self.session = s
         self.roots = False           # compare state roots per tick while driving
         self.replayed = 0
@@ -534,4 +536,58 @@ def seek(b: Bundle, tick: int, sup: Any, *, mode: SeekMode | str | None = None,
     return r
 
 
-__all__ = ["Cursor", "seek"]
+def resume_cursor(b: Bundle, tick: int, score: Any, cfg: Mapping[str, Any]) -> Cursor:
+    """Where `score` resumes after recorded tick `tick` of `b`, for a branch that continues from there.
+
+    The branch embeds `score` and the judge replays it from boot, so `score` must play exactly what `b`
+    recorded through `tick`: the same header, the same items before the tick (marks and asserts aside)
+    and the note spanning the tick unchanged up to it. Anything else is a TelosError naming the item.
+    """
+    from kptas.score import Assert, Mark
+    from kptas.score.fmt import render
+    own = _Seek(b, None, cfg, lambda _s: None)
+    new = compile_score(score) if isinstance(score, str) else score
+    if own.rec(tick) is None:
+        raise TelosError(f"{b.root.name} has no tick {tick}")
+    old = compile_score(b.score).header
+    for k in sorted(set(old) | set(new.header)):
+        if old.get(k) != new.header.get(k):
+            raise TelosError(f"the score header has {k}={new.header.get(k)} but {b.root.name} was recorded with "
+                             f"{k}={old.get(k)}")
+    cur = own.place(max(tick, b.last_tick)).get(tick)
+    if cur is None:
+        raise TelosError(f"tick {tick} is inside a wait of {b.root.name}; continue from a tick outside it")
+
+    def key(it: Any) -> str:
+        return f"@segment {it.hz} {it.scale} {it.pace}" if isinstance(it, Segment) else render(it)
+
+    def where(it: Any) -> str:
+        return f"{getattr(it, 'source', '?')}:{getattr(it, 'line', '?')}"
+
+    skip = (Mark, Assert)
+    want = [it for it in own.items[:cur.i] if not isinstance(it, skip)]
+    i = 0
+    for w in want:
+        while i < len(new.items) and isinstance(new.items[i], skip):
+            i += 1
+        if i == len(new.items):
+            raise TelosError(f"the score ends before tick {tick}; `{render(w)}` ({where(w)}) is missing")
+        if key(new.items[i]) != key(w):
+            raise TelosError(f"{where(new.items[i])}: `{render(new.items[i])}` differs from `{render(w)}`, which "
+                             f"{b.root.name} played before tick {tick}; edits must come after the branch tick")
+        i += 1
+    if not cur.j:
+        return dataclasses.replace(cur, i=i)
+    span = own.items[cur.i]           # the note running at `tick`, cur.j of its ticks already played
+    while i < len(new.items) and isinstance(new.items[i], skip):
+        i += 1
+    it = new.items[i] if i < len(new.items) else None
+    if not (isinstance(it, Note) and it.count >= cur.j
+            and render(dataclasses.replace(it, count=1)) == render(dataclasses.replace(span, count=1))):
+        got = f"`{render(it)}` ({where(it)})" if it is not None else "nothing"
+        raise TelosError(f"tick {tick} is tick {cur.j} of `{render(span)}` ({where(span)}), but the score has {got} "
+                         f"there; edit after the note or branch at its last tick")
+    return dataclasses.replace(cur, i=i + 1, j=0) if it.count == cur.j else dataclasses.replace(cur, i=i)
+
+
+__all__ = ["Cursor", "resume_cursor", "seek"]
