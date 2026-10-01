@@ -186,8 +186,8 @@ Its receipt is `best_effort`: frame hashes at `@sync` points plus human review o
 | Mode | Mechanism | Tiers | Verify level |
 |---|---|---|---|
 | replay | From the latest `boot` or `save` origin at or before T on T's ancestry, relaunch or reload and replay the score, skipping presents only. | all | `sim_root` if qualified, else `journal` |
-| restore | At a gate, compute W, the pages that differ between the live map and map(T). Reconcile commit state, write W, reconcile the real side (files, handles, GL, Miles, cursor), then verify. There is no replay. | lab, tas | `full_root` + journal + continuation canary |
-| hybrid | Restore to the latest restore point K ≤ T, then replay to T. | lab, tas | `full_root` |
+| restore | At a gate, compute W, the pages that differ between the live map and map(T). Reconcile commit state, write T's files tree and W, reconcile the real side (handles, GL, Miles, cursor), then verify. There is no replay of the target's ticks; with `seek.restore_warmup = loads` a process that has not run the first tick and T's area load plays those first. | lab, tas | `full_root` + journal + continuation canary |
+| hybrid | Restore the latest keyframe K ≤ T that is a restore point (the latest restore point when there is no such keyframe), then replay K..T. | lab, tas | `full_root` |
 | semantic | Write back journalled engine fields. The branch is tainted. | lab | `diff_only` |
 
 Rules:
@@ -266,7 +266,7 @@ KPTASInterface/native/
 **Load.** `dinput8.dll` sits in the game directory. Under Wine it loads only with `WINEDLLOVERRIDES=dinput8=n,b`, which is part of the environment pin. The loader binds the exe's imports and runs the proxy's `DllMain(PROCESS_ATTACH)` before the exe's entry point.
 
 `DllMain` runs under the loader lock. It does four things:
-- reads the clock origin (`qpf_hz`, `uptime0_ms`, `initial_realtime`, `hz`, mode) from `KPTAS_CLOCK`, which Python sets at launch;
+- reads the clock origin (`qpf_hz`, `uptime0_ms`, `initial_ft`, `hz`, mode) from `KPTAS_CLOCK`, which Python sets at launch. `initial_ft` is `clock.initial_realtime` as a Windows FILETIME;
 - reserves memory: `harness_core`, and from M2 the arena (1024 MB at 0x10000000 for k1_gog_103);
 - patches the exe's IAT slots, so the virtual clock is live at V = 0 before the CRT's first time call;
 - writes a 5-byte detour at the exe's entry point.
@@ -536,7 +536,7 @@ M2 and later add per-creature, event-queue and audio fields, under a new `journa
   - ZERO 0x2: no data, and hash = the zero-page key.
   - DECOMMIT 0x4: no data, hash zero, prot 0.
 - PAGE records may also carry SWEEP 0x8, meaning the record comes from a full sweep.
-- TICK_END records may carry RESTORE_POINT 0x100 and FULL 0x200.
+- TICK_END records may carry RESTORE_POINT 0x100 and FULL 0x200. A restore writes its own batch, the pages it wrote, closed by a TICK_END with RESTORE 0x400. It is not a played tick, and the consumer drops it.
 - JOURNAL records carry the semantic entry, and hash = BLAKE2s-128(data).
 - WRAP records are all zero.
 
@@ -564,21 +564,23 @@ Error codes: `refused` (outside the tier allowlist), `bad_args`, `unsupported`, 
 
 **Session order.** `hello`, `tier.lock`, `clock`, `ring.attach`, `capture`, `start`, then `step`, `wait` and the others.
 
-**StepReport** is `{tick, epoch, server_passes, subticks, verbclass, state_root, journal, restore_point, reason, events[], outcome}`. The roots are hex strings, and `state_root` is null when nothing was captured.
+**StepReport** is `{tick, epoch, server_passes, subticks, verbclass, state_root, journal, restore_point, reason, events[], outcome}`. The roots are hex strings, and `state_root` is null when nothing was captured. An event is `{name, tick}` plus `us` for `save.begin` and `save.done` (virtual µs the save advanced) or `code` for `proc.down`; a bare name dates the event to the report's tick. A step the process did not survive answers with `outcome: exited`.
 
 | Verb | Args → result | Tiers | Adds |
 |---|---|---|---|
-| `hello` | `{proto}` → `{proto, shim, shim_sha256, build, exe_sha256, text_sha256, epoch, modules[], hooks[], load_order[], seed_hooked, caps{}}` | lab, tas | — |
+| `hello` | `{proto}` → `{proto, shim, shim_sha256, build, game, exe_sha256, text_sha256, epoch, modules[], hooks[], load_order[], seed_hooked, caps{}}`. `build` is the first 16 hex digits of the loaded DLL's sha256, and Python refuses a build that does not match `shim.dll_sha256`; `game` names the address table (`k1_gog_103`). `caps` says what the shim virtualizes, plus `save_ms` and `os_events[]` when it has those verbs. | lab, tas | — |
 | `tier.lock` | `{tier}` → `{tier, allow[]}`; one-way, before `start` | lab, tas | — |
 | `clock` | `{mode, hz, scale, qpf_hz, uptime0_ms, initial_realtime, hooked_modules[], budget_guard{}, spin{}}` → `{mode, us_per_tick, hooked[]}` | virtual: lab, tas; fixed, wall: lab | CLOCK; FIXED_CLOCK when fixed; none when wall |
-| `ring.attach` | `{path, bytes}` → `{header}` | lab, tas | — |
+| `ring.attach` | `{path, mb}` → `{capacity, write_pos}` | lab, tas | — |
 | `capture` | `{enabled, tracker, classes[], sweep}` → `{classes:[{name, ranges[]}]}` | lab, tas | CAPTURE |
 | `start` | `{}` → StepReport for tick 0 | lab, tas | GATE |
 | `gate` | `{on}` → `{held, tick}` | lab, tas | — |
-| `input` | `{keys[], buttons[], mouse{abs\|rel}, wheel, msgs[]}` → `{for_tick}` | lab, tas | INPUT |
-| `step` | `{n, note}` → StepReport | lab, tas | INPUT, GATE, CLOCK |
-| `wait` | `{event, arg, timeout, note}` → StepReport + `{waited}` | lab, tas | WAIT, GATE, CLOCK |
-| `os_event` | `{ev: altf4\|focus\|blur\|close}` → `{outcome}`; synthesized as score messages | lab, tas | OS_EVENT |
+| `input` | `{note, keys[], buttons[], mouse{abs\|rel}, wheel, msgs[]}` → `{for_tick}` | lab, tas | INPUT |
+| `step` | `{n, first, note, keys[], buttons[], mouse{abs\|rel}, wheel, msgs[]}` → StepReport. `note` is the canonical note text the journal records; `first` is true on the note's first tick only (press edges, wheel, the absolute move); `msgs` carries the note's os event on its first tick. | lab, tas | INPUT, GATE, CLOCK |
+| `wait` | `{event, arg, timeout, note, …input}` → StepReport + `{waited}`; only events after the wait began count | lab, tas | WAIT, GATE, CLOCK |
+| `os_event` | `{ev: close}` → `{for_tick, outcome}`; WM_CLOSE reaches the game window at the start of the next tick | lab, tas | OS_EVENT |
+| `clock.save_ms` | `{ms}` → `{for_tick, ms}`: virtual length of every in-game save; an input, journalled | lab, tas | INPUT |
+| `clock.save_ms_next` | `{ms}` → `{for_tick, ms}`: the next save only | lab, tas | INPUT |
 | `digest` | `{regions[]}` → `{region: hex}` | lab, tas | CAPTURE |
 | `snap` | `{kind: digest\|full\|semantic}` → `{tick, state_root, path?}` | lab, tas | CAPTURE |
 | `restore` | `{tick, root, path}` → `{tick, pages, root, verified, us}` | lab, tas | RESTORE |
@@ -593,12 +595,14 @@ Error codes: `refused` (outside the tier allowlist), `bad_args`, `unsupported`, 
 | `frame` | `{path}` → `{w, h, sha256}` (M5) | lab, tas | SCREEN |
 | `hud` | `{on, text}` → `{}`; the watermark cannot be turned off above lab (M5) | lab, tas | — |
 | `bye` | `{exit}` → `{}` | lab, tas | — |
+| `log` | `{geo}` → `{}`; diagnostics only, it changes no game state and nothing journalled | lab, tas | — |
 
 **Pushes.**
 - `tick`: one per tick, when subscribed.
 - `event`: `{name, tick, arg}`, for `main_menu`, `area.ready`, `load.done`, `save.begin`, `save.done`, `dialog.open`, `dialog.close`, `gui.open <panel>` and `proc.down`.
 - `watch.hit`: this also holds the gate.
 - `log` and `desync`.
+- `exit`: `{tick, code, last_gate}`, once, when the game exits during tick `tick`. The step or wait that was running answers first, with `outcome: exited` and a `proc.down` event carrying `code`. That tick has no gate and no record; `last_gate` is the last tick that has.
 
 hands-off has no wire. Its backend drives xdotool and x11grab.
 
@@ -659,14 +663,18 @@ dir = ""                      # directory holding swkotor.exe
 exe = "swkotor.exe"
 wine = "wine"                 # "" = native Windows
 wineprefix = ""
-dll_overrides = "auto"        # WINEDLLOVERRIDES; pinned
+dll_overrides = "auto"        # WINEDLLOVERRIDES; pinned. auto for the shim: dinput8=n,b and the host audio drivers off
 display = "auto"
 launch_wrapper = "none"       # "none" | "setarch_R"; a determinism-key input
-pinned_env = true             # env -i plus a recorded environment
+pinned_env = true             # env -i: HOME, USER, LANG=C, PATH=/usr/bin:/bin, DISPLAY, WINE* and KPTAS_*
 relaunch = true               # honour @relaunch
+host = "auto"                 # "auto" | "local" | "host-spawn": auto uses host-spawn when wine is only on the host
+pin = ""                      # directory copied over files.stage_paths before every launch (cold start)
+prefix_pin = ""               # registry files copied into the wineprefix before every launch
 
 [shim]
-dll = "auto"                  # native/shim/build/dinput8.dll
+dll = "auto"                  # native/shim/build/dinput8.dll; copied into game.dir before every launch
+dll_sha256 = ""               # when set, the dll's sha256 must start with it
 listen = "127.0.0.1"          # Python listens; the shim connects
 port = 0                      # 0 = ephemeral, passed as KPTAS_PORT
 connect_timeout_s = 30
@@ -702,6 +710,10 @@ on_incompatible = "hybrid"    # "hybrid" | "replay" | "error"
 fallback_chain = ["hybrid", "replay"]
 keyframe_every = 600
 materialize_every = 36000
+restore_warmup = "auto"       # "auto" | "loads" | "none"; auto = loads for the shim, none otherwise.
+                              # loads: before a restore to K the process plays, checked like replay, through its
+                              # first tick and the tick after the last load-screen (HOLD) tick <= K, unless it
+                              # already played them. The game keeps state outside the sim set that those ticks build.
 
 [replay]
 origins = ["boot", "save"]
@@ -799,7 +811,9 @@ random = "from_score"         # BCryptGenRandom, RtlGenRandom, CryptGenRandom
 overlay_dirs = ["SAVES:", "GAMEINPROGRESS:", "CURRENTGAME:", "TEMP:"]
 overlay_times = "virtual"
 file_positions = "virtual"
-store = true
+store = true                  # shim: record the stage's writable files at every gate (TICK files_root)
+stage_paths = ["Saves", "Temp", "currentgame", "gameinprogress", "logs", "Tempclient", "LocalVault",
+               "DMVault", "ServerVault", "swkotor.ini"]
 
 [gl]
 driver = "native"             # real driver behind the profile: "native" | "llvmpipe"

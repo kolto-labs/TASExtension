@@ -176,6 +176,8 @@ static DWORD WINAPI hkm_GTC(void) { return (DWORD)(clock_u() / 1000ull); }
 /* GetProcAddress-resolved time and host APIs go through the same hooks. */
 static FARPROC WINAPI hk_GetProcAddress(HMODULE m, LPCSTR name) {
     if ((uintptr_t)name > 0xffff) {
+        FARPROC g = geo_proc(name);
+        if (g) return g;
         if (k_streq(name, "GetDiskFreeSpaceExA")) return (FARPROC)hk_GetDiskFreeSpaceExA;
         if (k_streq(name, "QueryPerformanceCounter")) return (FARPROC)hk_QPC;
         if (k_streq(name, "QueryPerformanceFrequency")) return (FARPROC)hk_QPF;
@@ -211,6 +213,60 @@ void clock_install_exe(void) {
     HOOK("KERNEL32.dll", "GlobalMemoryStatus", hk_GlobalMemoryStatus, 0);
     HOOK("KERNEL32.dll", "GetDiskFreeSpaceExA", hk_GetDiskFreeSpaceExA, 0);
     HOOK("KERNEL32.dll", "GetProcAddress", hk_GetProcAddress, &r_GetProcAddress);
+}
+
+/* ---- save length ----
+ * CServerExoAppInternal::StallEventSaveGame (0x4b3110, thiscall) writes the
+ * save synchronously from the server MainLoop's stall-event branch, which
+ * skips SetSnapshotTime. V stays frozen during the call; on return V moves
+ * on by the save length (SH->save_ms, or the one-shot SH->save_next_ms), so
+ * the next tick's frame delta carries the save, as on a real machine. The
+ * real duration of the save never reaches game time. */
+void *t_save;
+u32 g_save_ret, g_save_depth;
+static u32 g_save_us;
+
+void save_begin(void) {
+    if (g_save_depth++) { slog("save: nested StallEventSaveGame at tick %u", (u32)g_gate.tick); return; }
+    u32 ms = SH->save_next_set ? SH->save_next_ms : SH->save_ms;
+    SH->save_next_set = 0;
+    g_save_us = ms * 1000u;
+    ev_add(EV_SAVE_BEGIN, g_save_us);
+}
+
+void save_done(void) {
+    if (--g_save_depth) return;
+    if (g_save_us) {
+        g_clk.v += g_save_us;
+        g_clk.seg_v = g_clk.v;
+        g_clk.seg_tick = g_gate.tick;
+    }
+    ev_add(EV_SAVE_DONE, g_save_us);
+    slog("save: tick %u advanced V by %u us", (u32)g_gate.tick, g_save_us);
+}
+
+/* ecx (this) survives the entry call; eax (result) survives the exit call. */
+__attribute__((naked, used)) void st_save(void) {
+    __asm__ volatile("pushal\n\t"
+                     "call _save_begin\n\t"
+                     "popal\n\t"
+                     "movl (%esp), %eax\n\t"
+                     "movl %eax, _g_save_ret\n\t"
+                     "movl $1f, (%esp)\n\t"
+                     "jmp *_t_save\n"
+                     "1:\n\t"
+                     "pushal\n\t"
+                     "call _save_done\n\t"
+                     "popal\n\t"
+                     "jmp *_g_save_ret\n\t");
+}
+
+void save_install(void) {
+    static const u8 e_save[6] = {0x55, 0x8b, 0xec, 0x83, 0xe4, 0xf8};
+    static const u8 l_save[] = {1, 2, 3, 0};
+    if (g_clk.mode != 0) return;
+    if (detour(ADDR_STALL_SAVE, e_save, 6, l_save, (void *)st_save, &t_save)) hooks_note("exe:StallEventSaveGame");
+    else slog("detour StallEventSaveGame failed");
 }
 
 void clock_install_module(HMODULE m, const char *label) {

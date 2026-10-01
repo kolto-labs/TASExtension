@@ -23,12 +23,43 @@ static u32 g_rand_other;
 static u32 g_srand_n;
 static blake2s_t g_srand_h;
 
+/* journalled events of the current tick (saves, close, save-length inputs) */
+#define JEV_MAX 16
+static u32 g_jev_kind[JEV_MAX], g_jev_val[JEV_MAX], g_jev_n;
+
 void journal_tick_reset(void) {
     r_now++;
     r_used = 0;
     g_rand_other = 0;
     g_srand_n = 0;
     blake2s_init(&g_srand_h, 16);
+    g_jev_n = 0;
+}
+
+void journal_ev_add(u32 kind, u32 val) {
+    if (g_jev_n >= JEV_MAX) return;
+    g_jev_kind[g_jev_n] = kind;
+    g_jev_val[g_jev_n] = val;
+    g_jev_n++;
+}
+
+/* "ev" appears only on ticks that have an event, so other entries keep their bytes. */
+static void journal_ev(buf_t *b) {
+    if (!g_jev_n) return;
+    b_str(b, ",\"ev\":[");
+    for (u32 i = 0; i < g_jev_n; i++) {
+        u32 k = g_jev_kind[i], v = g_jev_val[i];
+        if (i) b_ch(b, ',');
+        switch (k) {
+        case EV_SAVE_BEGIN: b_str(b, "{\"name\":\"save.begin\",\"us\":"); b_u64(b, v); b_ch(b, '}'); break;
+        case EV_SAVE_DONE: b_str(b, "{\"name\":\"save.done\",\"us\":"); b_u64(b, v); b_ch(b, '}'); break;
+        case EV_CLOSE: b_str(b, "{\"name\":\"close\"}"); break;
+        case EV_SAVE_MS: b_str(b, "{\"ms\":"); b_u64(b, v); b_str(b, ",\"name\":\"clock.save_ms\"}"); break;
+        case EV_SAVE_MS_NEXT: b_str(b, "{\"ms\":"); b_u64(b, v); b_str(b, ",\"name\":\"clock.save_ms_next\"}"); break;
+        default: b_str(b, "{\"name\":\"?\"}"); break;
+        }
+    }
+    b_ch(b, ']');
 }
 
 void rand_count(u32 site) {
@@ -146,7 +177,9 @@ void journal_tick(buf_t *b, u8 digest_out[16]) {
     b_str(b, "{\"cl\":"); b_u64(b, g_gate.client_passes);
     b_str(b, ",\"cxr\":\""); b_hex(b, cxr, 16);
     b_str(b, "\",\"data\":\""); b_hex(b, root, 16);
-    b_str(b, "\",\"hg\":"); b_u64(b, SH->hang_trips);
+    b_ch(b, '"');
+    journal_ev(b);
+    b_str(b, ",\"hg\":"); b_u64(b, SH->hang_trips);
     b_str(b, ",\"hr\":"); b_u64(b, holdrand);
     b_str(b, ",\"in\":\""); b_hex(b, g_input_hash, 16);
     b_str(b, "\",\"joins\":"); b_u64(b, SH->joins);

@@ -6,11 +6,25 @@ the kst savestate engine), attaches the staging ring, captures every tick,
 plays a pinned step list, and writes the per-tick journal plus a side log with
 each tick's state root and capture numbers.
 
-  run      launch, capture every tick, play the steps; optionally pin trees at
-           target ticks, then restore to each target and continue, comparing
-           every continued tick's journal line and state root with the record
+  pin      copy a DLL into the rig once, by sha256, and make it the stage DLL
+  run      launch, capture every tick, play the steps or a score; optionally
+           pin trees at target ticks, then restore to each target and
+           continue, comparing every continued tick's journal line and state
+           root with the record
   compare  compare two runs: journals and per-tick state roots; page-level
            diff at the first differing root (from the page logs)
+
+The shim DLL is pinned per rig: `pin` stores it as dll/<sha256>.dll, copies it
+to the stage and records the hash in dll/pinned. `run` logs the stage DLL's
+sha256 and refuses to start when it differs from the pin, or when the shim's
+hello reports another build. Rebuilding the repo DLL never changes a rig.
+
+A score (--score) is compiled with kptas.score. `@sync EVENT` is satisfied by
+an event from the note just before it (the Python supervisor's carry); only
+otherwise does it wait for a later one. `@save ms=N` and the header `save_ms`
+(or --save-ms) set the virtual save length. A note's `!close` posts WM_CLOSE
+at the start of its first tick. When the game exits, the run stops there and
+the report records the exit tick and code.
 
 The ring consumer keeps a mirror of the live page map (vaddr -> key, prot,
 class), page contents only for keys the mirror or a pinned tree references,
@@ -44,6 +58,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent                    # KPTASInterface
+sys.path.insert(0, str(ROOT))
 LIVE = Path(os.environ.get("KPTAS_LIVE", Path.home() / "kptas-live")) / "m2"
 DEFAULTS = {
     "stage": LIVE / "stage",
@@ -51,9 +66,10 @@ DEFAULTS = {
     "prefix": LIVE.parent / "prefix",
     "prefix_pin": LIVE / "prefix-pin",
     "session": LIVE / "session",
-    "dll": ROOT / "native" / "shim" / "build" / "dinput8.dll",
+    "dlls": LIVE / "dll",
     "steps": LIVE / "scores" / "m1_exit.steps.json",
 }
+BUILD_DLL = ROOT / "native" / "shim" / "build" / "dinput8.dll"
 FT_2004_02_12 = 127210176000000000
 WRITABLE = ("Saves", "Temp", "currentgame", "gameinprogress", "logs", "Tempclient", "LocalVault", "DMVault",
             "ServerVault")
@@ -321,9 +337,42 @@ def reset_stage(a) -> None:
             shutil.rmtree(p)
     shutil.copytree(pin / "saves", stage / "Saves")
     (stage / "logs").mkdir()
-    shutil.copyfile(a.dll, stage / "dinput8.dll")
     for reg in ("system.reg", "user.reg", "userdef.reg"):
         shutil.copyfile(a.prefix_pin / reg, a.prefix / reg)
+
+
+# ---------------------------------------------------------------- DLL pin
+
+def sha256_file(p: Path) -> str:
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def cmd_pin(a) -> int:
+    """Store the DLL by hash (once), copy it to the stage, record the pin."""
+    sha = sha256_file(a.dll)
+    a.dlls.mkdir(parents=True, exist_ok=True)
+    kept = a.dlls / f"{sha}.dll"
+    if not kept.exists():
+        shutil.copyfile(a.dll, kept)
+    if sha256_file(kept) != sha:
+        raise SystemExit(f"{kept} does not hash to its name")
+    shutil.copyfile(kept, a.stage / "dinput8.dll")
+    (a.dlls / "pinned").write_text(sha + "\n")
+    print(f"pinned {sha} ({a.dll} -> {kept} -> {a.stage / 'dinput8.dll'})")
+    return 0
+
+
+def check_pin(a) -> str:
+    """The stage DLL's sha256; refuse to run when it is not the pinned build."""
+    pin = a.dlls / "pinned"
+    if not pin.exists():
+        raise SystemExit(f"no pinned DLL in {a.dlls}; run: pin --dll PATH")
+    want = pin.read_text().strip()
+    have = sha256_file(a.stage / "dinput8.dll")
+    print(f"stage dll sha256 {have} (pinned {want})")
+    if have != want:
+        raise SystemExit(f"stage DLL {have} is not the pinned build {want}; refusing to run")
+    return have
 
 
 def snap_files(stage: Path, dst: Path) -> None:
@@ -382,6 +431,7 @@ class Wire:
         self.buf = b""
         self.next_id = 1
         self.on_tick = None
+        self.exit = None                      # the shim's exit push, once the game exits
 
     def _line(self, timeout: float) -> dict:
         deadline = time.monotonic() + timeout
@@ -406,6 +456,8 @@ class Wire:
             if "push" in msg:
                 if msg["push"] == "tick" and self.on_tick:
                     self.on_tick(msg)
+                elif msg["push"] == "exit":
+                    self.exit = msg
                 continue
             if msg.get("id") != rid:
                 raise RuntimeError(f"unexpected reply {msg}")
@@ -415,6 +467,80 @@ class Wire:
 
 
 # ---------------------------------------------------------------- run
+
+def note_args(note) -> dict:
+    """A compiled score Note in the step verb's shape (same text and keys as kptas_m1)."""
+    from kptas.score import keys as K
+    from kptas.score.fmt import render
+    keys = sorted({K.dik(k) for tok in note.held for k in K.token_keys(tok)})
+    text = render(note).split(None, 1)
+    args = {"note": text[1] if len(text) > 1 else ".", "keys": keys, "buttons": list(note.buttons)}
+    mouse = {}
+    if note.mouse_abs is not None:
+        mouse["abs"] = list(note.mouse_abs)
+    if note.mouse_rel is not None:
+        mouse["rel"] = list(note.mouse_rel)
+    if mouse:
+        args["mouse"] = mouse
+    if note.wheel:
+        args["wheel"] = note.wheel
+    if note.osev:
+        args["msgs"] = [note.osev]
+    return args
+
+
+def load_plan(a) -> tuple[list, dict]:
+    """Actions to play, and the score header. From --score, else the --steps JSON (notes only)."""
+    if not a.score:
+        return [dict(s, op="step") for s in json.loads(Path(a.steps).read_text())], {}
+    import dataclasses
+    from kptas.score import Mark, Note, SaveMs, Segment, Sync, compile_score
+    sc = compile_score(a.score, include_dirs=[ROOT / "lib"])
+    acts, pending = [], None
+    for it in sc.items:
+        if isinstance(it, Note):
+            if it.count == 0:              # one-shots ride on the next note's first tick
+                if pending is not None and pending.osev and it.osev:
+                    raise SystemExit(f"!{pending.osev} and !{it.osev} land on the same tick")
+                pending = it if pending is None else dataclasses.replace(
+                    it, wheel=pending.wheel + it.wheel, osev=it.osev or pending.osev)
+                continue
+            note = it
+            if pending is not None:
+                if pending.osev and it.osev:
+                    raise SystemExit(f"!{pending.osev} and !{it.osev} land on the same tick")
+                note = dataclasses.replace(it, wheel=pending.wheel + it.wheel, osev=it.osev or pending.osev)
+                pending = None
+            acts.append(dict(note_args(note), n=it.count, op="step"))
+        elif isinstance(it, Sync):
+            acts.append({"op": "sync", "event": it.event, "arg": it.arg, "timeout": it.timeout or 1800})
+        elif isinstance(it, SaveMs):
+            acts.append({"op": "save_ms_next", "ms": it.ms})
+        elif isinstance(it, Mark):
+            acts.append({"op": "mark", "name": it.name})
+        elif isinstance(it, Segment):
+            if it.hz:
+                acts.append({"op": "hz", "hz": it.hz})
+        else:
+            print(f"  skipped unsupported item: {it}")
+    if pending is not None:
+        print("  a trailing count-0 note had nothing to attach to; its one-shots were dropped")
+    return acts, dict(sc.header)
+
+
+def maybe_shot(a, tick: int) -> None:
+    """Grab the X display once the run passes each --shot tick (needs --present draw or N)."""
+    while a.shot and tick >= a.shot[0]:
+        a.shot.pop(0)
+        png = Path(a.session) / f"shot-{tick:06d}.png"
+        subprocess.run(["host-spawn", "-no-pty", "ffmpeg", "-loglevel", "error", "-y", "-f", "x11grab",
+                        "-i", a.display, "-frames:v", "1", str(png)], stdin=subprocess.DEVNULL, timeout=60)
+        print(f"  shot at tick {tick}: {png}")
+
+
+def hit(evs: list, event: str, arg) -> bool:
+    return any(e["name"] == event and (arg is None or e.get("arg") == arg) for e in evs)
+
 
 def plan_steps(steps: list, cut: set) -> list:
     """Segments (first_tick, last_tick, args, first): the original notes, split at every cut tick."""
@@ -433,8 +559,13 @@ def plan_steps(steps: list, cut: set) -> list:
 
 
 def cmd_run(a) -> int:
-    steps = json.loads(Path(a.steps).read_text())
+    dll_sha = check_pin(a)
+    acts, header = load_plan(a)
+    steps = [{k: v for k, v in x.items() if k != "op"} for x in acts if x["op"] == "step"]
     targets = sorted(int(x) for x in a.targets.split(",")) if a.targets else []
+    if targets and any(x["op"] not in ("step", "mark") for x in acts):
+        raise SystemExit("--targets replays plain notes only; this score has @sync, @save or @segment")
+    save_ms = a.save_ms if a.save_ms is not None else header.get("save_ms")
     cont = a.continue_ticks
     windows = {}
     for T in targets:
@@ -473,6 +604,7 @@ def cmd_run(a) -> int:
     side = open(str(out) + ".side", "w")
     jf = open(out, "w")
     cur = {"mode": "record", "cmp": None}
+    marks, events = {}, []
 
     def on_tick(msg):
         t = msg["tick"]
@@ -504,11 +636,17 @@ def cmd_run(a) -> int:
                                   "fields": diff_obj(ea, eb)[:12], "orig_root": orig[1], "root": root}
     w.on_tick = on_tick
     rc = 0
-    report = {"targets": targets, "continue": cont, "restores": []}
+    report = {"targets": targets, "continue": cont, "restores": [], "dll_sha256": dll_sha,
+              "score": str(a.score) if a.score else None, "save_ms": save_ms}
     try:
         hello = w.call("hello", {"proto": "kptas-wire/1"}, timeout=60)
         (a.session / "hello.json").write_text(json.dumps(hello, indent=1, sort_keys=True))
-        print(f"hello: shim={hello['shim']} caps={hello['caps']} hooks={len(hello['hooks'])}")
+        print(f"hello: shim={hello['shim']} build={hello.get('build')} caps={hello['caps']} hooks={len(hello['hooks'])}")
+        report["hello_build"] = hello.get("build")
+        if hello.get("build") != dll_sha[:16]:
+            raise RuntimeError(f"the shim reports build {hello.get('build')}, not the pinned {dll_sha[:16]}")
+        if a.geo_log:
+            w.call("log", {"geo": 1})
         if a.tier_probe:
             probe = {}
             for verb in ("mem.write", "semantic.apply"):
@@ -532,6 +670,8 @@ def cmd_run(a) -> int:
         print("ring.attach:", w.call("ring.attach", {"path": winpath(ring_path), "mb": a.ring_mb}))
         w.call("capture", {"enabled": True})
         w.call("subscribe", {"topics": ["tick"]})
+        if save_ms is not None:
+            w.call("clock.save_ms", {"ms": int(save_ms)})
         r = w.call("start", {}, timeout=a.boot_timeout)
         print(f"start: tick {r['tick']} root={r['state_root'][:16] if r['state_root'] else None} "
               f"boot {time.monotonic() - t0:.1f}s")
@@ -540,22 +680,84 @@ def cmd_run(a) -> int:
             r2 = w.call("mem.write", {"addr": 0x78d000, "data_b64": cur_bytes})   # same bytes: state unchanged
             report["tier_probe_lab"] = r2
             print(f"tier probe (lab): mem.write of the current bytes at 0x78d000 -> {r2}")
-        segs = plan_steps(steps, set(targets) | {a.stop_at} if a.stop_at else set(targets))
-        if a.stop_at:
-            segs = [s for s in segs if s[0] <= a.stop_at]
         files_dir = Path(str(out) + ".files")
-        for (lo, hi, args, first) in segs:
-            q = dict(args)
-            q["n"] = hi - lo + 1
-            q["first"] = first
-            w.call("step", q)
-            if hi in targets:
-                snap_files(a.stage, files_dir / str(hi))
-                store.wait_tick(hi)
-                print(f"  pinned tick {hi}: root={rec[hi][1][:16]} pages={len(store.pinned[hi])} "
-                      f"contents={len(store.content)}")
-            if a.stop_at and hi >= a.stop_at:
+        cut = set(targets) | ({a.stop_at} if a.stop_at else set())
+        tick, carry, exited = r["tick"], [], None
+
+        def note_events(rep_):
+            for e in rep_.get("events", []):
+                events.append(e)
+                if e["name"] != "load.done":
+                    print(f"    event {e}")
+            return rep_.get("events", [])
+
+        for act in acts:
+            op = act["op"]
+            if a.stop_at and tick >= a.stop_at:
                 break
+            if op == "step":
+                args = {k: v for k, v in act.items() if k not in ("op", "n")}
+                carry = []                    # the carry is the whole last note, across its segments
+                start = lo = tick + 1
+                end = tick + act["n"]
+                for c in sorted(x for x in cut if lo <= x < end) + [end]:
+                    q = dict(args, n=c - lo + 1, first=lo == start)
+                    if not q["first"]:
+                        q.pop("msgs", None)
+                    rr = w.call("step", q)
+                    carry += note_events(rr)
+                    tick = rr["tick"]
+                    maybe_shot(a, tick)
+                    if rr.get("outcome") == "exited":
+                        exited = rr
+                        break
+                    if tick in targets:
+                        snap_files(a.stage, files_dir / str(tick))
+                        store.wait_tick(tick)
+                        print(f"  pinned tick {tick}: root={rec[tick][1][:16]} pages={len(store.pinned[tick])} "
+                              f"contents={len(store.content)}")
+                    if a.stop_at and tick >= a.stop_at:
+                        break
+                    lo = c + 1
+                if exited:
+                    break
+            elif op == "sync":
+                if hit(carry, act["event"], act["arg"]):
+                    print(f"  @sync {act['event']}: fired during the previous note, tick {tick}")
+                    carry = []
+                    continue
+                rr = w.call("wait", {"event": act["event"], "arg": act["arg"], "timeout": act["timeout"],
+                                     "note": "."})
+                evs = note_events(rr)
+                tick, carry = rr["tick"], []
+                print(f"  @sync {act['event']}: waited={rr.get('waited')} tick={tick}")
+                if rr.get("outcome") == "exited":
+                    exited = rr
+                    break
+                if not hit(evs, act["event"], act["arg"]):
+                    raise RuntimeError(f"@sync {act['event']} timed out at tick {tick}")
+            elif op == "save_ms_next":
+                w.call("clock.save_ms_next", {"ms": act["ms"]})
+            elif op == "mark":
+                marks[act["name"]] = tick
+            elif op == "hz":
+                w.call("clock", {"mode": "virtual", "hz": act["hz"], "qpf_hz": a.qpf, "uptime0_ms": a.uptime0,
+                                 "initial_ft": FT_2004_02_12})
+        report["marks"] = marks
+        if exited:
+            try:
+                while w.exit is None:         # the exit push follows the reply, then the shim closes
+                    msg = w._line(30)
+                    if msg.get("push") == "exit":
+                        w.exit = msg
+            except (ConnectionError, TimeoutError, json.JSONDecodeError):
+                pass
+            ex = w.exit or {}
+            report["exit"] = {"tick": ex.get("tick"), "code": ex.get("code"), "last_gate": ex.get("last_gate"),
+                              "reply_tick": exited["tick"]}
+            print(f"game exited during tick {ex.get('tick')} (last gate {ex.get('last_gate')}, "
+                  f"code {ex.get('code')})")
+            raise StopIteration
         last = max(rec)
         store.wait_tick(last)
         v = w.call("verify", {})
@@ -615,6 +817,8 @@ def cmd_run(a) -> int:
             v = w.call("verify", {})
             report["final_verify"] = v
         w.call("bye", {"exit": 0}, timeout=30)
+    except StopIteration:
+        pass
     except (ConnectionError, TimeoutError, RuntimeError, OSError) as e:
         print(f"run ended early at tick {max(rec) if rec else -1}: {e}", file=sys.stderr)
         report["error"] = str(e)
@@ -643,8 +847,10 @@ def cmd_run(a) -> int:
     report["journal_sha256"] = hashlib.sha256(data).hexdigest()
     report["ticks"] = data.count(b"\n")
     report["wall_s"] = round(time.monotonic() - t0, 1)
+    report["events"] = events
     Path(str(out) + ".report.json").write_text(json.dumps(report, indent=1, sort_keys=True))
-    print(f"journal: {out} ticks={report['ticks']} sha256={report['journal_sha256']} wall={report['wall_s']}s")
+    print(f"journal: {out} ticks={report['ticks']} sha256={report['journal_sha256']} wall={report['wall_s']}s "
+          f"dll={dll_sha[:16]} marks={marks}" + (f" exit={report['exit']}" if "exit" in report else ""))
     return rc
 
 
@@ -740,8 +946,19 @@ def cmd_compare(a) -> int:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
+    pn = sub.add_parser("pin")
+    pn.add_argument("--dll", type=Path, default=BUILD_DLL, help="the DLL to pin (default: the repo build)")
+    for k in ("stage", "dlls"):
+        pn.add_argument(f"--{k}", type=Path, default=DEFAULTS[k])
     r = sub.add_parser("run")
     r.add_argument("--out", required=True, help="journal output path (side log, page log, report beside it)")
+    r.add_argument("--score", default=None, help="score file (kptas.score) instead of --steps")
+    r.add_argument("--save-ms", type=int, default=None,
+                   help="virtual length of every in-game save (overrides the score header save_ms; "
+                        "unset = the header, else the shim default, 900)")
+    r.add_argument("--geo-log", action="store_true", help="log the game's geometry calls (diagnostics)")
+    r.add_argument("--shot", type=lambda v: sorted(int(x) for x in v.split(",")), default=[],
+                   help="comma list of ticks to screenshot (use with --present draw)")
     r.add_argument("--targets", default="", help="comma list of ticks to pin, restore to and continue from")
     r.add_argument("--continue-ticks", type=int, default=600)
     r.add_argument("--win-content", type=int, default=120,
@@ -770,7 +987,7 @@ def main() -> int:
     c.add_argument("b")
     c.add_argument("--pages", action="store_true", help="page-level diff at the first differing root")
     a = p.parse_args()
-    return {"run": cmd_run, "compare": cmd_compare}[a.cmd](a)
+    return {"pin": cmd_pin, "run": cmd_run, "compare": cmd_compare}[a.cmd](a)
 
 
 if __name__ == "__main__":

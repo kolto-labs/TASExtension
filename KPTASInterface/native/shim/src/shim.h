@@ -34,7 +34,7 @@ typedef int32_t i32;
 typedef int64_t i64;
 
 #define SHIM_NAME "kptas-shim"
-#define SHIM_VERSION "m2.0"
+#define SHIM_VERSION "m3.0"
 #define PROTO "kptas-wire/1"
 
 /* ---- K1 GOG 1.03 constants (contract section 2, verified by disassembly) ---- */
@@ -58,6 +58,8 @@ typedef int64_t i64;
 #define ADDR_GET_PLAYER_ID 0x004aea40u /* CServerExoApp::GetPlayerCreatureId (thiscall) */
 #define ADDR_GET_OBJECT    0x004ae750u /* CServerExoApp::GetGameObject (thiscall, id) */
 #define ADDR_GET_MODULE    0x004ae6b0u /* CServerExoApp::GetModule (thiscall) */
+#define ADDR_STALL_SAVE    0x004b3110u /* CServerExoAppInternal::StallEventSaveGame (thiscall) */
+#define ADDR_RENDER_WINDOW 0x007a39d8u /* renderWindow (HWND) */
 
 /* ---- rt.c ---- */
 void *memcpy(void *d, const void *s, size_t n);
@@ -141,7 +143,7 @@ const char *jstr(jnode *n, const char *def);
 void *iat_hook(HMODULE mod, const char *dll, const char *fn, void *hook);
 int detour(u32 addr, const u8 *expect, u32 len, const u8 *insn_lens, void *hook, void **tramp);
 int patch_jmp(u32 addr, void *target);
-extern char g_hooks_list[2048];
+extern char g_hooks_list[4096];
 extern u32 g_hooks_n;
 void hooks_note(const char *name);
 
@@ -166,6 +168,8 @@ void clock_install_exe(void);
 void clock_install_module(HMODULE m, const char *label);
 u64 __attribute__((thiscall)) hk_ghrt(void *self);
 void clock_tick_reset(void);
+void save_install(void);
+#define SAVE_MS_DEFAULT 900u   /* same documented estimate as the Python sim */
 extern u32 g_guard_trips, g_guard_site_reads, g_guard_step_us;
 extern u32 g_guard_first_site;
 
@@ -240,7 +244,20 @@ int wire_service(int phase);   /* runs requests until a release; returns 1 on re
 void wire_send_line(buf_t *b);
 void wire_push_tick(const char *entry, u32 n);
 void wire_gate_hook(void);
+void wire_tick_begin(void);    /* after the per-tick resets: events staged for this tick */
+void wire_exit(u32 code);      /* the game is exiting: report it before the process ends */
 extern int g_wire_ok;
+
+/* engine and harness events: step replies, wait, and (journalled kinds) the journal */
+enum { EV_LOAD_DONE = 0, EV_SAVE_BEGIN, EV_SAVE_DONE, EV_CLOSE, EV_PROC_DOWN, EV_SAVE_MS, EV_SAVE_MS_NEXT, EV_KINDS };
+void ev_add(u32 kind, u32 val);
+void journal_ev_add(u32 kind, u32 val);
+extern u32 g_ev_count[EV_KINDS];
+
+/* ---- geo.c: virtual display, window and cursor geometry ---- */
+void geo_install(void);
+FARPROC geo_proc(const char *name);   /* GetProcAddress-resolved geometry, or 0 */
+void geo_set_log(int on);
 
 /* ---- main.c ---- */
 extern int g_active;
@@ -357,6 +374,11 @@ typedef struct shim_hg {
     u32 prog[GL_PROGMAX];
     u32 buf[GL_BUFMAX];
     u32 tex[GL_TEXMAX];
+    /* appended fields: the offsets above stay fixed */
+    u32 save_ms;          /* virtual length of every in-game save */
+    u32 save_next_ms;     /* one-shot for the next save only */
+    u32 save_next_set;
+    u32 close_next;       /* WM_CLOSE staged for the next tick */
 } shim_hg;
 
 extern shim_hg *SH;

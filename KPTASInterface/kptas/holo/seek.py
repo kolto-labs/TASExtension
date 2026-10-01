@@ -25,7 +25,7 @@ from typing import Any
 from kptas.holo import verify as hv
 from kptas.holo.bundle import EVENT_MARK, Bundle
 from kptas.holo.pages import PageMap
-from kptas.score import Expect, Note, Relaunch, Segment, Sync, compile_score
+from kptas.score import Expect, Note, Relaunch, SaveMs, Segment, Sync, compile_score
 from kptas.supervisor import PROCESS_BACKENDS, RunError, TelosError, merge_oneshots
 from kptas.types import (NULL_DIGEST, PAGE_SIZE, ZERO_PAGE_KEY, BackendError, EngineEvent, FormatError, MemClass,
                          Receipt, SeekMode, StagingRecord, Tier, TickFlag, TickRecord, VerbClass, VerifyLevel, sha256)
@@ -54,6 +54,7 @@ class Cursor:
 class _Session:
     live: hv.Live
     seeks: int = 0
+    played: set[int] = dataclasses.field(default_factory=set)   # ticks this process ran itself, since its boot
 
 
 def _held(note: Any) -> Any:
@@ -78,11 +79,13 @@ class _Seek:
     def __init__(self, b: Bundle, sup: Any, cfg: Mapping[str, Any], log: Callable[[str], None]):
         self.b, self.sup, self.cfg, self.log = b, sup, cfg, log
         self._recs: dict[int, TickRecord | None] = {}
+        self._rows: dict[int, tuple[int, int]] | None = None
         score = compile_score(b.score)
         self.items = score.items
         hz = score.header.get("hz")
         self.base_hz = int(hz) if hz else cfg["clock"]["hz"]
         self.base_scale = cfg["clock"]["scale"]
+        self.save_ms = score.header.get("save_ms")
         self.timeout = cfg["score"]["default_timeout_ticks"]
         s = _SESSIONS.get(sup) if sup is not None else None
         if s is None:
@@ -191,6 +194,7 @@ class _Seek:
             return
         first = None
         for t, journal in live.feed(recs, sup.offset):
+            self.session.played.add(t)
             try:
                 self.compare(t, journal, None, strict)
             except _Mismatch as e:        # keep folding: records already drained must reach live.map
@@ -231,9 +235,61 @@ class _Seek:
         sup.tick, sup.epoch, sup.offset, sup.carry = -1, -1, 0, []
         sup.hz, sup.scale = self.base_hz, self.base_scale
         self.session.live = hv.Live()
+        self.session.played = set()
         rep = sup.open()
         self.live.via = "boot"
         self.absorb(rep, strict=False)
+
+    def flags(self) -> dict[int, tuple[int, int]]:
+        """(epoch, flags) of every recorded tick on the bundle's ancestry, from the index rows."""
+        if self._rows is None:
+            out: dict[int, tuple[int, int]] = {}
+            b, upto = self.b, None
+            while b is not None:
+                for r in b.rows:
+                    if (upto is None or r.tick <= upto) and r.tick not in out:
+                        out[r.tick] = (r.epoch, r.flags)
+                upto = b.header.parent.tick if b.header.parent is not None else None
+                b = b.parent
+            self._rows = out
+        return self._rows
+
+    def warm_target(self, K: int) -> int | None:
+        """The tick the live process must have played up to before a restore to K (seek.restore_warmup).
+
+        In the game a restore rewinds the sim set, but some state outside it is built by what the process
+        ran: its first tick after boot, and the load screens of an area load. A restore at the boot gate,
+        or into an area this process never loaded, verifies its root and then diverges on the next ticks.
+        So the process first plays, checked like replay, up to the tick after its first tick and after the
+        last load-screen tick (HOLD) at or before K, never past K. None: nothing to play.
+        """
+        if self.cfg["seek"]["restore_warmup"] != "loads" or self.rec(K) is None:
+            return None
+        first, epoch = self.first_tick(), self.rec(K).epoch
+        if K <= first:
+            return None
+        holds = [t for t, (ep, fl) in self.flags().items() if ep == epoch and fl & TickFlag.HOLD and first < t <= K]
+        need = {first + 1, *holds}
+        if need <= self.session.played:
+            return None
+        return min(max(need) + 1, K)
+
+    def warm(self, K: int, at: dict[int, Cursor], out: dict[str, Any]) -> None:
+        target = self.warm_target(K)
+        if target is None:
+            return
+        L = self.live
+        if not (L.ok and L.tick <= target and L.tick in at and self.rec(L.tick) is not None
+                and self.rec(L.tick).epoch == self.sup.epoch):
+            self.roots = False
+            self.reboot()
+            L = self.live
+            if not L.ok:
+                self.compare(L.tick, L.journal, None, True)
+        self.roots = self.cfg["replay"]["require_verify_level"] == "full_root"
+        self.drive(at[L.tick], target)
+        L.via = "replay"
+        out["warm"] = target
 
     def write_set(self, want: PageMap, t: int) -> list[StagingRecord]:
         """W: pages where the live map differs from want, plus decommits. After a semantic write the live
@@ -249,12 +305,24 @@ class _Seek:
                 if want.get(h.vaddr) is None]
         return sorted(out, key=lambda r: r.vaddr)
 
+    def put_files(self, t: int) -> None:
+        """Write T's files tree back before its pages, for a backend that tracks the game's files."""
+        rec, put = self.rec(t), getattr(self.sup.backend, "put_files", None)
+        if put is None or rec is None or not rec.flags & TickFlag.FILES:
+            return
+        try:
+            rows = self.b.file_tree(rec.files_root)
+            put(rows, lambda h: self.b.file(bytes.fromhex(h)))
+        except (KeyError, FormatError, BackendError, OSError) as e:
+            raise _Mismatch(t, f"files tree: {e}") from None
+
     def restore_to(self, t: int) -> int:
         want = self.map_at(t)
         if want is None:
             raise _Mismatch(t, "map(T) is not resolvable from the store")
         W = self.write_set(want, t)
         sup = self.sup
+        self.put_files(t)
         rc = sup.backend.restore(t - sup.offset, want.root(), W)
         self.live.restored(t, W)
         sup.tick, sup.carry, sup.alive = t, [], True
@@ -287,6 +355,8 @@ class _Seek:
         if self.live.via in ("restore", "semantic"):
             sup.carry = [EngineEvent(e, sup.tick, a) for e, a in cur.carry]
         pending = cur.pending
+        if self.save_ms is not None and (cur.i, cur.j) == (0, 0) and sup.tick < target:
+            sup.save_length(int(self.save_ms), once=False)     # as run_score does right after the boot
 
         def hit(evs: Any, it: Any) -> bool:
             return any(e.name == it.event and (it.arg is None or e.arg == it.arg) for e in evs)
@@ -337,6 +407,8 @@ class _Seek:
                         continue
                     rep = sup.relaunch("relaunch")
                     self.absorb(rep)
+                elif isinstance(it, SaveMs):
+                    sup.save_length(it.ms, once=True)
         finally:
             self.replayed += max(0, self.live.tick - start)
         if sup.tick != target:
@@ -373,16 +445,22 @@ class _Seek:
         return None
 
     def anchor(self, T: int, at: dict[int, Cursor], need_cursor: bool) -> int | None:
-        """K: the latest restore point <= T in T's epoch whose map resolves (and whose score position is known)."""
+        """K: the latest restore point <= T in T's epoch whose map resolves (and whose score position is known).
+        With need_cursor (hybrid), a keyframe is preferred: hybrid restores the nearest keyframe and replays
+        from there, even where every tick is a restore point."""
         epoch = self.rec(T).epoch
+        fallback = None
         for k in range(T, self.first_tick() - 1, -1):
             r = self.rec(k)
             if r is None or r.epoch != epoch:
-                return None
+                break
             if r.flags & TickFlag.CAPTURED and r.flags & TickFlag.RESTORE_POINT and (k in at or not need_cursor):
-                if self.map_at(k) is not None:
-                    return k
-        return None
+                if not need_cursor or r.flags & TickFlag.KEYFRAME:
+                    if self.map_at(k) is not None:
+                        return k
+                elif fallback is None and self.map_at(k) is not None:
+                    fallback = k
+        return fallback
 
     def attempt(self, mode: SeekMode, T: int, at: dict[int, Cursor], out: dict[str, Any]) -> None:
         if mode is SeekMode.REPLAY:
@@ -400,8 +478,9 @@ class _Seek:
             L.via = "replay"
             return
         K = T if mode is SeekMode.RESTORE else self.anchor(T, at, need_cursor=mode is SeekMode.HYBRID)
+        self.warm(K, at, out)
         out["W"] += self.restore_to(K)          # always: the restore call is also the root check
-        out["origin"] = f"restore@{K}"
+        out["origin"] = (f"replay@{out['warm']} > " if out.get("warm") is not None else "") + f"restore@{K}"
         if mode is SeekMode.RESTORE:
             bad = self.journal_fields(T)
             if bad:
@@ -414,6 +493,8 @@ class _Seek:
             if want.flags & TickFlag.CAPTURED and self.live.map.root() != want.state_root:
                 raise _Mismatch(T, "state_root")
             self.live.via = "restore"
+            if K == T:
+                self.canary(T, at, out)     # nothing replayed: this is a restore, so it gets the restore's check
         else:
             self.semantic(T, out)
 
@@ -528,7 +609,7 @@ def seek(b: Bundle, tick: int, sup: Any, *, mode: SeekMode | str | None = None,
             path.append(f"{m} ({why})")
             log(f"seek {tick}: {m} is not possible: {why}")
             continue
-        out.update(W=0, origin="-", canary="none")
+        out.update(W=0, origin="-", canary="none", warm=None)
         s.replayed, used = 0, m
         try:
             s.attempt(m, tick, at, out)

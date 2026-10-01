@@ -42,7 +42,7 @@ The first line is `#!score v1`, then `key=value` pairs.
 | `start` | `boot`, or `save:<sha256>` | `boot` |
 | `render` | free text, for example `800x600/low` | unset |
 | `keymap` | free text | unset |
-| `save_ms` | a whole number, milliseconds | `clock.save_ms`, then a documented backend estimate (pysim: 900, an unmeasured guess for a quicksave stall; see `DEFAULT_SAVE_MS` in `kptas/backend/pysim.py`) |
+| `save_ms` | a whole number, milliseconds | `clock.save_ms`, then a documented backend estimate (pysim and the shim: 900, an unmeasured guess for a quicksave stall; see `DEFAULT_SAVE_MS` in `kptas/backend/pysim.py`) |
 
 Other lowercase keys are kept as written. The header's `tier` and `hz` win over `telos.toml`.
 
@@ -67,6 +67,8 @@ Other lowercase keys are kept as written. The header's `tier` and `hz` win over 
 | `$name` | an alias from `@alias` |
 
 A count of 0 is allowed. Its one-shot inputs land on the first tick of the next note.
+
+In the game `!close` sends WM_CLOSE to the game window at the start of its tick. K1 answers with its quit box and pauses; it exits only when the score clicks OK. PySim treats `!close` as an immediate exit.
 
 Key names are lowercase. `shift`, `ctrl`, `alt`, `escape` and `return` are accepted and rewritten as `lshift`, `lctrl`, `lalt`, `esc` and `enter`. The full table is in `kptas/score/keys.py`, with each key's Windows VK code and DirectInput scan code.
 

@@ -3,11 +3,17 @@
 Python listens on loopback; the shim (or SimGame.exe) connects from its entry
 detour using KPTAS_PORT and KPTAS_SESSION, then answers hello. Bulk bytes go
 through files in the session directory; page records come through the staging ring.
+
+A savestate is the tick's pages plus the stage's writable files. The pages come
+through the ring every tick. The files are scanned at every gate, so a step of
+n ticks runs as n one-tick steps; only the first carries the note's first-tick
+edges (first=true), so the game sees the same input as one n-tick step.
 """
 
 from __future__ import annotations
 
 import base64
+import dataclasses
 import json
 import os
 import shutil
@@ -22,9 +28,10 @@ from typing import Any, Literal
 from kptas.config import DEFAULTS
 from kptas.supervisor import clock_env, filetime
 from kptas.types import (VERB_ALLOW, WIRE_MAX_LINE, WIRE_PROTO, BackendError, Caps, ClockMode,
-                         EngineEvent, EnvPin, OsEvent, ProcOutcome, Receipt, RefusedError, SeekMode,
-                         StagingRecord, StepReport, Tier, VerifyLevel)
+                         EngineEvent, EnvPin, OsEvent, ProcOutcome, Receipt, RecordFlag, RecordKind, RefusedError,
+                         SeekMode, StagingRecord, StepReport, Tier, VerbClass, VerifyLevel)
 
+from .rig import StageFiles
 from .staging import StagingRing, write_records
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -149,23 +156,58 @@ def win_path(path: str | os.PathLike[str], wine: bool = True) -> str:
     return "Z:" + p.replace("/", "\\") if wine else p
 
 
-def note_to_wire(note: Any) -> dict[str, Any]:
-    """A score Note in the input verb's shape: DIK codes, buttons, mouse, wheel, msgs."""
-    from kptas.score.keys import dik
+def note_args(note: Any) -> dict[str, Any]:
+    """A score Note as the step verb's input fields: the note text the shim journals, DIK codes, buttons,
+    and mouse and wheel when the note has them. One-shot os events travel separately (msgs)."""
+    from kptas.score.keys import dik, token_keys
+    from kptas.supervisor import note_text
     if note is None:
-        return {"keys": [], "buttons": [], "mouse": {}, "wheel": 0, "msgs": []}
-    keys = sorted({dik(k) for tok in note.held for k in tok.split("+")})
+        return {"note": ".", "keys": [], "buttons": []}
+    args: dict[str, Any] = {"note": note_text(note), "buttons": list(note.buttons),
+                            "keys": sorted({dik(k) for tok in note.held for k in token_keys(tok)})}
     mouse: dict[str, list[int]] = {}
     if note.mouse_abs is not None:
         mouse["abs"] = list(note.mouse_abs)
     if note.mouse_rel is not None:
         mouse["rel"] = list(note.mouse_rel)
-    return {"keys": keys, "buttons": list(note.buttons), "mouse": mouse, "wheel": note.wheel,
-            "msgs": [note.osev] if note.osev else []}
+    if mouse:
+        args["mouse"] = mouse
+    if note.wheel:
+        args["wheel"] = note.wheel
+    return args
 
 
 def _hex(b: bytes | None) -> str | None:
     return None if b is None else b.hex()
+
+
+def _caps(hello: Mapping[str, Any], backend: str) -> Caps:
+    """Caps from a hello reply. The contract's shape names tier_ceiling; the shim's own caps object says
+    what it virtualizes, and restore plus capture make restore and hybrid seeks possible."""
+    c = hello.get("caps", {})
+    if "tier_ceiling" in c:
+        return Caps.from_hello({**hello, "backend": backend})
+    seek = {SeekMode.REPLAY}
+    if c.get("restore") and c.get("capture"):
+        seek |= {SeekMode.RESTORE, SeekMode.HYBRID}
+    threads = str(c.get("threads", ""))
+    return Caps(
+        backend=backend, tier_ceiling=Tier.TAS,
+        clock_modes=frozenset(ClockMode(m) for m in c.get("clock", ())), seek_modes=frozenset(seek),
+        input_paths=frozenset({"dinput"} if c.get("dinput") else ()),
+        thread_models=frozenset({threads.split("_")[0]} if threads else ()),
+        tick_source="winmain_loop_head", seed_hooked=bool(hello.get("seed_hooked", False)),
+        capture=bool(c.get("capture", False)), fiber=c.get("context") == "fiber", ring=True,
+        gl_names=bool(c.get("gl_names", False)), build=str(hello.get("build", "")),
+        exe_sha256=str(hello.get("exe_sha256", "")), shim_version=str(hello.get("shim", "")),
+        modules=tuple(hello.get("modules", ())), hooks=tuple(hello.get("hooks", ())))
+
+
+def _gone(e: BaseException) -> bool:
+    """The connection ended (the game exited), as opposed to the shim refusing or failing a request."""
+    if isinstance(e, (WireError, RefusedError)):
+        return False
+    return isinstance(e, OSError) or "closed the connection" in str(e)
 
 
 # ---------------------------------------------------------------- backend
@@ -181,6 +223,8 @@ class ShimBackend:
     """
 
     name = "shim"
+    note_first = True            # step(n, note, first=False) goes on with a note whose first tick has run
+    save_ms_rewound = True       # save lengths are journalled inputs in the shim's state; a restore rewinds them
 
     def __init__(self, simgame: bool = False, launch: bool = True, command: Sequence[str] | None = None,
                  host_prefix: Sequence[str] | None = None,
@@ -207,9 +251,15 @@ class ShimBackend:
         self._events: deque[EngineEvent] = deque()
         self._seq = 0
         self._tick = 0
-        self._pending: deque[StagingRecord] = deque()
+        self._pending: deque[StagingRecord] = deque()     # records of complete tick batches
+        self._open: list[StagingRecord] = []              # records of a batch whose TICK_END is still to come
+        self._last_end = -1                               # tick of the last TICK_END seen
+        self.restore_batches = 0
         self._ring_attached = False
         self._clock_args: tuple[ClockMode, int, int] | None = None
+        self._files: StageFiles | None = None
+        self._file_log: list[tuple[int, Any]] = []
+        self._msgs: list[str] = []                        # os events for the next tick
         self.logs: deque[dict[str, Any]] = deque(maxlen=1000)
         self.ticks: deque[dict[str, Any]] = deque(maxlen=1000)
         self.last_waited: Any = None
@@ -266,13 +316,14 @@ class ShimBackend:
     def _child_env(self, port: int) -> dict[str, str]:
         """The launch environment; matches kptas.supervisor.game_environ."""
         game, clock = self.cfg.get("game", {}), self.cfg.get("clock", {})
-        env = {"KPTAS_PORT": str(port), "KPTAS_SESSION": str(self.session_dir),
-               "KPTAS_CLOCK": clock_env({"clock": {**DEFAULTS["clock"], "mode": "virtual", **clock}})}
+        env = {"KPTAS_PORT": str(port), "KPTAS_SESSION": win_path(self.session_dir, bool(game.get("wine", "wine"))),
+               "KPTAS_CLOCK": clock_env({"clock": {**DEFAULTS["clock"], "mode": "virtual", **clock}}),
+               "KPTAS_PRESENT": str(self.cfg.get("replay", {}).get("present", "skip"))}
         if game.get("pinned_env", True):
-            for k in ("PATH", "HOME", "USER", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR"):
+            for k in ("HOME", "USER"):
                 if k in os.environ:
                     env[k] = os.environ[k]
-            env.update(LANG="C", LC_ALL="C", TZ="UTC", WINEDEBUG="-all")
+            env.update(LANG="C", PATH="/usr/bin:/bin", WINEDEBUG="-all")
         display = game.get("display", "auto")
         display = os.environ.get("DISPLAY", "") if display == "auto" else display
         if display:
@@ -290,9 +341,13 @@ class ShimBackend:
         """Listen, launch, accept the shim's connection, hello, and attach the staging ring."""
         self.cfg = cfg
         shim = cfg.get("shim", {})
-        self._wine = bool(cfg.get("game", {}).get("wine", "wine"))
+        game = cfg.get("game", {})
+        self._wine = bool(game.get("wine", "wine"))
         self.session_dir = Path(self.link.session) if self.link is not None else self._session()
         self.session_dir.mkdir(parents=True, exist_ok=True)
+        if self.name == "shim" and game.get("dir") and cfg.get("files", {}).get("store", True):
+            self._files = StageFiles(Path(os.path.expanduser(game["dir"])),
+                                     cfg.get("files", {}).get("stage_paths", ()))
         cap = int(shim.get("ring_mb", 64)) << 20
         self.ring = StagingRing.create(self.session_dir / "ring.bin", cap)
         self.ring.set_consumer(state=0)
@@ -329,9 +384,16 @@ class ShimBackend:
         hello = self.wire.request("hello", {"proto": WIRE_PROTO})
         if hello.get("proto") != WIRE_PROTO:
             raise BackendError(f"shim speaks {hello.get('proto')!r}, not {WIRE_PROTO}")
+        # build is the loaded DLL's sha256 prefix (older builds sent a game name): it must match the pin
+        want = str(self.cfg.get("shim", {}).get("dll_sha256", "")).lower()
+        got = str(hello.get("build", "")).lower()
+        if self.name == "shim" and want and got and all(c in "0123456789abcdef" for c in got):
+            n = min(len(want), len(got))
+            if want[:n] != got[:n]:
+                raise BackendError(f"the game loaded shim build {got}, not the pinned {want[:16]}")
         self.hello = hello
         self._epoch = int(hello.get("epoch", self._epoch))
-        self._caps = Caps.from_hello({**hello, "backend": self.name})
+        self._caps = _caps(hello, self.name)
         # section 10 order is hello, tier.lock, clock, ring.attach: attach before capture or start
         self._ring_attached = False
 
@@ -340,6 +402,7 @@ class ShimBackend:
             return
         assert self.ring is not None and self.session_dir is not None
         self.ring_header = self._call("ring.attach", {"path": win_path(self.ring.path, self._wine),
+                                                      "mb": self.ring.capacity >> 20,
                                                       "bytes": 4096 + self.ring.capacity}).get("header")
         self.ring.set_consumer()
         self._ring_attached = True
@@ -360,8 +423,20 @@ class ShimBackend:
         return res
 
     def _drain_ring(self) -> None:
-        if self.ring is not None:
-            self._pending.extend(self.ring.read())
+        """Move complete tick batches to the queue. A restore's batch is dropped: it holds the pages the
+        restore wrote, which the caller already knows, and no tick was played."""
+        if self.ring is None:
+            return
+        for rec in self.ring.read():
+            self._open.append(rec)
+            if rec.kind is not RecordKind.TICK_END:
+                continue
+            batch, self._open = self._open, []
+            if rec.flags & RecordFlag.RESTORE:
+                self.restore_batches += 1
+                continue
+            self._last_end = rec.tick
+            self._pending.extend(batch)
 
     def lock_tier(self, tier: Tier) -> None:
         tier = Tier.parse(tier)
@@ -376,19 +451,23 @@ class ShimBackend:
             raise RefusedError(f"clock {mode} is refused in tier tas")
         c = self.cfg.get("clock", {})
         spin = {"escape": c.get("spin_escape", "callsite"), "count": dict(c.get("spin_count", {}))}
+        ft = filetime(str(c.get("initial_realtime", "2004-02-12T00:00:00Z")))
         self._call("clock", {
             "mode": str(mode), "hz": hz, "scale": scale, "qpf_hz": int(c.get("qpf_hz", 10_000_000)),
-            "uptime0_ms": int(c.get("uptime0_ms", 3_600_000)),
-            "initial_realtime": filetime(str(c.get("initial_realtime", "2004-02-12T00:00:00Z"))),
+            "uptime0_ms": int(c.get("uptime0_ms", 3_600_000)), "initial_realtime": ft, "initial_ft": ft,
             "hooked_modules": list(c.get("hooked_modules", ())),
             "budget_guard": dict(c.get("budget_guard", {})), "spin": spin})
         self._clock_args = (mode, hz, scale)
 
     def start(self) -> StepReport:
+        """Attach the ring, turn capture on (the shim takes it only before start), and run to tick 0."""
         self._ensure_ring()
-        rep = StepReport.from_wire(self._call("start"))
+        if self.cfg.get("capture", {}).get("enabled", "auto") is not False:
+            self._call("capture", {"enabled": True})
+        rep = self._report(self._call("start"))
         self._started = True
-        return self._note_events(rep)
+        self._scan_files(rep.tick)
+        return rep
 
     def close(self) -> None:
         if self.wire is not None:
@@ -419,23 +498,117 @@ class ShimBackend:
 
     # ------------------------------------------------------------------ ticks
 
-    def _note_events(self, rep: StepReport) -> StepReport:
-        self._events.extend(rep.events)
+    def _report(self, res: Mapping[str, Any]) -> StepReport:
+        """A step reply as a StepReport, with the events pushed while it ran."""
+        rep = StepReport.from_wire(res)
+        pushed = []
+        while self._events:
+            pushed.append(self._events.popleft())
+        if pushed:
+            rep = dataclasses.replace(rep, events=(*rep.events, *pushed))
         self._tick = rep.tick
         return rep
 
-    def step(self, n: int, note: Any = None) -> StepReport:
-        return self._note_events(StepReport.from_wire(
-            self._call("step", {"n": n, "note": note_to_wire(note)}, timeout_s=0)))
+    def _scan_files(self, tick: int) -> None:
+        if self._files is None:
+            return
+        tree = self._files.changed()
+        if tree is not None:
+            self._file_log.append((tick, tree))
+
+    def file_changes(self) -> list[tuple[int, Any]]:
+        """(tick, (rows, {sha256: bytes})) for each gate where the stage's files differed from the gate
+        before; the first entry is the tree at tick 0."""
+        out, self._file_log = self._file_log, []
+        return out
+
+    def _exited(self) -> StepReport:
+        """The connection ended during a step: the process is gone. Ticks it finished are in the ring."""
+        if self.wire is not None:
+            self.wire.close()
+            self.wire = None
+        self._drain_ring()
+        self._open = []
+        tick = max(self._last_end, self._tick)
+        self._tick = tick
+        return StepReport(tick=tick, epoch=self._epoch, server_passes=1, subticks=0,
+                          verbclass=VerbClass.GATE | VerbClass.CLOCK | VerbClass.INPUT, outcome=ProcOutcome.EXITED)
+
+    def _one(self, verb: str, args: Mapping[str, Any]) -> StepReport:
+        try:
+            res = self._call(verb, args, timeout_s=0)
+        except (BackendError, OSError) as e:
+            if not _gone(e):
+                raise
+            return self._exited()
+        rep = self._report(res)
+        if rep.outcome is ProcOutcome.EXITED:
+            # the reply names the tick that was running; the last one with a gate (and a record) is before it
+            self._drain_ring()
+            self._open = []
+            rep = dataclasses.replace(rep, tick=self._last_end if self._last_end >= 0 else rep.tick)
+            self._tick = rep.tick
+            return rep
+        self._scan_files(rep.tick)
+        return rep
+
+    @staticmethod
+    def _merge(reps: Sequence[StepReport]) -> StepReport:
+        vc, evs = VerbClass.NONE, []
+        for r in reps:
+            vc |= r.verbclass
+            evs.extend(r.events)
+        return dataclasses.replace(reps[-1], verbclass=vc, events=tuple(evs))
+
+    def step(self, n: int, note: Any = None, first: bool = True) -> StepReport:
+        """Run n ticks holding note. first=False: the note's first tick already ran (a resumed note)."""
+        args = note_args(note)
+        msgs = [*self._msgs, *([str(note.osev)] if note is not None and note.osev and first else [])]
+        self._msgs = []
+        if n <= 0:
+            return self._one("step", {**args, "n": 0})
+        per_tick = self._files is not None
+        reps: list[StepReport] = []
+        left = n
+        while left > 0:
+            k = 1 if per_tick else left
+            a = {**args, "n": k, "first": first and not reps}
+            if msgs and not reps:
+                a["msgs"] = msgs
+            rep = self._one("step", a)
+            reps.append(rep)
+            left -= k
+            if rep.outcome is ProcOutcome.EXITED:
+                break
+        return self._merge(reps)
 
     def wait(self, event: str, arg: str | None, timeout_ticks: int, note: Any = None) -> StepReport:
-        res = self._call("wait", {"event": event, "arg": arg, "timeout": timeout_ticks,
-                                  "note": note_to_wire(note)}, timeout_s=0)
-        self.last_waited = res.get("waited")
-        return self._note_events(StepReport.from_wire(res))
+        """Run ticks holding note (nothing by default) until event fires or timeout_ticks pass. Every tick
+        of a wait carries WAIT. proc.down waits for the process to exit."""
+        args = note_args(note)
+        if self._files is None and event != "proc.down":
+            res = self._one("wait", {**args, "event": event, "arg": arg, "timeout": timeout_ticks})
+            self.last_waited = res.outcome is ProcOutcome.ALIVE and any(e.name == event for e in res.events)
+            return dataclasses.replace(res, verbclass=res.verbclass | VerbClass.WAIT)
+        reps: list[StepReport] = []
+        hit = False
+        for i in range(max(0, timeout_ticks)):
+            rep = self._one("step", {**args, "n": 1, "first": i == 0})
+            reps.append(rep)
+            if rep.outcome is ProcOutcome.EXITED:
+                hit = event == "proc.down"
+                break
+            if any(e.name == event and (arg is None or e.arg == arg) for e in rep.events):
+                hit = True
+                break
+        if not reps:
+            reps.append(self._one("step", {**args, "n": 0}))
+        self.last_waited = hit
+        rep = self._merge(reps)
+        return dataclasses.replace(rep, verbclass=rep.verbclass | VerbClass.WAIT)
 
     def input(self, note: Any) -> int:
-        return int(self._call("input", note_to_wire(note))["for_tick"])
+        return int(self._call("input", note_args(note))["for_tick"])
 
     def gate(self, on: bool) -> dict[str, Any]:
         return self._call("gate", {"on": on})
@@ -456,15 +629,19 @@ class ShimBackend:
             yield self._pending.popleft()
 
     def restore(self, tick: int, root: bytes, pages: Iterable[StagingRecord]) -> Receipt:
+        """Write the page set W (a restore set file in the session directory) and let the shim verify the
+        whole sim set against root. Put the tick's files first (put_files)."""
         assert self.session_dir is not None
         self._seq += 1
         path = self.session_dir / f"restore-{self._seq:06d}.rec"
         n = write_records(path, pages)
         t0 = time.perf_counter_ns()
-        res = self._call("restore", {"tick": tick, "root": root.hex(), "path": win_path(path, self._wine)},
-                         timeout_s=0)
+        try:
+            res = self._call("restore", {"tick": tick, "root": root.hex(), "path": win_path(path, self._wine)},
+                             timeout_s=0)
+        finally:
+            path.unlink(missing_ok=True)
         us = int(res.get("us", (time.perf_counter_ns() - t0) // 1000))
-        path.unlink(missing_ok=True)
         ok = (bool(res.get("verified")) and res.get("root") == root.hex()
               and int(res.get("tick", tick)) == tick)
         from_tick, self._tick = self._tick, int(res.get("tick", tick))
@@ -472,6 +649,12 @@ class ShimBackend:
                        to_tick=int(res.get("tick", tick)), mode=SeekMode.RESTORE,
                        verify_level=VerifyLevel.FULL_ROOT, write_pages=int(res.get("pages", n)), micros=us,
                        state_root=str(res.get("root", "")), verifier=self.name)
+
+    def put_files(self, rows: Sequence[Sequence[Any]], blob: Callable[[str], bytes]) -> None:
+        """Make the stage's writable files equal a recorded tree, at the gate, before a restore."""
+        if self._files is None:
+            raise BackendError("this backend does not track the game's files (game.dir or files.store)")
+        self._files.write(rows, blob)
 
     def digest(self, regions: Sequence[str]) -> dict[str, str]:
         return self._call("digest", {"regions": list(regions)})
@@ -504,6 +687,19 @@ class ShimBackend:
         raise BackendError(f"semantic op must be read or apply, not {op!r}")
 
     def files(self, op: Literal["snap", "put"], blob: bytes | None = None) -> bytes | None:
+        """The stage's writable files. With the stage tracked here they are read and written directly;
+        otherwise the shim's files verb carries them."""
+        if self._files is not None:
+            if op == "snap":
+                return self._files.snapshot()
+            if op == "put":
+                if self._started and self._tier is not Tier.LAB:
+                    raise RefusedError("files put after start is lab only")
+                ents = json.loads(blob or b'{"entries": []}')["entries"]
+                data = {h: base64.b64decode(b64) for _p, h, _s, _v, b64 in ents}
+                self._files.write([e[:4] for e in ents], data.__getitem__)
+                return None
+            raise BackendError(f"files op must be snap or put, not {op!r}")
         assert self.session_dir is not None
         self._seq += 1
         path = self.session_dir / f"files-{self._seq:06d}.bin"
@@ -521,6 +717,27 @@ class ShimBackend:
             return data
         raise BackendError(f"files op must be snap or put, not {op!r}")
 
+    # ------------------------------------------------------------------ save length
+
+    def _save_verb(self, verb: str, ms: int) -> None:
+        if ms < 0:
+            raise BackendError("a save length is >= 0 ms")
+        try:
+            self._call(verb, {"ms": int(ms)})
+        except WireError as e:
+            if e.code == "unsupported":
+                raise BackendError(f"this shim build ({self.hello.get('shim', '?')}, build "
+                                   f"{self.hello.get('build', '?')}) has no {verb}; it needs a newer shim") from None
+            raise
+
+    def set_save_ms(self, ms: int) -> None:
+        """Virtual length of every in-game save (score header save_ms)."""
+        self._save_verb("clock.save_ms", ms)
+
+    def set_next_save_ms(self, ms: int) -> None:
+        """Virtual length of the next in-game save only (@save ms=N)."""
+        self._save_verb("clock.save_ms_next", ms)
+
     # ------------------------------------------------------------------ events, os, frame, hud
 
     def _drain_pushes(self) -> None:
@@ -530,7 +747,10 @@ class ShimBackend:
             p = self.wire.pushes.popleft()
             kind = p.get("push")
             if kind == "event":
-                self._events.append(EngineEvent(p["name"], int(p["tick"]), p.get("arg")))
+                arg = p.get("arg")
+                if arg is None and p.get("us") is not None:
+                    arg = str(p["us"])
+                self._events.append(EngineEvent(p["name"], int(p.get("tick", self._tick)), arg))
             elif kind == "watch.hit":
                 self._events.append(EngineEvent("watch.hit", int(p.get("tick", 0)), p.get("id")))
             elif kind == "desync":
@@ -548,12 +768,18 @@ class ShimBackend:
             yield self._events.popleft()
 
     def os_event(self, ev: OsEvent) -> ProcOutcome:
+        """close: the shim posts WM_CLOSE to the game window at the start of the next tick (os_event verb).
+        Other window events ride on the next step's msgs, which the shim refuses when it lacks them.
+        relaunch starts a new process."""
         ev = OsEvent(ev)
         if ev is OsEvent.RELAUNCH:
             if self.link is not None:
                 raise BackendError("relaunch belongs to the link owner")
             return self.relaunch()
-        return ProcOutcome(self._call("os_event", {"ev": str(ev)}).get("outcome", "alive"))
+        if ev is OsEvent.CLOSE:
+            return ProcOutcome(self._call("os_event", {"ev": str(ev)}).get("outcome", "alive"))
+        self._msgs.append(str(ev))
+        return ProcOutcome.ALIVE
 
     def relaunch(self) -> ProcOutcome:
         """End this process and start the next epoch on the same listener and ring."""

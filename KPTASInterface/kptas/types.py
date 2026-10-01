@@ -200,6 +200,7 @@ VERB_ALLOW: Mapping[str, frozenset[Tier]] = {
     "digest": _LT, "snap": _LT, "restore": _LT, "verify": _LT, "mem.read": _LT,
     "mem.write": _L, "semantic.read": _LT, "semantic.apply": _L, "watch": _LT,
     "watch.rm": _LT, "files": _LT, "subscribe": _LT, "frame": _LT, "hud": _LT, "bye": _LT,
+    "clock.save_ms": _LT, "clock.save_ms_next": _LT,
 }
 
 #: Verbclass bits a verb adds to the tick it runs in.
@@ -216,6 +217,7 @@ VERB_CLASS: Mapping[str, VerbClass] = {
     "mem.write": VerbClass.WRITE, "semantic.apply": VerbClass.SEMANTIC,
     "frame": VerbClass.SCREEN,
     "clock": VerbClass.CLOCK,
+    "clock.save_ms": VerbClass.INPUT, "clock.save_ms_next": VerbClass.INPUT,
     "start": VerbClass.GATE,
 }
 
@@ -397,6 +399,7 @@ class RecordFlag(enum.IntFlag):
     SWEEP = 0x0008          # PAGE: emitted by a full sweep, not by write tracking
     RESTORE_POINT = 0x0100  # TICK_END: the gate predicate held
     FULL = 0x0200           # TICK_END: the batch lists every sim page
+    RESTORE = 0x0400        # TICK_END: the batch a restore wrote, not a played tick
 
 
 SR_MAGIC = b"SR"
@@ -463,7 +466,7 @@ class StagingRecord:
         elif k is RecordKind.TICK_END:
             _need(self.vaddr == 0 and self.mclass == 0 and self.prot == 0 and not self.data,
                   "TICK_END carries only tick, flags and the batch digest")
-            _need(not (f & ~(RecordFlag.RESTORE_POINT | RecordFlag.FULL)),
+            _need(not (f & ~(RecordFlag.RESTORE_POINT | RecordFlag.FULL | RecordFlag.RESTORE)),
                   f"TICK_END flags {int(f):#x} invalid")
         elif k is RecordKind.WRAP:
             _need(self.vaddr == 0 and self.mclass == 0 and self.prot == 0 and not self.data
@@ -1140,6 +1143,15 @@ def _digest_from_hex(v: str | None) -> bytes:
     return NULL_DIGEST if not v else bytes.fromhex(v)
 
 
+def _event(e: Any, tick: int) -> EngineEvent:
+    if isinstance(e, str):
+        return EngineEvent(e, tick)
+    arg = e.get("arg")
+    if arg is None and e.get("us") is not None:
+        arg = str(e["us"])            # save.begin / save.done: virtual microseconds the save took
+    return EngineEvent(e["name"], int(e.get("tick", tick)), None if arg is None else str(arg))
+
+
 @dataclass(frozen=True, slots=True)
 class StepReport:
     tick: int                     # the last tick run
@@ -1156,14 +1168,18 @@ class StepReport:
 
     @classmethod
     def from_wire(cls, obj: Mapping[str, Any]) -> StepReport:
+        """An event is an object (name, tick, arg) or a bare name, which dates it to the report's tick.
+        A journal digest that is not sha256 (the shim's is BLAKE2s-128) is left out."""
+        tick = obj["tick"]
+        journal = obj.get("journal")
         return cls(
-            tick=obj["tick"], epoch=obj["epoch"], server_passes=obj.get("server_passes", 1),
+            tick=tick, epoch=obj["epoch"], server_passes=obj.get("server_passes", 1),
             subticks=obj.get("subticks", 0), verbclass=VerbClass(obj.get("verbclass", 0)),
             state_root=_digest_from_hex(obj.get("state_root")),
-            journal_sha256=_digest_from_hex(obj.get("journal")),
+            journal_sha256=_digest_from_hex(journal if isinstance(journal, str) and len(journal) == 64 else None),
             restore_point=bool(obj.get("restore_point", False)),
             reason=PointReason(obj.get("reason", PointReason.NOT_CAPTURED)),
-            events=tuple(EngineEvent(e["name"], e["tick"], e.get("arg")) for e in obj.get("events", ())),
+            events=tuple(_event(e, tick) for e in obj.get("events", ())),
             outcome=ProcOutcome(obj.get("outcome", "alive")),
         )
 

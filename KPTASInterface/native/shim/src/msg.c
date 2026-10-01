@@ -139,14 +139,6 @@ static BOOL WINAPI hk_GetMessageA(LPMSG msg, HWND h, UINT a, UINT b) {
     return r_GetMessageA(msg, h, a, b);
 }
 
-static BOOL WINAPI hk_SetCursorPos(int x, int y) {
-    POINT pt = {x, y};
-    HWND hw = *(HWND *)(uintptr_t)0x007a39d8u;  /* renderWindow */
-    if (hw) ScreenToClient(hw, &pt);
-    di_set_cursor(pt.x, pt.y);
-    return TRUE;  /* the real cursor is not warped: that would queue external motion */
-}
-
 /* Pinned host facts (contract 7 item 4): the exe reads the screensaver and
  * mouse-trail settings into .data (0x7a3cac, 0x7a3ca8) on activation, and
  * writes them back on exit. The X server's value varied between cold runs, so
@@ -189,7 +181,6 @@ void msg_install(void) {
     if ((o = iat_hook(exe, "USER32.dll", "RegisterClassA", (void *)hk_RegisterClassA))) { r_RegisterClassA = o; hooks_note("exe:RegisterClassA"); }
     if ((o = iat_hook(exe, "USER32.dll", "PostMessageA", (void *)hk_PostMessageA))) { r_PostMessageA = o; hooks_note("exe:PostMessageA"); }
     if ((o = iat_hook(exe, "USER32.dll", "GetMessageA", (void *)hk_GetMessageA))) { r_GetMessageA = o; hooks_note("exe:GetMessageA"); }
-    if ((o = iat_hook(exe, "USER32.dll", "SetCursorPos", (void *)hk_SetCursorPos))) { hooks_note("exe:SetCursorPos"); }
     if ((o = iat_hook(exe, "USER32.dll", "SystemParametersInfoA", (void *)hk_SystemParametersInfoA))) {
         r_SystemParametersInfoA = o;
         hooks_note("exe:SystemParametersInfoA");

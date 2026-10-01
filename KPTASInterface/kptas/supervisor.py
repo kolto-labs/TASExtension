@@ -12,6 +12,7 @@ from __future__ import annotations
 import base64
 import binascii
 import dataclasses
+import functools
 import importlib
 import json
 import os
@@ -74,7 +75,7 @@ def clock_env(cfg: Mapping[str, Any], hz: int | None = None) -> str:
     """KPTAS_CLOCK value: semicolon-separated key=decimal pairs, trivial to parse without a CRT."""
     c = cfg["clock"]
     parts = {"mode": c["mode"], "hz": hz or c["hz"], "qpf_hz": c["qpf_hz"],
-             "uptime0_ms": c["uptime0_ms"], "initial_realtime": filetime(c["initial_realtime"])}
+             "uptime0_ms": c["uptime0_ms"], "initial_ft": filetime(c["initial_realtime"])}
     return ";".join(f"{k}={v}" for k, v in parts.items())
 
 
@@ -87,6 +88,8 @@ def session_dir(cfg: Mapping[str, Any], run: str) -> Path:
 
 
 def game_command(cfg: Mapping[str, Any], backend: str) -> tuple[list[str], Path]:
+    """argv and working directory of the game. The exe is named relative to its directory, as a player's
+    shortcut does, so its command line does not carry the install path."""
     g = cfg["game"]
     if backend == "simgame":
         exe = cfg["sim"]["simgame_exe"]
@@ -100,10 +103,10 @@ def game_command(cfg: Mapping[str, Any], backend: str) -> tuple[list[str], Path]
         exe_path = cwd / g["exe"]
         if not (cwd / "dinput8.dll").is_file():
             raise TelosError(f"{cwd / 'dinput8.dll'} is missing; place the shim build "
-                             "(native/shim/build/dinput8.dll) in the game directory")
+                             "(native/shim/build/dinput8.dll) in the game directory or set shim.dll")
     if not exe_path.is_file():
         raise TelosError(f"{exe_path} does not exist")
-    argv = [g["wine"], str(exe_path)] if g["wine"] else [str(exe_path)]
+    argv = [g["wine"], exe_path.name] if g["wine"] else [str(exe_path)]
     if g["launch_wrapper"] == "setarch_R":
         argv = ["setarch", os.uname().machine, "-R", *argv]
     return argv, cwd
@@ -111,11 +114,14 @@ def game_command(cfg: Mapping[str, Any], backend: str) -> tuple[list[str], Path]
 
 def game_environ(cfg: Mapping[str, Any], port: int, session: Path, hz: int | None = None
                  ) -> dict[str, str]:
+    """The game's whole environment. Pinned, it holds only HOME, USER and fixed values; no Wayland or
+    session variables reach Wine, and XAUTHORITY only when the game uses the caller's own display."""
     g = cfg["game"]
     if g["pinned_env"]:
-        keep = ("PATH", "HOME", "USER", "XAUTHORITY", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR")
-        env = {k: os.environ[k] for k in keep if k in os.environ}
-        env.update(LANG="C", LC_ALL="C", TZ="UTC", WINEDEBUG="-all")
+        env = {k: os.environ[k] for k in ("HOME", "USER") if k in os.environ}
+        env.update(LANG="C", PATH="/usr/bin:/bin", WINEDEBUG="-all")
+        if g["display"] == "auto" and "XAUTHORITY" in os.environ:
+            env["XAUTHORITY"] = os.environ["XAUTHORITY"]
     else:
         env = dict(os.environ)
     display = os.environ.get("DISPLAY", "") if g["display"] == "auto" else g["display"]
@@ -126,18 +132,21 @@ def game_environ(cfg: Mapping[str, Any], port: int, session: Path, hz: int | Non
     if g["dll_overrides"]:
         env["WINEDLLOVERRIDES"] = g["dll_overrides"]
     env["KPTAS_PORT"] = str(port)
-    env["KPTAS_SESSION"] = str(session)
+    env["KPTAS_SESSION"] = "Z:" + str(session.resolve()).replace("/", "\\") if g["wine"] else str(session)
     env["KPTAS_CLOCK"] = clock_env(cfg, hz)
+    env["KPTAS_PRESENT"] = cfg["replay"]["present"]
     return env
 
 
 @dataclasses.dataclass
 class GameLink:
-    """One game process (None when attached to an external one) and its shim connection."""
+    """One game process (None when attached to an external one) and its shim connection.
+    `cleanup` runs once the process is gone (it stops the wineprefix's wineserver)."""
     sock: socket.socket
     proc: subprocess.Popen | None
     session: Path
     port: int
+    cleanup: Callable[[], None] | None = None
 
     def exit_status(self, timeout: float = 5.0) -> int | None:
         if self.proc is None:
@@ -158,6 +167,8 @@ class GameLink:
         if status is None:
             self.proc.kill()
             status = self.proc.wait()
+        if self.cleanup is not None:
+            self.cleanup()
         return status
 
 
@@ -196,15 +207,28 @@ def open_link(cfg: Mapping[str, Any], backend: str, session: Path, *, attach: bo
     srv = listen_socket(sh["listen"], port, "another session may own it")
     port = srv.getsockname()[1]
     proc = None
+    cleanup = None
     try:
         if not attach:
+            if backend == "shim":
+                from kptas.backend import rig
+                try:
+                    rig.prepare_launch(cfg)          # cold start from the pins, with the pinned shim
+                except (BackendError, OSError) as e:
+                    raise TelosError(f"cannot prepare the game directory: {e}") from None
+                cleanup = functools.partial(rig.stop_wineserver, cfg)
             argv, cwd = game_command(cfg, backend)
             env = game_environ(cfg, port, session, hz)
+            if backend in PROCESS_BACKENDS:
+                from kptas.backend.rig import launch_argv
+                argv = launch_argv(cfg, argv, cwd, env, session / "game.out")
+                env = dict(os.environ)             # the command line carries the game's environment
             if not shutil.which(argv[0]) and not Path(argv[0]).is_file():
                 raise TelosError(f"{argv[0]} not found on PATH")
-            proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL)
+            proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                                    stderr=subprocess.DEVNULL, start_new_session=True)
             if log:
-                log(f"launched pid {proc.pid}: {' '.join(argv)}; waiting on port {port}")
+                log(f"launched pid {proc.pid}: {' '.join(argv[-2:])} in {cwd}; waiting on port {port}")
         elif log:
             log(f"waiting for the game on {sh['listen']}:{port}")
         deadline = time.monotonic() + sh["connect_timeout_s"]
@@ -220,11 +244,13 @@ def open_link(cfg: Mapping[str, Any], backend: str, session: Path, *, attach: bo
             if time.monotonic() > deadline:
                 raise TelosError(f"no connection within {sh['connect_timeout_s']} s")
         conn.settimeout(None)
-        return GameLink(conn, proc, session, port)
+        return GameLink(conn, proc, session, port, cleanup)
     except BaseException:
         if proc is not None and proc.poll() is None:
             proc.kill()
             proc.wait()
+        if cleanup is not None:
+            cleanup()
         raise
     finally:
         srv.close()
@@ -235,7 +261,8 @@ def open_link(cfg: Mapping[str, Any], backend: str, session: Path, *, attach: bo
 class Sink(Protocol):
     """Receives what a run produces. The holorecord writer implements it."""
 
-    def tick(self, report: StepReport, note: Any, records: list[StagingRecord]) -> None: ...
+    def tick(self, report: StepReport, note: Any, records: list[StagingRecord],
+             files: list[tuple[int, Any]] | None = None) -> None: ...
 
     def mark(self, name: str, tick: int) -> None: ...
 
@@ -249,7 +276,8 @@ class BundleSink:
     One TickRecord per TICK_END batch. Per-tick server_passes, subticks and input
     come from the semantic journal when it carries them; verbclass is the union
     the step reported. With no records (no ring), the report alone makes one
-    uncaptured TICK per step.
+    uncaptured TICK per step. When the backend tracks its files, every tick from
+    the first files tree on carries the tree in force at its gate (files_root).
     """
 
     def __init__(self, bundle: Any, declared: Tier):
@@ -259,20 +287,25 @@ class BundleSink:
         self.ceiling = declared
         self.ticks = 0
         self.first_vc = VerbClass.NONE  # bits for the next tick only (see resume)
+        self.files_root: bytes | None = None
+        self._stored: set[str] = set()   # file blobs this sink has put
 
     def resume(self, tick: int, restored: bool = False) -> None:
         """Continue a branch after its branch tick: the next TICK's refs apply to map(tick), in tick's epoch.
         `restored`: the seek wrote state back (restore, hybrid, semantic), so the first tick carries RESTORE
         even when a hybrid seek's replay steps already reported the bit."""
-        from kptas.types import FormatError
+        from kptas.types import NULL_DIGEST, FormatError, TickFlag
         self.first_vc = VerbClass.RESTORE if restored else VerbClass.NONE
         self.epoch_seen = self.bundle.epoch_at(tick)
         try:
             self.pmap = self.bundle.map_at(tick)
         except (FormatError, KeyError):
             self.pmap = None          # uncaptured: the next captured tick must be a full sweep
+        rec = self.bundle.record(tick)
+        self.files_root = rec.files_root if rec.flags & TickFlag.FILES and rec.files_root != NULL_DIGEST else None
 
-    def tick(self, report: StepReport, note: Any, records: list[StagingRecord]) -> None:
+    def tick(self, report: StepReport, note: Any, records: list[StagingRecord],
+             files: list[tuple[int, Any]] | None = None) -> None:
         from kptas.backend.staging import batches
         from kptas.holo.bundle import EVENT_MARK
         from kptas.holo.pages import PageMap
@@ -284,8 +317,13 @@ class BundleSink:
         text = note_text(note) if note is not None else "."
         held = note_text(dataclasses.replace(note, wheel=0, osev=None)) if note is not None else "."
         groups = list(batches(records)) or [(report.tick, [], None, None)]
+        trees = sorted(files or (), key=lambda f: f[0])
         for i, (t, pages, jrec, end) in enumerate(groups):
             flags = TickFlag.NONE
+            while trees and trees[0][0] <= t:
+                self.files_root = self._store_tree(trees.pop(0)[1])
+            if self.files_root is not None:
+                flags |= TickFlag.FILES
             if report.epoch != self.epoch_seen:
                 flags |= TickFlag.EPOCH_START
                 self.epoch_seen, self.pmap = report.epoch, None
@@ -320,6 +358,7 @@ class BundleSink:
                 tick=t, epoch=report.epoch, note=n, verbclass=vc0 if i == 0 else report.verbclass & ~once,
                 server_passes=meta.get("server_passes", report.server_passes if last else 1),
                 subticks=sub, flags=flags, reason=reason, state_root=root,
+                files_root=self.files_root if self.files_root is not None else NULL_DIGEST,
                 input_sha256=(bytes.fromhex(inp) if isinstance(inp, str) and len(inp) == 64
                               else sha256(n.encode())),
                 journal_sha256=(sha256(journal) if journal else
@@ -342,6 +381,19 @@ class BundleSink:
         from kptas.types import NULL_DIGEST
         root = NULL_DIGEST if files is None else self._store_files(files)
         self.bundle.end_epoch(epoch, max(tick, 0), reason, exit_status, files_root=root)
+
+    def _store_tree(self, tree: Any) -> bytes:
+        """A backend files tree: (rows of (path, sha256, size, vtime), {sha256: bytes}), or a files("snap") blob."""
+        if isinstance(tree, (bytes, bytearray)):
+            return self._store_files(bytes(tree))
+        rows, blobs = tree
+        for path, digest, _s, _v in rows:
+            if digest in self._stored:
+                continue
+            if self.bundle.put_file(blobs[digest]).hex() != digest:
+                raise RunError(f"files tree: the bytes for {path} do not match their sha256")
+            self._stored.add(digest)
+        return self.bundle.put_file_tree(rows)
 
     def _store_files(self, blob: bytes) -> bytes:
         try:
@@ -375,7 +427,11 @@ def _journal_fields(journal: bytes) -> dict[str, Any]:
         return {}
     if not isinstance(obj, dict):
         return {}
-    return {k: obj[k] for k in ("server_passes", "subticks", "input") if k in obj}
+    out = {k: obj[k] for k in ("server_passes", "subticks", "input") if k in obj}
+    for short, name in (("sp", "server_passes"), ("st", "subticks")):   # the shim's short names
+        if name not in out and isinstance(obj.get(short), int):
+            out[name] = obj[short]
+    return out
 
 
 BackendFactory = Callable[[str, Mapping[str, Any], "GameLink | None"], Any]
@@ -540,9 +596,20 @@ class Supervisor:
         self.carry = (self.carry if keep_carry else []) + list(rep.events)
         if rep.outcome is ProcOutcome.EXITED:
             self.alive = False
+        files = self._file_changes()
         if self.sink is not None:
-            self.sink.tick(rep, note, self._records())
+            if files:
+                self.sink.tick(rep, note, self._records(), files=files)
+            else:
+                self.sink.tick(rep, note, self._records())
         return rep
+
+    def _file_changes(self) -> list[tuple[int, Any]]:
+        """(global tick, files tree) for every tick where the backend saw its files change."""
+        fn = getattr(self.backend, "file_changes", None)
+        if fn is None:
+            return []
+        return [(t + self.offset, tree) for t, tree in fn()]
 
     def _shift(self, events: Any) -> tuple[Any, ...]:
         """Engine events with backend-local ticks moved to global ticks."""
@@ -567,11 +634,13 @@ class Supervisor:
 
     # ticks
     def step(self, n: int, note: Any, keep_carry: bool = False) -> StepReport:
-        """keep_carry: this step finishes a note resumed inside it, so the note's earlier events still count."""
+        """keep_carry: this step finishes a note resumed inside it, so the note's earlier events still count.
+        A backend with `note_first` is told that the note's first tick has already been played."""
         b = self._live()
         if note.osev:
             self.last_osev = note.osev
-        return self._emit(b.step(n, note), note, keep_carry)
+        rep = b.step(n, note, first=False) if keep_carry and getattr(b, "note_first", False) else b.step(n, note)
+        return self._emit(rep, note, keep_carry)
 
     def wait(self, event: str, arg: str | None, timeout: int, note: Any = None) -> StepReport:
         return self._emit(self._live().wait(event, arg, timeout, note), note)
@@ -620,7 +689,11 @@ class Supervisor:
             rep = self.open()
             if on_report:
                 on_report(rep, None)
-        if compiled.header.get("save_ms") is not None:
+        # A resumed run already has the header's save length when the backend keeps it in the rewound state
+        # (the seek set it, or the restored tick holds it); setting it again would journal a new input.
+        resumed = start is not None and (start.i, start.j) != (0, 0)
+        if compiled.header.get("save_ms") is not None and not (
+                resumed and getattr(self.backend, "save_ms_rewound", False)):
             self.save_length(int(compiled.header["save_ms"]), once=False)
         pace, wall0, pending = "gate", None, None
         first, played = (start.i, start.j) if start is not None else (0, 0)

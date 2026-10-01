@@ -123,7 +123,9 @@ static void attach(void) {
     vhandle_install();
     gl_install();
     msg_install();
+    geo_install();
     gate_install();
+    save_install();
     slog("attach done: clock mode=%d hz=%u qpf=%u uptime0=%u hooks=%u",
          g_clk.mode, g_clk.hz, (u32)g_clk.qpf, (u32)g_clk.uptime0_ms, g_hooks_n);
     slog("hooks: %s", g_hooks_list);

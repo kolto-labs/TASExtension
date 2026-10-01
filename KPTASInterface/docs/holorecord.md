@@ -85,7 +85,7 @@ PySim captures every tick. It also simulates a load, so ticks 11 to 23 of the ex
 12    0   IGCP   ch     recorded  1   3    c8653c86  c1ec3f0d  w lmb rmb
 ```
 
-In the game, M1 records a journal per tick only: a digest of the exe's writable data, engine fields and rand call counts. Capturing pages every tick, the full heap included, is M2.
+In the game every tick is captured: the heap in the fixed arena, the exe's writable data and the shim's own game-side state, plus a journal of the exe's writable data digest, engine fields and rand call counts. The M1 exit score (3,823 ticks) makes a 2.4 GB bundle.
 
 ## Seeking
 
@@ -94,8 +94,8 @@ In the game, M1 records a journal per tick only: a digest of the exe's writable 
 | Mode | How | Tiers | Checked by |
 |---|---|---|---|
 | replay | Start from the boot, replay the score up to T | all | journal (or `sim_root` when qualified) |
-| restore | Write W, the pages where the live map and map(T) differ, then check | lab, tas | full root, journal, and a continuation canary |
-| hybrid | Restore the latest restore point at or before T, then replay to T | lab, tas | full root |
+| restore | Write T's files, then W, the pages where the live map and map(T) differ, then check | lab, tas | full root, journal, and a continuation canary |
+| hybrid | Restore the latest keyframe at or before T, then replay to T | lab, tas | full root |
 | semantic | Write back the journalled engine fields; the branch is marked tainted | lab | diff only |
 
 The default is restore in lab and replay in tas and hands-off. `seek.mode` in `telos.toml` picks another one, and also takes `checkpoint` for replay and `exact` or `tick_restore` for restore.
@@ -109,14 +109,71 @@ $ telos seek a.holo 15 --mode restore
 telos: seek 15: restore is not possible: tick 15 is not a restore point (other)
   result            pass
   mode              hybrid
-  write_pages       3
   fallback          restore (tick 15 is not a restore point (other)) > hybrid
-  verifier          pysim; origin restore@10; replayed 5 ticks
+  verifier          pysim; origin restore@0; replayed 15 ticks
 ```
 
-(Receipt trimmed.) A plain restore to tick 40 wrote 27 pages, checked the full root and passed its canary.
+(Receipt trimmed.) Hybrid restored keyframe 0 and replayed 15 ticks. A plain restore to tick 40 checked the full root and passed its canary.
 
-All four modes run on PySim today. In the game, replay is M1, which has its first identical pair; restore and hybrid need M2 and M3, and semantic stays lab only. Replay starts from boot for now, because no backend can start a run from a save file yet. A score can still load a save the way a player does, through the Load Game menu. The M1 pair did.
+### In the game
+
+Every tick of a shim run is captured and is a restore point, so every tick has a savestate: its page map (map(T)) and its files tree (`files_root`, the stage's `Saves`, `Temp`, `currentgame`, `gameinprogress` and the other writable paths in `files.stage_paths`). The shim cannot see file writes, so the shim backend plays a step of n ticks as n one-tick steps and scans the files at every gate. Only the first carries the note's first-tick edges, so the game sees the same input. A restore writes the files back in place, then the pages.
+
+A restore verifies the whole sim set against T's root. Some state outside the sim set is built by what the process ran: its first tick after boot, and the load screens of an area load. A process that restores at the boot gate, or into an area it never loaded, passes the root check and then diverges on the next ticks. The canary catches that. So with `seek.restore_warmup = "loads"` (the default for the shim) the process first plays, checked like replay, through its first tick and the tick after the last load-screen tick at or before T. The receipt's verifier shows it:
+
+```
+$ telos seek m1.holo 2400 --mode restore
+  result            pass
+  mode              restore
+  write_pages       2271
+  canary            pass
+  fallback          -
+  verifier          shim; origin replay@286 > restore@2400; replayed 286 ticks
+```
+
+That took 50 s: 286 ticks of replay across the Load Game path, a 2,271-page restore and a 120-tick canary. Replaying to 2400 takes about 5 minutes.
+
+#### Running it
+
+The game needs a directory holding K1 GOG 1.03 (`swkotor.exe`), a Wine prefix and a display. A `telos.toml` for it:
+
+```toml
+[run]
+backend = "shim"
+
+[game]
+dir = "~/kotor/stage"              # swkotor.exe and its data
+wineprefix = "~/kotor/prefix"
+launch_wrapper = "setarch_R"       # no address randomisation
+display = ":173"                   # a private Xvfb works
+pin = "~/kotor/pin"                # Saves/, logs/ and swkotor.ini as every run starts
+prefix_pin = "~/kotor/prefix-pin"  # system.reg, user.reg, userdef.reg
+
+[shim]
+dll = "~/kotor/dinput8.dll"        # a pinned build, not the one in native/shim/build
+dll_sha256 = "31e7ec71ec5afefd"   # the file must hash to this, and so must the build the game loaded
+session_dir = "~/kotor/session"    # ring and restore files; a restore set can be 300 MB
+```
+
+Every launch is a cold start. The stage's writable paths (`files.stage_paths`) are copied from `game.pin`, the prefix's registry files from `game.prefix_pin`, and `shim.dll` is copied in as `dinput8.dll`. The shim's hello names the build it runs (a sha256 prefix of the DLL), and telos stops when that is not `shim.dll_sha256`. The prefix's wineserver is stopped before the launch and again when the game ends; nothing is stopped without an explicit `game.wineprefix`. The game gets only the pinned environment. Inside a container where Wine lives on the host, telos starts it through `host-spawn` (`game.host`).
+
+```sh
+telos run m1_exit.score --out m1.holo                      # every tick captured, pages and files
+telos seek m1.holo 2400 --mode restore                     # boot, restore tick 2400, check it
+telos run m1_exit.score --from m1.holo@1200 --mode restore  # restore 1200, record the rest as a branch
+telos diff m1.holo m1@1200.holo                             # the branch against the original
+telos verify m1.holo --fresh                               # judge replay from boot in a new process
+```
+
+Measured on the M1 exit score (3,823 ticks: menus, Load Game, walking) with shim build 31e7ec71:
+
+- The run took 9 minutes and made a 2.4 GB bundle. Its journal matched the M2 driver's tick for tick.
+- `seek --mode restore` took 14 s to tick 150, 47 s to 1200 and 50 s to 2400. Each passed the root check and a 120-tick canary. `seek 2450 --mode hybrid` restored keyframe 2400 and replayed 50 ticks (91 s, an earlier build).
+- The branch from tick 1200 matched the original on all 2,622 ticks after it: journal, state root and files tree.
+- `verify --fresh` compared 3,823 of 3,823 ticks in 5 minutes. Its last state root equals the recording's.
+- Save length: the Save Teleport score with header `save_ms=1000` moved the player 16.540 m from tick 493 to 615, and 14.197 m with `save_ms=0`. Two runs at 1000 were equal on every tick's journal, state root and files tree.
+
+All four modes run on PySim. In the game replay, restore and hybrid run; semantic stays lab only. Replay starts from boot for now, because no backend can start a run from a save file yet. A score can still load a save the way a player does, through the Load Game menu.
 
 ## Branches
 

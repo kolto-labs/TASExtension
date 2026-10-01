@@ -1,7 +1,7 @@
 /* IAT slot patching and 5-byte detours with fixed, pre-checked prologues. */
 #include "shim.h"
 
-char g_hooks_list[2048];
+char g_hooks_list[4096];
 u32 g_hooks_n;
 
 void hooks_note(const char *name) {

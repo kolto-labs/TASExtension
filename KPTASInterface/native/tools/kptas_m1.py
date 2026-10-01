@@ -5,12 +5,20 @@ Launches K1 GOG 1.03 under Wine with native/shim/build/dinput8.dll, listens
 for the shim on loopback, locks tier tas, sets the clock, steps a score's
 notes, and writes the per-tick journal.
 
+  pin      copy a DLL into the rig once, by sha256, and make it the stage DLL
   run      launch, play a score, write the journal (one canonical JSON line per tick)
   compare  compare two journals: first divergent tick and the fields that differ
 
 Every run starts cold from the same pinned inputs: the stage's swkotor.ini,
 Saves, Temp, currentgame and logs are reset from the pin directory, the game
 gets a fixed environment (env -i), the same port, cwd and command line.
+
+The shim DLL is pinned per rig (dll/<sha256>.dll, dll/pinned): `run` logs the
+stage DLL's sha256 and refuses to start when it is not the pinned build or
+when the shim's hello reports another build. `@sync EVENT` is satisfied by an
+event from the note just before it; only otherwise does it wait. `save_ms`,
+`@save ms=N` and --save-ms set the virtual save length; `!close` posts
+WM_CLOSE; when the game exits the run stops and reports the exit tick.
 """
 
 import argparse
@@ -36,8 +44,9 @@ DEFAULTS = {
     "pin": LIVE / "pin",
     "prefix": LIVE.parent / "prefix",
     "session": LIVE / "session",
-    "dll": ROOT / "native" / "shim" / "build" / "dinput8.dll",
+    "dlls": LIVE / "dll",
 }
+BUILD_DLL = ROOT / "native" / "shim" / "build" / "dinput8.dll"
 DATA_VA, DATA_END = 0x0078D000, 0x00836000
 FT_2004_02_12 = 127210176000000000          # 2004-02-12T00:00:00Z as FILETIME
 
@@ -52,7 +61,7 @@ def winpath(p: Path) -> str:
 
 # ---------------------------------------------------------------- stage and launch
 
-def reset_stage(stage: Path, pin: Path, dll: Path) -> None:
+def reset_stage(stage: Path, pin: Path) -> None:
     shutil.copyfile(pin / "swkotor.ini", stage / "swkotor.ini")
     for d in ("Saves", "Temp", "currentgame", "logs", "Tempclient", "LocalVault", "DMVault", "ServerVault"):
         p = stage / d
@@ -62,7 +71,38 @@ def reset_stage(stage: Path, pin: Path, dll: Path) -> None:
             shutil.rmtree(p)
     shutil.copytree(pin / "saves", stage / "Saves")
     (stage / "logs").mkdir()
-    shutil.copyfile(dll, stage / "dinput8.dll")
+
+
+def sha256_file(p: Path) -> str:
+    return hashlib.sha256(p.read_bytes()).hexdigest()
+
+
+def cmd_pin(a) -> int:
+    """Store the DLL by hash (once), copy it to the stage, record the pin."""
+    sha = sha256_file(a.dll)
+    a.dlls.mkdir(parents=True, exist_ok=True)
+    kept = a.dlls / f"{sha}.dll"
+    if not kept.exists():
+        shutil.copyfile(a.dll, kept)
+    if sha256_file(kept) != sha:
+        raise SystemExit(f"{kept} does not hash to its name")
+    shutil.copyfile(kept, a.stage / "dinput8.dll")
+    (a.dlls / "pinned").write_text(sha + "\n")
+    print(f"pinned {sha} ({a.dll} -> {kept} -> {a.stage / 'dinput8.dll'})")
+    return 0
+
+
+def check_pin(a) -> str:
+    """The stage DLL's sha256; refuse to run when it is not the pinned build."""
+    pin = a.dlls / "pinned"
+    if not pin.exists():
+        raise SystemExit(f"no pinned DLL in {a.dlls}; run: pin --dll PATH")
+    want = pin.read_text().strip()
+    have = sha256_file(a.stage / "dinput8.dll")
+    print(f"stage dll sha256 {have} (pinned {want})")
+    if have != want:
+        raise SystemExit(f"stage DLL {have} is not the pinned build {want}; refusing to run")
+    return have
 
 
 def game_env(a) -> dict:
@@ -114,6 +154,7 @@ class Wire:
         self.last_entry = None
         self.page_every = 0
         self.want_pages = False
+        self.exit = None                      # the shim's exit push, once the game exits
 
     def _line(self, timeout: float) -> dict:
         deadline = time.monotonic() + timeout
@@ -156,6 +197,9 @@ class Wire:
             return msg["result"]
 
     def _push(self, msg: dict) -> None:
+        if msg["push"] == "exit":
+            self.exit = msg
+            return
         if msg["push"] == "tick":
             entry = msg["entry"]
             self.journal.write(canon(entry) + "\n")
@@ -183,25 +227,64 @@ def note_args(note) -> dict:
         args["mouse"] = mouse
     if note.wheel:
         args["wheel"] = note.wheel
+    if note.osev:
+        args["msgs"] = [note.osev]
     return args
 
 
-def play(w: Wire, score, a, marks: dict) -> None:
-    from kptas.score import Mark, Note, Segment, Sync
+def hit(evs: list, event: str, arg) -> bool:
+    return any(e["name"] == event and (arg is None or e.get("arg") == arg) for e in evs)
+
+
+def play(w: Wire, score, a, marks: dict) -> dict | None:
+    """Play the score's items. Returns the final step report if the game exited, else None.
+
+    @sync follows the Python supervisor: an event from the note just before it
+    satisfies it (the carry); otherwise it waits for a later one."""
+    import dataclasses
+    from kptas.score import Mark, Note, SaveMs, Segment, Sync
+    carry, pending = [], None
     for item in score.items:
         if isinstance(item, Note):
-            if item.count == 0:
+            if item.count == 0:               # one-shots ride on the next note's first tick
+                if pending is not None and pending.osev and item.osev:
+                    raise RuntimeError(f"!{pending.osev} and !{item.osev} land on the same tick")
+                pending = item if pending is None else dataclasses.replace(
+                    item, wheel=pending.wheel + item.wheel, osev=item.osev or pending.osev)
                 continue
-            args = note_args(item)
+            note = item
+            if pending is not None:
+                if pending.osev and item.osev:
+                    raise RuntimeError(f"!{pending.osev} and !{item.osev} land on the same tick")
+                note = dataclasses.replace(item, wheel=pending.wheel + item.wheel, osev=item.osev or pending.osev)
+                pending = None
+            args = note_args(note)
             args["n"] = item.count
-            w.call("step", args)
+            r = w.call("step", args)
+            carry = list(r.get("events", []))
+            for e in carry:
+                if e["name"] != "load.done":
+                    print(f"    event {e}")
+            if r.get("outcome") == "exited":
+                return r
             maybe_shot(w, a)
             if a.dump_at is not None and w.ticks - 1 >= a.dump_at and not a._dumped:
                 dump(w, a)
         elif isinstance(item, Sync):
+            if hit(carry, item.event, item.arg):
+                print(f"  @sync {item.event}: fired during the previous note, tick {w.ticks - 1}")
+                carry = []
+                continue
             r = w.call("wait", {"event": item.event, "arg": item.arg,
                                 "timeout": item.timeout or 1800, "note": "."})
+            carry = []
             print(f"  @sync {item.event}: waited={r.get('waited')} tick={r['tick']}")
+            if r.get("outcome") == "exited":
+                return r
+            if not hit(r.get("events", []), item.event, item.arg):
+                raise RuntimeError(f"@sync {item.event} timed out at tick {r['tick']}")
+        elif isinstance(item, SaveMs):
+            w.call("clock.save_ms_next", {"ms": item.ms})
         elif isinstance(item, Segment):
             if item.hz and item.hz != a.hz:
                 w.call("clock", {"mode": "virtual", "hz": item.hz, "qpf_hz": a.qpf,
@@ -210,6 +293,9 @@ def play(w: Wire, score, a, marks: dict) -> None:
             marks[item.name] = w.ticks - 1
         else:
             print(f"  skipped unsupported item: {item}")
+    if pending is not None:
+        print("  a trailing count-0 note had nothing to attach to; its one-shots were dropped")
+    return None
 
 
 def read_spec(w: Wire, spec: str) -> str:
@@ -258,13 +344,15 @@ def dump(w: Wire, a, out: Path | None = None) -> None:
 
 def cmd_run(a) -> int:
     from kptas.score import compile_score
+    dll_sha = check_pin(a)
     a._dumped = False
     score = compile_score(a.score, include_dirs=[ROOT / "lib"]) if a.score else None
+    save_ms = a.save_ms if a.save_ms is not None else (score.header.get("save_ms") if score else None)
     a.session.mkdir(parents=True, exist_ok=True)
     for f in ("kptas_shim.log", "game.out"):
         (a.session / f).unlink(missing_ok=True)
     kill_wine(a.prefix)
-    reset_stage(a.stage, a.pin, a.dll)
+    reset_stage(a.stage, a.pin)
 
     srv = socket.socket()
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -284,6 +372,7 @@ def cmd_run(a) -> int:
     out.parent.mkdir(parents=True, exist_ok=True)
     marks = {}
     rc = 0
+    exited = None
     with open(out, "w") as jf, open(str(out) + ".side", "w") as sf:
         w = Wire(conn, jf, sf)
         try:
@@ -291,13 +380,18 @@ def cmd_run(a) -> int:
         except Exception:
             kill_wine(a.prefix)
             raise
-        print(f"hello: shim={hello['shim']} text_sha256={hello['text_sha256'][:16]} "
+        print(f"hello: shim={hello['shim']} build={hello.get('build')} text_sha256={hello['text_sha256'][:16]} "
               f"seed_hooked={hello['seed_hooked']} context={hello['caps']['context']} hooks={len(hello['hooks'])}")
         (a.session / "hello.json").write_text(json.dumps(hello, indent=1, sort_keys=True))
+        if hello.get("build") != dll_sha[:16]:
+            kill_wine(a.prefix)
+            raise SystemExit(f"the shim reports build {hello.get('build')}, not the pinned {dll_sha[:16]}")
         w.call("tier.lock", {"tier": "tas"})
         w.call("clock", {"mode": "virtual", "hz": a.hz, "qpf_hz": a.qpf, "uptime0_ms": a.uptime0,
                          "initial_ft": FT_2004_02_12, "initial_realtime": "2004-02-12T00:00:00Z"})
         w.call("subscribe", {"topics": ["tick"]})
+        if save_ms is not None:
+            w.call("clock.save_ms", {"ms": int(save_ms)})
         if a.start_delay:
             time.sleep(a.start_delay)   # diagnostics: lets a watchdog fire during CRT startup
         try:
@@ -306,7 +400,19 @@ def cmd_run(a) -> int:
             dump(w, a, Path(str(out) + ".dump"))   # tick-0 .data, so a one-off divergence can be diffed later
             w.page_every = 600
             if score is not None:
-                play(w, score, a, marks)
+                exited = play(w, score, a, marks)
+            if exited:
+                try:
+                    while w.exit is None:     # the exit push follows the reply, then the shim closes
+                        msg = w._line(30)
+                        if msg.get("push") == "exit":
+                            w.exit = msg
+                except (ConnectionError, TimeoutError, RuntimeError):
+                    pass
+                ex = w.exit or {}
+                print(f"game exited during tick {ex.get('tick')} (last gate {ex.get('last_gate')}, "
+                      f"code {ex.get('code')})")
+                raise StopIteration
             while w.ticks - 1 < a.min_ticks:
                 n = min(600, a.min_ticks - (w.ticks - 1))
                 w.call("step", {"n": n, "note": "."})
@@ -318,6 +424,8 @@ def cmd_run(a) -> int:
             for spec in a.read:
                 print(f"  read {spec}: {read_spec(w, spec)}")
             w.call("bye", {"exit": 0}, timeout=30)
+        except StopIteration:
+            pass
         except (ConnectionError, TimeoutError, RuntimeError, OSError) as e:
             print(f"run ended early at tick {w.ticks - 1}: {e}", file=sys.stderr)
             rc = 1
@@ -331,7 +439,7 @@ def cmd_run(a) -> int:
     kill_wine(a.prefix)
     data = out.read_bytes()
     print(f"journal: {out} ticks={data.count(b'\n')} sha256={hashlib.sha256(data).hexdigest()} "
-          f"wall={time.monotonic() - t0:.1f}s marks={marks}")
+          f"wall={time.monotonic() - t0:.1f}s dll={dll_sha[:16]} marks={marks}")
     return rc
 
 
@@ -397,8 +505,15 @@ def cmd_datadiff(a) -> int:
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = p.add_subparsers(dest="cmd", required=True)
+    pn = sub.add_parser("pin")
+    pn.add_argument("--dll", type=Path, default=BUILD_DLL, help="the DLL to pin (default: the repo build)")
+    for k in ("stage", "dlls"):
+        pn.add_argument(f"--{k}", type=Path, default=DEFAULTS[k])
     r = sub.add_parser("run")
     r.add_argument("--score", help="score file (kptas.score); omit to only step idle ticks")
+    r.add_argument("--save-ms", type=int, default=None,
+                   help="virtual length of every in-game save (overrides the score header save_ms; "
+                        "unset = the header, else the shim default, 900)")
     r.add_argument("--out", required=True, help="journal output path")
     r.add_argument("--min-ticks", type=int, default=0, help="step idle notes until this tick")
     r.add_argument("--port", type=int, default=47317)
@@ -431,7 +546,7 @@ def main() -> int:
     d.add_argument("a")
     d.add_argument("b")
     a = p.parse_args()
-    return {"run": cmd_run, "compare": cmd_compare, "datadiff": cmd_datadiff}[a.cmd](a)
+    return {"pin": cmd_pin, "run": cmd_run, "compare": cmd_compare, "datadiff": cmd_datadiff}[a.cmd](a)
 
 
 if __name__ == "__main__":

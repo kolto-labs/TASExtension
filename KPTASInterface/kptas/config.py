@@ -47,9 +47,13 @@ DEFAULTS: dict[str, Any] = {
         "launch_wrapper": "none",
         "pinned_env": True,
         "relaunch": True,
+        "host": "auto",               # auto: through host-spawn when wine is only on the host
+        "pin": "",                    # directory copied over files.stage_paths before every launch
+        "prefix_pin": "",             # registry files copied into the wineprefix before every launch
     },
     "shim": {
         "dll": "auto",
+        "dll_sha256": "",             # when set, the dll's sha256 must start with it
         "listen": "127.0.0.1",
         "port": 0,
         "connect_timeout_s": 30,
@@ -85,6 +89,7 @@ DEFAULTS: dict[str, Any] = {
         "fallback_chain": ["hybrid", "replay"],
         "keyframe_every": 600,
         "materialize_every": 36000,
+        "restore_warmup": "auto",     # loads: play through the first tick and the load screens before a restore
     },
     "replay": {
         "origins": ["boot", "save"],
@@ -183,6 +188,8 @@ DEFAULTS: dict[str, Any] = {
         "overlay_times": "virtual",
         "file_positions": "virtual",
         "store": True,
+        "stage_paths": ["Saves", "Temp", "currentgame", "gameinprogress", "logs", "Tempclient", "LocalVault",
+                        "DMVault", "ServerVault", "swkotor.ini"],
     },
     "gl": {
         "driver": "native",
@@ -268,6 +275,9 @@ DEFAULTS: dict[str, Any] = {
     },
 }
 
+#: game.dll_overrides = "auto" for the shim backend.
+SHIM_OVERRIDES = "dinput8=n,b;winepulse.drv=d;winealsa.drv=d;wineoss.drv=d"
+
 #: Built-in profile id chosen by portable.profile = "auto" above hands-off.
 DEFAULT_PROFILE = "baseline-1"
 
@@ -279,6 +289,7 @@ ENUMS: dict[str, frozenset[str]] = {
     "run.game": _S({"k1", "k2"}),
     "run.backend": _S({"auto", "pysim", "simgame", "shim", "handsoff", "phasor"}),
     "game.launch_wrapper": _S({"none", "setarch_R"}),
+    "game.host": _S({"auto", "local", "host-spawn"}),
     "tick.gate": _S({"winmain_loop_head"}),
     "tick.context": _S({"auto", "inline", "fiber"}),
     "clock.mode": _S({"auto", "virtual", "fixed", "wall"}),
@@ -286,6 +297,7 @@ ENUMS: dict[str, frozenset[str]] = {
     "clock.spin_escape": _S({"callsite", "count"}),
     "seek.scope": _S({"session", "rehydrate"}),
     "seek.on_incompatible": _S({"hybrid", "replay", "error"}),
+    "seek.restore_warmup": _S({"auto", "loads", "none"}),
     "replay.present": _S({"skip", "draw"}),
     "replay.require_verify_level": _S({"full_root", "sim_root", "journal"}),
     "verify.compare": _S({"every_tick", "syncs", "end"}),
@@ -511,9 +523,13 @@ def _derive(cfg: dict[str, Any]) -> None:
     if inp["path"] == "auto":
         inp["path"] = "os" if hands_off else "dinput"
     if cfg["game"]["dll_overrides"] == "auto":
-        cfg["game"]["dll_overrides"] = "dinput8=n,b" if run["backend"] == "shim" else ""
+        # the host audio drivers stay off: a live audio device adds main-thread rand() calls
+        cfg["game"]["dll_overrides"] = SHIM_OVERRIDES if run["backend"] == "shim" else ""
     if cfg["portable"]["profile"] == "auto":
         cfg["portable"]["profile"] = "native" if hands_off else DEFAULT_PROFILE
+    if seek["restore_warmup"] == "auto":
+        # the game keeps state outside the sim set that its first tick and its area loads build
+        seek["restore_warmup"] = "loads" if run["backend"] == "shim" else "none"
 
     backend = run["backend"]
     mode = SeekMode(seek["mode"])

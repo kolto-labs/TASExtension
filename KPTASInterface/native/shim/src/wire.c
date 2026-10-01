@@ -3,9 +3,10 @@
  * read on the harness fiber: before start, and at the gate. The game is never
  * blocked outside the gate.
  *
- * Verbs: hello, tier.lock, clock, subscribe, ring.attach, capture, start,
- * step, input, wait, digest, mem.read, semantic.read, gate, restore, verify,
- * stats, bye (and quit). Others: unsupported.
+ * Verbs: hello, tier.lock, clock, clock.save_ms, clock.save_ms_next,
+ * os_event, subscribe, ring.attach, capture, start, step, input, wait,
+ * digest, mem.read, semantic.read, gate, restore, verify, stats, bye (and
+ * quit). Others: unsupported.
  *
  * Tiers: an unlocked session behaves like tas. Verbs whose verbclass writes
  * game state outside the game's own recorded states (mem.write,
@@ -39,9 +40,49 @@ static input_t g_input;          /* held input for the running request */
 static char g_req_note[256] = ".";
 static int g_first_tick;
 static u32 g_verbclass_tick, g_verbclass_acc;
-static u32 g_events_step;       /* bit0 load.done */
 static u32 g_last_load_done;
 static u8 g_last_jdig[16];
+static int g_input_close;        /* the held note carries !close (first tick only) */
+static int g_os_close;           /* os_event close: the next tick */
+static int g_exited;
+
+/* events of the running step or wait, reported in its reply */
+#define SEV_MAX 64
+static u32 g_sev_kind[SEV_MAX], g_sev_val[SEV_MAX], g_sev_n;
+static u64 g_sev_tick[SEV_MAX];
+u32 g_ev_count[EV_KINDS];
+static u32 g_wait_kind;
+/* journalled inputs staged at a gate for the next tick */
+static u32 g_stage_kind[8], g_stage_val[8], g_stage_n;
+
+static const char *const EV_NAME[EV_KINDS] = {"load.done", "save.begin", "save.done", "close", "proc.down",
+                                              "clock.save_ms", "clock.save_ms_next"};
+
+void ev_add(u32 kind, u32 val) {
+    if (kind >= EV_KINDS) return;
+    g_ev_count[kind]++;
+    if (kind <= EV_PROC_DOWN && g_sev_n < SEV_MAX) {
+        g_sev_kind[g_sev_n] = kind;
+        g_sev_val[g_sev_n] = val;
+        g_sev_tick[g_sev_n] = g_gate.tick;
+        g_sev_n++;
+    }
+    if (kind != EV_LOAD_DONE && kind != EV_PROC_DOWN) journal_ev_add(kind, val);
+}
+
+static void stage_ev(u32 kind, u32 val) {
+    if (g_stage_n < 8) { g_stage_kind[g_stage_n] = kind; g_stage_val[g_stage_n] = val; g_stage_n++; }
+}
+
+/* Called after the per-tick resets, as tick g_gate.tick begins. */
+void wire_tick_begin(void) {
+    for (u32 i = 0; i < g_stage_n; i++) ev_add(g_stage_kind[i], g_stage_val[i]);
+    g_stage_n = 0;
+    if (SH->close_next) {
+        SH->close_next = 0;
+        ev_add(EV_CLOSE, 0);
+    }
+}
 
 #define VC_INPUT 1u
 #define VC_GATE 4u
@@ -157,12 +198,23 @@ static void reply_err(i64 id, const char *code, const char *msg) {
     wire_send_line(&b);
 }
 
-static void step_report(buf_t *b, int waited) {
+static void step_report(buf_t *b, int waited, const char *outcome) {
     b_str(b, "{\"epoch\":1,\"events\":[");
-    if (g_events_step & 1) b_str(b, "\"load.done\"");
+    for (u32 i = 0; i < g_sev_n; i++) {
+        if (i) b_ch(b, ',');
+        b_str(b, "{\"name\":");
+        b_jstr(b, EV_NAME[g_sev_kind[i]]);
+        b_str(b, ",\"tick\":");
+        b_u64(b, g_sev_tick[i]);
+        if (g_sev_kind[i] == EV_SAVE_BEGIN || g_sev_kind[i] == EV_SAVE_DONE) { b_str(b, ",\"us\":"); b_u64(b, g_sev_val[i]); }
+        if (g_sev_kind[i] == EV_PROC_DOWN) { b_str(b, ",\"code\":"); b_u64(b, g_sev_val[i]); }
+        b_ch(b, '}');
+    }
     b_str(b, "],\"journal\":\"");
     b_hex(b, g_last_jdig, 16);
-    b_str(b, "\",\"outcome\":\"alive\",\"reason\":1,\"restore_point\":");
+    b_str(b, "\",\"outcome\":");
+    b_jstr(b, outcome);
+    b_str(b, ",\"reason\":1,\"restore_point\":");
     b_str(b, (g_capture_on && g_root_valid) ? "true" : "false");
     b_str(b, ",\"server_passes\":");
     b_u64(b, g_gate.server_passes);
@@ -238,12 +290,16 @@ static void do_hello(i64 id) {
     static char mods[4096];
     modules_now(mods, sizeof mods);
     reply_begin(&b, id);
-    b_str(&b, "{\"build\":\"k1_gog_103\",\"caps\":{\"capture\":true,\"clock\":[\"virtual\"],\"context\":\"fiber\"");
+    /* build: sha256 prefix of the loaded DLL file, so builds can be told apart */
+    b_str(&b, "{\"build\":\"");
+    if (ok1) b_hex(&b, shim_sha, 8);
+    b_str(&b, "\",\"caps\":{\"capture\":true,\"clock\":[\"virtual\"],\"context\":\"fiber\"");
     b_str(&b, ",\"dinput\":\"virtual_device\",\"gl_names\":\"virtual\",\"handles\":\"virtual\",\"heap\":\"arena\"");
-    b_str(&b, ",\"messages\":\"interpose\",\"restore\":true,\"threads\":\"slots_serial\"}");
+    b_str(&b, ",\"messages\":\"interpose\",\"os_events\":[\"close\"],\"restore\":true,\"save_ms\":true");
+    b_str(&b, ",\"threads\":\"slots_serial\"}");
     b_str(&b, ",\"epoch\":1,\"exe_sha256\":\"");
     if (ok2) b_hex(&b, exe_sha, 32);
-    b_str(&b, "\",\"hooks\":");
+    b_str(&b, "\",\"game\":\"k1_gog_103\",\"hooks\":");
     list_json(&b, g_hooks_list);
     b_str(&b, ",\"load_order\":");
     list_json(&b, g_modlist);
@@ -290,6 +346,19 @@ static void parse_input(jnode *args, input_t *in) {
         }
     }
     in->wheel = (int)jint(jget(args, "wheel"), 0);
+}
+
+/* "msgs": OS events on the note's first tick. Returns 0 on an unsupported one. */
+static int parse_msgs(jnode *args, int *close, const char **bad) {
+    *close = 0;
+    jnode *m = jget(args, "msgs");
+    if (m && m->type == J_ARR)
+        for (jnode *c = m->child; c; c = c->next) {
+            const char *s = jstr(c, "");
+            if (k_streq(s, "close")) *close = 1;
+            else { *bad = s; return 0; }
+        }
+    return 1;
 }
 
 static void set_note(jnode *args) {
@@ -396,10 +465,15 @@ static void do_memwrite(i64 id, jnode *args) {
     reply_end(&b);
 }
 
+static int event_kind(const char *name) {
+    for (u32 k = 0; k <= EV_PROC_DOWN; k++) if (k_streq(name, EV_NAME[k])) return (int)k;
+    return -1;
+}
+
+/* only events after the wait began count; the driver carries the previous note's */
 static int event_fired(void) {
-    if (k_streq(g_wait_event, "load.done")) return g_load_done_count != g_wait_base;
-    if (k_streq(g_wait_event, "tick")) return 0;
-    return 0;
+    if (g_wait_kind >= EV_KINDS) return 0;
+    return g_ev_count[g_wait_kind] != g_wait_base;
 }
 
 /* ---- dispatch ---- */
@@ -429,7 +503,7 @@ static void handle(char *line, u32 len, int phase) {
         memcpy(g_tier, t, strlen(t) + 1);
         g_tier_locked = 1;
         reply_begin(&b, id);
-        b_str(&b, "{\"allow\":[\"hello\",\"tier.lock\",\"clock\",\"subscribe\",\"ring.attach\",\"capture\",\"start\",\"step\",\"input\",\"wait\",\"digest\",\"mem.read\",\"semantic.read\",\"gate\",\"restore\",\"verify\",\"stats\",\"bye\"");
+        b_str(&b, "{\"allow\":[\"hello\",\"tier.lock\",\"clock\",\"clock.save_ms\",\"clock.save_ms_next\",\"os_event\",\"subscribe\",\"ring.attach\",\"capture\",\"start\",\"step\",\"input\",\"wait\",\"digest\",\"mem.read\",\"semantic.read\",\"gate\",\"restore\",\"verify\",\"stats\",\"bye\"");
         if (k_streq(t, "lab")) b_str(&b, ",\"mem.write\",\"semantic.apply\"");
         b_str(&b, "],\"tier\":");
         b_jstr(&b, g_tier);
@@ -472,6 +546,47 @@ static void handle(char *line, u32 len, int phase) {
         reply_end(&b);
         return;
     }
+    if (k_streq(verb, "clock.save_ms") || k_streq(verb, "clock.save_ms_next")) {
+        /* inputs: journalled on the next tick, rewound by a restore (SH) */
+        jnode *ms = jget(args, "ms");
+        if (!ms) ms = jget(req, "ms");
+        if (!ms || ms->type != J_NUM || ms->num < 0 || ms->num > 3600000) {
+            reply_err(id, "bad_args", "ms: 0..3600000");
+            return;
+        }
+        int once = k_streq(verb, "clock.save_ms_next");
+        if (once) { SH->save_next_ms = (u32)ms->num; SH->save_next_set = 1; }
+        else SH->save_ms = (u32)ms->num;
+        stage_ev(once ? EV_SAVE_MS_NEXT : EV_SAVE_MS, (u32)ms->num);
+        reply_begin(&b, id);
+        b_str(&b, "{\"for_tick\":");
+        b_u64(&b, g_gate.started ? g_gate.tick + 1 : 0);
+        b_str(&b, ",\"ms\":");
+        b_u64(&b, (u64)ms->num);
+        b_ch(&b, '}');
+        reply_end(&b);
+        return;
+    }
+    if (k_streq(verb, "os_event")) {
+        const char *ev = jstr(jget(args, "ev"), "");
+        if (!k_streq(ev, "close")) { reply_err(id, "unsupported", "os_event: only close"); return; }
+        if (phase != 1) { reply_err(id, "state", "os_event runs at the gate after start"); return; }
+        g_os_close = 1;
+        reply_begin(&b, id);
+        b_str(&b, "{\"for_tick\":");
+        b_u64(&b, g_gate.tick + 1);
+        b_str(&b, ",\"outcome\":\"alive\"}");
+        reply_end(&b);
+        return;
+    }
+    if (k_streq(verb, "log")) {
+        /* diagnostics only: the environment block stays pinned */
+        geo_set_log((int)jint(jget(args, "geo"), 0));
+        reply_begin(&b, id);
+        b_str(&b, "{}");
+        reply_end(&b);
+        return;
+    }
     if (k_streq(verb, "subscribe")) {
         jnode *t = jget(args, "topics");
         g_sub_tick = 0;
@@ -494,22 +609,28 @@ static void handle(char *line, u32 len, int phase) {
         g_client_count = g_server_count = g_us_count = 0;
         g_start_id = id;
         g_verbclass_acc = VC_GATE | VC_CLOCK;
+        g_sev_n = 0;
+        wire_tick_begin();
         g_release = 1;
         return;
     }
     if (k_streq(verb, "step") || k_streq(verb, "wait")) {
         if (phase != 1) { reply_err(id, "state", "step and wait run at the gate after start"); return; }
+        const char *bad = "";
+        int cl = 0;
+        if (!parse_msgs(args, &cl, &bad)) { reply_err(id, "unsupported", bad); return; }
         parse_input(args, &g_input);
+        g_input_close = cl;
         set_note(args);
         g_first_tick = jget(args, "first") ? (jget(args, "first")->type == J_BOOL ? (int)jget(args, "first")->num : 1) : 1;
-        g_events_step = 0;
+        g_sev_n = 0;
         g_verbclass_acc = 0;
         if (k_streq(verb, "step")) {
             i64 n = jint(jget(args, "n"), 1);
             if (n < 0) { reply_err(id, "bad_args", "n < 0"); return; }
             if (n == 0) {
                 reply_begin(&b, id);
-                step_report(&b, -1);
+                step_report(&b, -1, "alive");
                 reply_end(&b);
                 return;
             }
@@ -522,14 +643,20 @@ static void handle(char *line, u32 len, int phase) {
             memcpy(g_wait_event, ev, l);
             g_wait_event[l] = 0;
             g_wait_deadline = g_gate.tick + (u64)jint(jget(args, "timeout"), 1800);
-            g_wait_base = g_load_done_count;
+            int k = event_kind(g_wait_event);
+            g_wait_kind = k < 0 ? EV_KINDS : (u32)k;
+            g_wait_base = k < 0 ? 0 : g_ev_count[k];
             g_wait_id = id;
         }
         g_release = 1;
         return;
     }
     if (k_streq(verb, "input")) {
+        const char *bad = "";
+        int cl = 0;
+        if (!parse_msgs(args, &cl, &bad)) { reply_err(id, "unsupported", bad); return; }
         parse_input(args, &g_input);
+        g_input_close = cl;
         set_note(args);
         reply_begin(&b, id);
         b_str(&b, "{\"for_tick\":");
@@ -686,7 +813,7 @@ void wire_gate_hook(void) {
     b_term(&j);
     state_capture(g_gate.tick, j.p, j.n);
     g_verbclass_acc |= g_verbclass_tick;
-    if (g_load_done_count != g_last_load_done) { g_events_step |= 1; g_last_load_done = g_load_done_count; }
+    if (g_load_done_count != g_last_load_done) { ev_add(EV_LOAD_DONE, 0); g_last_load_done = g_load_done_count; }
 
     if (g_wire_ok && g_sub_tick) {
         buf_t b;
@@ -719,14 +846,14 @@ void wire_gate_hook(void) {
     if (g_start_id >= 0) {
         buf_t b;
         reply_begin(&b, g_start_id);
-        step_report(&b, -1);
+        step_report(&b, -1, "alive");
         reply_end(&b);
         g_start_id = -1;
     } else if (g_step_id >= 0) {
         if (--g_step_left == 0) {
             buf_t b;
             reply_begin(&b, g_step_id);
-            step_report(&b, -1);
+            step_report(&b, -1, "alive");
             reply_end(&b);
             g_step_id = -1;
         } else hold = 0;
@@ -735,7 +862,7 @@ void wire_gate_hook(void) {
         if (fired || g_gate.tick >= g_wait_deadline) {
             buf_t b;
             reply_begin(&b, g_wait_id);
-            step_report(&b, fired ? 1 : 0);
+            step_report(&b, fired ? 1 : 0, "alive");
             reply_end(&b);
             g_wait_id = -1;
         } else hold = 0;
@@ -747,8 +874,45 @@ void wire_gate_hook(void) {
     /* stage tick n+1 */
     u32 ms = (u32)((g_clk.uptime0_ms * 1000ull + g_clk.seg_v + (g_gate.tick + 1 - g_clk.seg_tick) * 1000000ull / g_clk.hz) / 1000ull);
     di_stage(&g_input, g_first_tick, ms, g_input_hash);
+    /* OS event close: WM_CLOSE to the game window at the start of tick n+1,
+     * through the staged queue so it reaches the game's WndProc */
+    if ((g_first_tick && g_input_close) || g_os_close) {
+        msg_synth_push(WM_CLOSE, 0, 0);
+        SH->close_next = 1;
+        g_os_close = 0;
+    }
     g_first_tick = 0;
     memcpy(g_note, g_req_note, sizeof g_note);
     g_verbclass_tick = VC_GATE | VC_CLOCK | VC_INPUT;
     QueryPerformanceCounter(&g_t_release);
+}
+
+/* The game is exiting (ExitProcess on the main slot, or the CRT entry
+ * returned). Tick g_gate.tick is running and will never reach its gate.
+ * Answer the pending step or wait with outcome "exited" and a proc.down
+ * event, push the exit, then let the process end. No journal entry is built:
+ * the game's objects may already be freed. */
+void wire_exit(u32 code) {
+    if (!g_wire_ok || g_exited) return;
+    g_exited = 1;
+    ev_add(EV_PROC_DOWN, code);
+    buf_t b;
+    i64 pid = g_step_id >= 0 ? g_step_id : g_wait_id >= 0 ? g_wait_id : g_start_id;
+    if (pid >= 0) {
+        reply_begin(&b, pid);
+        step_report(&b, -1, "exited");
+        reply_end(&b);
+        g_step_id = g_wait_id = g_start_id = -1;
+    }
+    b_init(&b, g_out, OBUF);
+    b_str(&b, "{\"code\":");
+    b_u64(&b, code);
+    b_str(&b, ",\"last_gate\":");
+    b_u64(&b, g_gate.tick ? g_gate.tick - 1 : 0);
+    b_str(&b, ",\"push\":\"exit\",\"tick\":");
+    b_u64(&b, g_gate.tick);
+    b_ch(&b, '}');
+    wire_send_line(&b);
+    slog("exit: code %u during tick %u", code, (u32)g_gate.tick);
+    shutdown(g_sock, SD_SEND);
 }

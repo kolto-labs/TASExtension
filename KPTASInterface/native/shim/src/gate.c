@@ -184,7 +184,15 @@ static void main_slot_entry(void *arg) {
     (void)arg;
     ((void (*)(void))t_entry)();
     slog("CRT entry returned");
+    wire_exit(0);
     TerminateProcess(GetCurrentProcess(), 0);
+}
+
+/* The game's own exit (WM_QUIT, then CRT exit): tell the driver first. */
+static void (WINAPI *r_ExitProcess)(UINT);
+static void WINAPI hk_ExitProcess(UINT code) {
+    wire_exit(code);
+    r_ExitProcess(code);
 }
 
 static void harness_loop(void) {
@@ -244,6 +252,7 @@ static void gate_body(void) {
     clock_tick_reset();
     journal_tick_reset();
     msg_tick_reset();
+    wire_tick_begin();
     g_client_count = g_server_count = g_us_count = 0;
     g_last_gate_ms = (LONG)GetTickCount();
     kst_set_in_gate(0);
@@ -279,6 +288,8 @@ void gate_install(void) {
     HMODULE exe = GetModuleHandleA(NULL);
     void *o = iat_hook(exe, "USER32.dll", "PeekMessageA", (void *)hk_PeekMessageA);
     if (o) { r_PeekMessageA = o; hooks_note("exe:PeekMessageA(gate)"); }
+    o = iat_hook(exe, "KERNEL32.dll", "ExitProcess", (void *)hk_ExitProcess);
+    if (o) { r_ExitProcess = o; hooks_note("exe:ExitProcess"); }
     if (g_present_every != 1) {
         o = iat_hook(exe, "GDI32.dll", "SwapBuffers", (void *)hk_SwapBuffers);
         if (o) { r_SwapBuffers = o; hooks_note("exe:SwapBuffers(present)"); }

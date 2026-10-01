@@ -93,6 +93,7 @@ int state_init_early(void) {
     SH->gl_prog_next = 1;
     SH->gl_ati_next = 1;
     SH->gl_buf_next = 1;
+    SH->save_ms = SAVE_MS_DEFAULT;
     clock_defaults();
     di_init_objects();
     slog("state: arena %x+%x hg %x+%x shim_hg %x (%u bytes)", ARENA_BASE, ARENA_SIZE, HG_BASE, HG_SIZE,
