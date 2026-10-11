@@ -1,3 +1,4 @@
+import { ListenerScope } from '../packages/tas-ui/listener-scope.js';
 // Piano roll: one row per tick, one column per input. Drawn on a canvas with
 // only the visible rows painted. The roll never edits anything itself: it
 // reports paints, seeks and menu requests to the page through hooks.
@@ -24,6 +25,8 @@ const K1 = {
   w: 'Move Forward', a: 'Pan Camera Left', s: 'Move Backwards', d: 'Pan Camera Right',
   q: 'Select Previous (Previous Menu in GUIs)', e: 'Select Next (Next Menu in GUIs)',
   space: 'Pause Game', tab: 'Change Leader', esc: 'Game Menu',
+  enter: 'Enter key', up: 'Up arrow key', down: 'Down arrow key',
+  left: 'Left arrow key', right: 'Right arrow key',
   1: 'Activate Left Action, dialog reply 1', 2: 'Activate Middle Action, dialog reply 2',
   3: 'Activate Right Action, dialog reply 3', 4: 'Activate Friendly Power, dialog reply 4',
   5: 'Activate Medical Item, dialog reply 5', 6: 'Activate Non-medical Item, dialog reply 6',
@@ -42,6 +45,7 @@ function makeCols() {
   for (const k of ['w', 'a', 's', 'd', 'q', 'e']) add(k, 20, 'key', k, k === 'w' ? 4 : 0);
   for (const k of ['space', 'tab', 'esc']) add(k, 32, 'key', k === 'space' ? 'spc' : k, k === 'space' ? 6 : 0);
   for (let d = 1; d <= 9; d++) add(String(d), 16, 'key', String(d), d === 1 ? 6 : 0);
+  for (const key of ['enter', 'up', 'down', 'left', 'right']) add(key, key === 'enter' ? 42 : 36, 'key', key, key === 'enter' ? 6 : 0);
   add('lmb', 30, 'key', 'lmb', 6);
   add('rmb', 30, 'key', 'rmb');
   add('mx', 52, 'mouse', 'mouse x', 6);
@@ -51,7 +55,7 @@ function makeCols() {
     c.bind = K1[c.id] || '';
     if (c.kind === 'key' || c.kind === 'mouse') {
       c.title = `${c.kind === 'mouse' ? c.label : c.id} — ${c.bind} (K1 keymap). ` +
-        (c.wired ? `Stand-in: ${STANDIN[c.id]}.` : 'Inert here: the stand-in scene does not read it yet. Painting it still writes the score.');
+        (c.wired ? `Sample scene: ${STANDIN[c.id]}.` : 'Painting this lane still writes the score; the sample scene has no matching action.');
     }
   }
   cols.width = x + 4;
@@ -65,6 +69,7 @@ const isKeyCol = (c) => c && c.kind === 'key';
 
 export class Roll {
   constructor(el, hooks) {
+    this.events = new ListenerScope();
     this.el = el;
     this.hooks = hooks;
     this.scroll = el.querySelector('.roll-scroll');
@@ -152,10 +157,23 @@ export class Roll {
     return isKeyCol(col) && heldIn(rowInput(this.data.prog, row), col.id);
   }
 
+  suspend() {
+    this.events.suspend();
+    if (this.pointerId != null && this.canvas.hasPointerCapture(this.pointerId)) this.canvas.releasePointerCapture(this.pointerId);
+    this.pointerId = null; this.stroke = null; this.selecting = false; this.hover = -1;
+  }
+  resume() { this.events.resume(); this.dirty = true; }
+
   bind() {
     const cv = this.canvas;
-    this.scroll.addEventListener('scroll', () => { this.dirty = true; });
-    cv.addEventListener('pointerdown', (ev) => {
+    this.events.listen(this.scroll, 'scroll', () => { this.dirty = true; });
+    this.events.listen(this.scroll, 'wheel', () => { if (this.hooks.onBrowse) this.hooks.onBrowse(); }, { passive: true });
+    this.events.listen(this.scroll, 'pointerdown', (ev) => {
+      // A press on the scrollport itself is scrollbar/empty-track navigation.
+      // Canvas edits and selections must not disable follow mode.
+      if (ev.target === this.scroll && this.hooks.onBrowse) this.hooks.onBrowse();
+    });
+    this.events.listen(cv, 'pointerdown', (ev) => {
       if (ev.button !== 0 || !this.data) return;
       const { t, c } = this.at(ev);
       this.el.focus({ preventScroll: true });
@@ -172,16 +190,16 @@ export class Roll {
       if (col.kind === 'key') {
         const row = this.rows[t];
         if (row.kind === 'wait' || row.kind === 'boot') { this.select(t, t, c, false); if (this.hooks.onRefuse) this.hooks.onRefuse(row); return; }
-        cv.setPointerCapture(ev.pointerId);
+        this.pointerId = ev.pointerId; cv.setPointerCapture(ev.pointerId);
         this.stroke = { t0: t, t1: t, c0: c, c1: c, value: !this.held(t, c) };
         this.dirty = true;
         return;
       }
-      cv.setPointerCapture(ev.pointerId);
+      this.pointerId = ev.pointerId; cv.setPointerCapture(ev.pointerId);
       this.selecting = true;
       this.select(t, t, col.kind === 'mouse' ? c : this.sel.c, false);
     });
-    cv.addEventListener('pointermove', (ev) => {
+    this.events.listen(cv, 'pointermove', (ev) => {
       if (!this.data) return;
       const { t, c } = this.at(ev);
       this.edgeScroll(ev);
@@ -210,14 +228,14 @@ export class Roll {
       }
       this.selecting = false;
     };
-    cv.addEventListener('pointerup', end);
-    cv.addEventListener('pointercancel', () => { this.stroke = null; this.selecting = false; this.dirty = true; });
-    cv.addEventListener('pointerleave', () => { this.hover = -1; this.dirty = true; if (this.hooks.onHover) this.hooks.onHover(-1, -1, 0, 0); });
-    cv.addEventListener('dblclick', (ev) => {
+    this.events.listen(cv, 'pointerup', end);
+    this.events.listen(cv, 'pointercancel', () => { this.stroke = null; this.selecting = false; this.dirty = true; });
+    this.events.listen(cv, 'pointerleave', () => { this.hover = -1; this.dirty = true; if (this.hooks.onHover) this.hooks.onHover(-1, -1, 0, 0); });
+    this.events.listen(cv, 'dblclick', (ev) => {
       const { t, c } = this.at(ev);
       if (COLS[c] && COLS[c].kind === 'mouse' && this.hooks.onEditMouse) this.hooks.onEditMouse(t);
     });
-    cv.addEventListener('contextmenu', (ev) => {
+    this.events.listen(cv, 'contextmenu', (ev) => {
       ev.preventDefault();
       if (!this.data) return;
       const { t, c } = this.at(ev);
@@ -227,7 +245,7 @@ export class Roll {
       this.dirty = true;
       this.hooks.onContext(ev.clientX, ev.clientY);
     });
-    this.head.addEventListener('contextmenu', (ev) => {
+    this.events.listen(this.head, 'contextmenu', (ev) => {
       const id = ev.target && ev.target.dataset ? ev.target.dataset.col : '';
       const c = colIndex(id);
       if (c < FIRST_INPUT) return;
@@ -236,9 +254,9 @@ export class Roll {
       this.dirty = true;
       this.hooks.onContext(ev.clientX, ev.clientY);
     });
-    this.el.addEventListener('keydown', (ev) => this.onKey(ev));
-    this.el.addEventListener('focus', () => { this.dirty = true; if (this.hooks.onSelect) this.hooks.onSelect(); });
-    this.el.addEventListener('blur', () => { this.dirty = true; });
+    this.events.listen(this.el, 'keydown', (ev) => this.onKey(ev));
+    this.events.listen(this.el, 'focus', () => { this.dirty = true; if (this.hooks.onSelect) this.hooks.onSelect(); });
+    this.events.listen(this.el, 'blur', () => { this.dirty = true; });
   }
 
   edgeScroll(ev) {
@@ -257,6 +275,7 @@ export class Roll {
       else this.select(t, t, s.c);
     };
     const k = ev.key;
+    if ((k === 'PageUp' || k === 'PageDown') && h.onBrowse) h.onBrowse();
     const ctrl = ev.ctrlKey || ev.metaKey;
     if (ctrl && (k === 'f' || k === 'F')) { ev.preventDefault(); h.onFind(); return; }
     if (ctrl && (k === 'b' || k === 'B')) { ev.preventDefault(); h.onBranch(); return; }

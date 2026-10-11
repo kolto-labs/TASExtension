@@ -1,6 +1,6 @@
 // Score parser for the browser prototype. A subset of the real score format:
-// notes (`count keys`), comments, a header line, @sync, @mark, @segment,
-// @repeat/@end, @alias with $name keys, and m@x,y mouse positions.
+// notes (`count inputs`), comments, a header line, @sync, @mark, @segment,
+// @repeat/@end, @alias with $name inputs, m@x,y positions, and mouse buttons.
 // Errors are collected per line so the editor can show them.
 
 import { BIT, EVENTS, KEYS } from './sim.js';
@@ -13,18 +13,44 @@ const MAX_INS = 50000;
 
 export const HZ_MIN = 10, HZ_MAX = 240;
 
+// Portable score semantics, shared with native input_edits.py. This is a
+// representation contract, not an advertisement of browser dispatch support.
+export const MOUSE_INPUT_CONTRACT = Object.freeze({
+  schema: 'telos-mouse-input/1',
+  wheel_unit: 'detent', wheel_phase: 'first-frame',
+  wheel_min: -17895697, wheel_max: 17895697,
+  absolute_unit: 'guest-pixel', relative_unit: 'guest-pixel',
+  relative_phase: 'every-frame',
+});
+
+// Reject fields the browser would otherwise discard during an edit or copy.
+// Never reinterpret a wheel detent as a DOM pixel delta or a held button.
+export function requireBrowserMouseInput(inp) {
+  if (inp.wheel !== undefined && inp.wheel !== 0)
+    throw new Error('Wheel detents require a wheel-capable runtime and input editor.');
+  if (inp.mouse_rel != null || inp.mouseRel != null || inp.mouse_abs != null)
+    throw new Error('Native mouse coordinates require an explicit input adapter.');
+  if (inp.mouse != null && (!Array.isArray(inp.mouse) || inp.mouse.length !== 2 ||
+      inp.mouse.some(v => !Number.isSafeInteger(v) || v < 0 || v > 9999)))
+    throw new Error('Mouse positions must be two whole guest-pixel coordinates from 0 to 9999.');
+}
+
 // Keys the roll shows but the stand-in scene does not read. They reach the
 // score and the roll, never the sim: only `bits` is passed to step().
-export const XKEYS = ['q', 'e', 'space', 'tab', 'esc', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
-export const XBIT = Object.fromEntries(XKEYS.map((k, i) => [k, 1 << i]));
-export const KEY_ORDER = ['w', 'a', 's', 'd', ...XKEYS];
+export const XKEYS = ['q', 'e', 'space', 'tab', 'esc', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'enter', 'up', 'down', 'left', 'right'];
 export const BUTTONS = ['lmb', 'rmb'];
+// `xbits` stores score lanes that are not part of the sample sim's four-key
+// movement mask. Mouse buttons share this compact, serializable lane mask;
+// they are still emitted separately as mouse buttons by the live-game bridge.
+export const XBIT = Object.fromEntries([...XKEYS, ...BUTTONS].map((k, i) => [k, 1 << i]));
+export const KEY_ORDER = ['w', 'a', 's', 'd', ...XKEYS];
 const SYN = { escape: 'esc' };
 
 export const isKey = (k) => k in BIT || k in XBIT;
 export const heldIn = (inp, k) => (k in BIT ? (inp.bits & BIT[k]) !== 0 : (inp.xbits & XBIT[k]) !== 0);
 
 export function setKey(inp, k, on) {
+  requireBrowserMouseInput(inp);
   const out = { bits: inp.bits, xbits: inp.xbits, mouse: inp.mouse, al: inp.al };
   if (k in BIT) out.bits = on ? out.bits | BIT[k] : out.bits & ~BIT[k];
   else out.xbits = on ? out.xbits | XBIT[k] : out.xbits & ~XBIT[k];
@@ -33,9 +59,14 @@ export function setKey(inp, k, on) {
 }
 
 export const EMPTY = Object.freeze({ bits: 0, xbits: 0, mouse: null, al: null });
-export const inputOf = (it) => ({ bits: it.bits, xbits: it.xbits || 0, mouse: it.mouse || null, al: it.al || null });
+export const inputOf = (it) => {
+  requireBrowserMouseInput(it);
+  return { bits: it.bits, xbits: it.xbits || 0, mouse: it.mouse || null, al: it.al || null };
+};
 
 export function sameInput(a, b) {
+  requireBrowserMouseInput(a);
+  requireBrowserMouseInput(b);
   if (a.bits !== b.bits || (a.xbits || 0) !== (b.xbits || 0)) return false;
   const ma = a.mouse, mb = b.mouse;
   if (!ma || !mb) return !ma && !mb;
@@ -44,6 +75,7 @@ export function sameInput(a, b) {
 
 // Tokens for one held set, in roll order: keys, mouse, buttons, then $aliases.
 export function inputTokens(inp) {
+  requireBrowserMouseInput(inp);
   const toks = [], als = [];
   const push = (k) => { const a = inp.al && inp.al[k]; if (a) als.push('$' + a); else toks.push(k); };
   for (const k of KEY_ORDER) if (heldIn(inp, k)) push(k);
@@ -82,11 +114,14 @@ export function parseScore(text) {
     const ln = i + 1;
     const raw = lines[i];
     if (i === 0 && raw.trimStart().startsWith('#!score')) {
-      const toks = raw.trim().split(/\s+/).slice(1);
-      const hash = toks.findIndex((t) => t.startsWith('#'));
+      const toks = raw.trim().split(/\s+/);
+      const hash = toks.findIndex((t, index) => index >= 2 && t.startsWith('#'));
       const used = hash >= 0 ? toks.slice(0, hash) : toks;
-      if (used[0] !== 'v1') errors.push({ line: ln, msg: "the header starts with '#!score v1'" });
-      for (const t of used.slice(1)) {
+      if (used[0] !== '#!score' || used[1] !== 'v1') {
+        errors.push({ line: ln, msg: "the header starts with '#!score v1'" });
+        break;
+      }
+      for (const t of used.slice(2)) {
         const [k, v] = t.split('=');
         if (!v) { errors.push({ line: ln, msg: `header entries are key=value, got '${t}'` }); continue; }
         header[k] = v;
@@ -111,6 +146,10 @@ export function parseScore(text) {
       if (!(keys.length === 1 && keys[0] === '.')) {
         for (const tok of keys) {
           if (tok === '.') { errors.push({ line: ln, msg: "'.' means no input, so it stands alone" }); bad = true; break; }
+          if (/^wh[+-]/.test(tok) || /^md/.test(tok)) {
+            errors.push({ line: ln, msg: 'wheel detents and relative mouse inputs need a capable runtime; this editor cannot execute them' });
+            bad = true; break;
+          }
           const mm = MOUSE.exec(tok);
           if (mm) {
             if (mouse) { errors.push({ line: ln, msg: 'a note holds one mouse position' }); bad = true; break; }
@@ -124,7 +163,7 @@ export function parseScore(text) {
             k = aliases[alias];
           } else k = SYN[tok] || tok;
           if (!isKey(k)) {
-            errors.push({ line: ln, msg: `unknown key '${tok}'. The scene reads ${KEYS.join(' ')}. The roll also takes ${XKEYS.join(' ')} and m@x,y` });
+            errors.push({ line: ln, msg: `unknown input '${tok}'. The scene reads ${KEYS.join(' ')}. The score also accepts ${XKEYS.join(' ')}, ${BUTTONS.join(' ')}, and m@x,y` });
             bad = true; break;
           }
           if (k in BIT) {
@@ -166,19 +205,22 @@ export function parseScore(text) {
         if (!(v.slice(1) in aliases)) { errors.push({ line: ln, msg: `undefined alias '${v}'` }); continue; }
         v = aliases[v.slice(1)];
       } else v = SYN[v] || v;
-      if (!isKey(v)) { errors.push({ line: ln, msg: `this prototype has no column for '${m[2]}'. Use one of ${KEYS.join(' ')} ${XKEYS.join(' ')}` }); continue; }
+      if (!isKey(v)) { errors.push({ line: ln, msg: `the score editor has no column for '${m[2]}'. Use one of ${KEYS.join(' ')} ${XKEYS.join(' ')} ${BUTTONS.join(' ')}` }); continue; }
       if (aliases[m[1]] && aliases[m[1]] !== v) { errors.push({ line: ln, msg: `alias $${m[1]} is already ${aliases[m[1]]} and cannot become ${v}` }); continue; }
       aliases[m[1]] = v;
       continue;
     }
     if (head === '@segment') {
       if (!toks[1] || !LABEL.test(toks[1])) { errors.push({ line: ln, msg: '@segment needs a name' }); continue; }
-      let hz = 0, ok = true;
+      let hz = 0, pace = '', ok = true;
       for (const t of toks.slice(2)) {
         if (t.startsWith('hz=')) { const n = intOpt(t, 'hz', HZ_MIN, HZ_MAX, errors, ln); if (n === null) ok = false; else hz = n; }
+        // The sample's normal playback follows hz in wall time (with the
+        // explicit transport speed multiplier). Preserve this canonical mode.
+        else if (t === 'pace=realtime') pace = 'realtime';
         else { errors.push({ line: ln, msg: `unknown @segment option '${t}'` }); ok = false; }
       }
-      if (ok) body.push({ op: 'seg', name: toks[1], hz, line: ln, rep: inRep, rl });
+      if (ok) body.push({ op: 'seg', name: toks[1], hz, pace, line: ln, rep: inRep, rl });
       continue;
     }
     if (head === '@repeat') {
@@ -200,7 +242,7 @@ export function parseScore(text) {
       continue;
     }
     if (head.startsWith('@')) {
-      errors.push({ line: ln, msg: `unknown directive '${head}'. This prototype reads @sync @mark @segment @repeat @end @alias` });
+      errors.push({ line: ln, msg: `unknown directive '${head}'. This score editor reads @sync @mark @segment @repeat @end @alias` });
       continue;
     }
     errors.push({ line: ln, msg: `expected a note (tick count first) or a directive, got '${head}'` });
@@ -238,7 +280,7 @@ export function sameIns(a, b, hz0) {
 }
 
 export const EXAMPLE = `#!score v1 game=standin hz=60
-# Stand-in scene, not KotOR. One note per line: tick count, then every
+# Deterministic sample scene. One note per line: tick count, then every
 # input held for those ticks. A lone . holds nothing.
 # Keys: w a s d move. rmb runs. lmb opens doors and attacks.
 @mark start

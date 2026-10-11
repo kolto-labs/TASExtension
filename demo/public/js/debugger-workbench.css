@@ -1,0 +1,84 @@
+.debugger-workbench { border-top: 1px solid var(--line); background: var(--panel); color: var(--ink); }
+.debugger-workbench .dw-summary { cursor: pointer; padding: 12px; min-height: 44px; box-sizing: border-box; }
+.debugger-workbench .dw-summary:focus-visible { outline: 2px solid var(--bacta); outline-offset: -3px; }
+.debugger-workbench .dw-title { font-weight: 600; margin-right: 12px; }
+.debugger-workbench .dw-status { display: inline-block; color: var(--dim); font: 11px var(--mono); }
+.debugger-workbench .dw-status[data-state="paused"], .debugger-workbench .dw-status[data-state="running"] { color: var(--bacta); }
+.debugger-workbench .dw-body { padding: 0 12px 12px; }
+.debugger-workbench .dw-provenance { color: var(--dim); margin: 0 0 12px; font-size: 11px; }
+.debugger-workbench .dw-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); gap: 12px; margin: 0; padding-bottom: 12px; }
+.debugger-workbench dt { color: var(--dim); font-size: 11px; }
+.debugger-workbench dd { margin: 4px 0 0; font: 12px var(--mono); overflow-wrap: anywhere; }
+.debugger-workbench .dw-capabilities { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; padding: 0; margin: 0; }
+.debugger-workbench .dw-capability { border: 1px solid var(--line); padding: 3px 7px; border-radius: 3px; font-size: 11px; color: var(--dim); overflow-wrap: anywhere; }
+.debugger-workbench .dw-capability[data-state="available"] { color: var(--bacta); }
+.debugger-workbench .dw-note, .debugger-workbench .dw-empty { margin: 8px 0 0; color: var(--dim); font-size: 11px; line-height: 1.5; }
+.debugger-workbench .dw-input-watch { margin-top: 12px; padding: 10px; border: 1px solid var(--line); }
+.debugger-workbench .dw-input-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 8px; }
+.debugger-workbench .dw-input-head h3 { margin: 0; font-size: 12px; }
+.debugger-workbench .dw-input-head .dw-note { margin: 0; }
+.debugger-workbench .dw-input-watch .dw-metrics { padding-bottom: 0; gap: 8px; }
+.debugger-workbench .dw-history-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); }
+.debugger-workbench .dw-history-head h3 { margin: 0; }
+.debugger-workbench .dw-history { max-height: 200px; overflow-y: auto; list-style: none; padding: 0; margin: 6px 0 0; scrollbar-gutter: stable; }
+.debugger-workbench .dw-history li { display: grid; grid-template-columns: minmax(105px, 1fr) 3fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font: 11px/1.5 var(--mono); overflow-wrap: anywhere; }
+.debugger-workbench .dw-history strong { font-weight: 500; }
+.debugger-workbench .dw-history span { color: var(--dim); }
+.debugger-workbench .dw-error strong { color: #f5a5a5; }
+.debugger-workbench .dw-binary { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.debugger-workbench .dw-binary > summary { cursor: pointer; padding: 6px 0; }
+.debugger-workbench .dw-binary-picker { display: grid; gap: 6px; margin: 6px 0; font-size: 11px; }
+.debugger-workbench .dw-binary-picker input { width: 100%; min-width: 0; font: inherit; }
+.debugger-workbench .dw-binary .dw-metrics { margin-top: 10px; }
+.debugger-workbench .dw-binary-evidence { padding-left: 18px; margin: 4px 0; color: var(--dim); font: 11px/1.5 var(--mono); overflow-wrap: anywhere; }
+@media (max-width: 480px) { .debugger-workbench .dw-history li { grid-template-columns: 1fr; gap: 2px; } }
+
+.debugger-workbench .dw-binary-dependencies { max-height: 160px; overflow: auto; scrollbar-gutter: stable; padding-left: 18px; margin: 6px 0; font: 11px/1.5 var(--mono); overflow-wrap: anywhere; }
+.debugger-workbench .dw-binary-dependencies:empty { display: none; }
+.debugger-workbench .dw-binary > summary:focus-visible, .debugger-workbench .dw-binary-picker input:focus-visible { outline: 2px solid var(--bacta); outline-offset: 2px; }
+
+.debugger-workbench .dw-support { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 6px; }
+.debugger-workbench .dw-support > summary { cursor: pointer; padding: 8px 0; font-size: 12px; }
+.debugger-workbench .dw-support > summary:focus-visible { outline: 2px solid var(--bacta); outline-offset: 2px; }
+.debugger-workbench .dw-support-list { margin: 4px 0 0; }
+.debugger-workbench .dw-support-list > div { display: grid; grid-template-columns: minmax(100px, 1fr) 2fr; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.debugger-workbench .dw-support-list dd { margin: 0; color: var(--dim); }
+.debugger-workbench .dw-support-list dd[data-state="available"] { color: var(--bacta); }
+.debugger-workbench .dw-note:empty { display: none; }
+
+.debugger-workbench .dw-file-layout { margin-top: 10px; }
+.debugger-workbench .dw-file-layout > summary { cursor: pointer; padding: 8px 0; font-size: 12px; }
+.debugger-workbench .dw-file-layout > summary:focus-visible, .debugger-workbench .dw-layout-scroll:focus-visible { outline: 2px solid var(--bacta); outline-offset: 2px; }
+.debugger-workbench .dw-layout-scroll { overflow: auto; max-height: 320px; margin-top: 8px; scrollbar-gutter: stable; }
+.debugger-workbench .dw-layout-table { width: 100%; border-collapse: collapse; font: 11px/1.5 var(--mono); text-align: left; }
+.debugger-workbench .dw-layout-table caption { text-align: left; color: var(--dim); padding-bottom: 8px; }
+.debugger-workbench .dw-layout-table th, .debugger-workbench .dw-layout-table td { padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.debugger-workbench .dw-layout-table th { color: var(--dim); font-weight: 500; }
+.debugger-workbench .dw-layout-table td { overflow-wrap: anywhere; min-width: 65px; max-width: 220px; }
+
+.debugger-workbench .dw-memory { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 6px; }
+.debugger-workbench .dw-memory > summary { cursor: pointer; padding: 8px 0; font-size: 12px; }
+.debugger-workbench .dw-memory-form fieldset { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; border: 1px solid var(--line); margin: 10px 0 0; padding: 10px; min-width: 0; }
+.debugger-workbench .dw-memory-form legend { color: var(--dim); font-size: 11px; }
+.debugger-workbench .dw-memory-form label { display: grid; gap: 5px; font-size: 11px; min-width: 0; flex: 1 1 130px; }
+.debugger-workbench .dw-memory-form input, .debugger-workbench .dw-memory-form select { box-sizing: border-box; width: 100%; min-width: 0; background: var(--panel); color: var(--ink); border: 1px solid var(--line); padding: 7px; font: 12px var(--mono); }
+.debugger-workbench .dw-memory-form fieldset:disabled { opacity: .65; }
+.debugger-workbench .dw-memory-dump { max-height: 320px; overflow: auto; padding: 10px; border: 1px solid var(--line); font: 11px/1.6 var(--mono); scrollbar-gutter: stable; }
+.debugger-workbench .dw-memory > summary:focus-visible, .debugger-workbench .dw-memory-form :focus-visible, .debugger-workbench .dw-memory-dump:focus-visible { outline: 2px solid var(--bacta); outline-offset: 2px; }
+
+.debugger-workbench .dw-capture-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.debugger-workbench .dw-capture-actions button { min-height: 36px; }
+.debugger-workbench .dw-capture-actions button:disabled { opacity: .55; cursor: default; }
+.debugger-workbench .dw-capture-actions button:focus-visible { outline: 2px solid var(--bacta); outline-offset: 2px; }
+
+.debugger-workbench .dw-value-inspector { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.debugger-workbench .dw-value-inspector h3 { margin: 0; font-size: 12px; }
+.debugger-workbench .dw-value-inspector .dw-metrics { padding: 12px 0 0; }
+.debugger-workbench .dw-value-inspector input[aria-invalid="true"] { border-color: var(--warn, #ffb000); }
+
+.debugger-workbench .dw-capture-search { margin-top: 10px; }
+.debugger-workbench .dw-capture-search > summary { cursor: pointer; padding: 8px 0; font-size: 12px; }
+.debugger-workbench .dw-capture-search > summary:focus-visible { outline: 2px solid var(--bacta); outline-offset: 2px; }
+.debugger-workbench .dw-capture-search input[aria-invalid="true"] { border-color: var(--warn, #ffb000); }
+.debugger-workbench .dw-match-context { max-height: 160px; }
+.debugger-workbench .dw-match-context mark { background: var(--bacta, #21d4c5); color: #07171a; font-weight: 700; }

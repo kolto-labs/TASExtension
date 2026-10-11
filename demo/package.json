@@ -1,0 +1,14 @@
+{
+  "name": "kptas-demo-publication-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "sync:theme": "node ./tools/ui-tokens.mjs",
+    "build:public": "node ./tools/build-public.mjs",
+    "deploy": "npm run build:public && npx --yes wrangler@4.125.0 deploy",
+    "preview": "npm run build:public && npx --yes wrangler@4.125.0 dev"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.11"
+  }
+}

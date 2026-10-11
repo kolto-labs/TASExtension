@@ -108,8 +108,8 @@ static BOOL WINAPI hk_PostMessageA(HWND h, UINT m, WPARAM w, LPARAM l) {
  * returns the head without removing it, and WinMain's GetMessageA serves
  * the same message, which DispatchMessageA hands to the game WndProc. */
 
-void msg_synth_push(UINT m, WPARAM w, LPARAM l) {
-    if (g_synth_n >= 64) return;
+int msg_synth_push(UINT m, WPARAM w, LPARAM l) {
+    if (g_synth_n >= 64) return 0;
     MSG *q = &g_synth[(g_synth_h + g_synth_n) % 64];
     memset(q, 0, sizeof *q);
     q->hwnd = *(HWND *)(uintptr_t)0x007a39d8u;  /* renderWindow */
@@ -120,6 +120,7 @@ void msg_synth_push(UINT m, WPARAM w, LPARAM l) {
     q->pt.x = (LONG)(l & 0xffff);
     q->pt.y = (LONG)((l >> 16) & 0xffff);
     g_synth_n++;
+    return 1;
 }
 
 int msg_synth_peek(MSG *out) {

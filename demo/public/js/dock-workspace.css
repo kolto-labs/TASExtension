@@ -1,0 +1,191 @@
+.dock-toolbar {
+  display:flex; align-items:center; flex-wrap:wrap; gap:5px; min-height:30px; padding:3px 10px;
+  border-bottom:1px solid var(--line); background:var(--panel); color:var(--ink);
+}
+.dock-toolbar .dock-layout-select, .dock-toolbar .dock-layout-name {
+  min-width:120px; max-width:190px; min-height:26px; padding:3px 7px;
+  border:1px solid var(--line); background:var(--void); color:var(--ink); font:11px var(--sans);
+}
+.dock-toolbar .dock-layout-name { width:130px; }
+.dock-toolbar .dock-status { min-width:0; color:var(--dim); font:10px/1.3 var(--sans); }
+.dock-panel-list { position:relative; z-index:45; }
+.dock-panel-list > summary { list-style:none; cursor:pointer; }
+.dock-panel-list > summary::-webkit-details-marker { display:none; }
+.dock-panel-list-body {
+  position:absolute; top:calc(100% + 4px); left:0; z-index:45; display:grid; gap:3px; min-width:190px;
+  padding:7px; border:1px solid var(--bacta); background:var(--panel); box-shadow:0 8px 24px rgba(0,0,0,.35);
+}
+.dock-panel-check { display:flex; align-items:center; gap:7px; padding:4px; cursor:pointer; }
+.dock-panel-check input { accent-color:var(--kolto); }
+
+#cockpit {
+  position:relative; isolation:isolate; display:grid !important; grid-template-columns:minmax(0,var(--dock-left-track,var(--dock-left,23%))) minmax(0,var(--dock-center,1fr)) minmax(0,var(--dock-right-track,var(--dock-right,24%)));
+  grid-template-rows:minmax(0,var(--dock-main-track,1fr)) minmax(0,var(--dock-transport,14%)) minmax(0,var(--dock-bottom,18%));
+  grid-template-areas:"score game right" "score transport right" "console console console";
+  align-items:stretch; align-content:stretch; gap:var(--space-medium); flex:1; min-width:0; min-height:0; overflow:hidden;
+}
+#cockpit > .dock-panel {
+  grid-area:auto; min-width:0; min-height:0; width:auto; height:auto; max-width:none; max-height:none;
+  margin:0; overflow:auto; resize:none; background-color:color-mix(in srgb,var(--panel) calc(var(--dock-opacity,1) * 100%),transparent);
+}
+#cockpit > [data-dock-id="score"] { grid-area:score; }
+#cockpit > [data-dock-id="game"] { grid-area:game; }
+#cockpit > [data-dock-id="right"] { grid-area:right; }
+#cockpit > [data-dock-id="transport"] { grid-area:transport; }
+#cockpit > [data-dock-id="console"] { grid-area:console; }
+#cockpit > .dock-widget-shell { display:flex; flex-direction:column; gap:6px; padding:var(--space-medium); border:1px solid var(--line); }
+.dock-widget-shell > details { min-width:0; min-height:0; overflow:auto; }
+#cockpit > [data-floating="true"] {
+  position:fixed !important; z-index:var(--dock-stack,80); min-width:min(260px,calc(100vw - 16px)); min-height:min(180px,calc(100vh - 16px)); max-width:calc(100vw - 16px); max-height:calc(100vh - 16px);
+  margin:0; overflow:auto; resize:both; box-shadow:0 12px 36px rgba(0,0,0,.55); border-color:var(--bacta);
+}
+.dock-titlebar {
+  position:relative; z-index:2; flex:0 0 auto; display:flex; align-items:center; gap:6px; min-height:var(--panel-header);
+  margin:-8px -8px 3px; padding:2px 5px; border-bottom:1px solid var(--line); background:var(--chrome);
+  color:var(--dim); touch-action:none; user-select:none;
+}
+.dock-grip {
+  display:inline-flex; justify-content:center; align-items:center; flex:0 0 24px; width:24px; height:23px; padding:0;
+  border:1px solid transparent; background:transparent; color:var(--bacta); cursor:grab; font-size:15px; line-height:1;
+}
+.dock-grip:active { cursor:grabbing; }
+.dock-grip:hover { border-color:var(--line); background:var(--raise); }
+.dock-title { min-width:0; flex:1; overflow:hidden; color:var(--ink); font-size:var(--font-small); font-weight:600; text-overflow:ellipsis; white-space:nowrap; }
+.dock-actions { display:flex; align-items:center; gap:3px; }
+.dock-actions > .btn { min-width:25px; min-height:23px; padding:1px 5px; }
+.dock-settings { position:relative; }
+.dock-settings > summary { display:inline-flex; align-items:center; justify-content:center; list-style:none; min-width:25px; min-height:23px; padding:1px 5px; cursor:pointer; }
+.dock-settings > summary::-webkit-details-marker { display:none; }
+.dock-settings-body {
+  position:fixed; inset:auto; z-index:65; display:grid; gap:8px; width:220px; max-width:calc(100vw - 16px); max-height:calc(100vh - 16px); overflow:auto; box-sizing:border-box; margin:0; padding:9px; color:var(--ink);
+  border:1px solid var(--bacta); background:var(--panel); box-shadow:0 8px 24px rgba(0,0,0,.42);
+}
+.dock-setting { display:grid; gap:4px; color:var(--dim); font-size:10px; }
+.dock-setting select { min-height:27px; padding:3px 6px; background:var(--void); border:1px solid var(--line); color:var(--ink); }
+.dock-setting input[type="range"] { width:100%; accent-color:var(--kolto); }
+.dock-hide { justify-self:end; }
+.dock-panel[data-collapsed="true"] > :not(.dock-titlebar) { display:none !important; }
+#p-score > .dock-titlebar { margin-bottom:3px; }
+#p-score > .panel-head > h2 { display:none; }
+#p-center > .dock-titlebar { margin:0; }
+#p-branches > .dock-titlebar { margin-bottom:2px; }
+#p-console > .dock-titlebar { margin:0 0 3px; }
+#live-tas-workspace { flex:none !important; width:auto; max-width:none; max-height:none !important; min-height:0; overflow:auto; gap:3px; }
+#live-tas-workspace > .dock-titlebar { margin:0 0 2px; }
+#live-tas-workspace > .timeline { flex:0 0 auto; }
+#live-tas-workspace > .p-roll { min-height:120px; }
+.dock-splitter { position:absolute; z-index:30; display:block; touch-action:none; background:transparent; }
+.dock-splitter::after { content:""; position:absolute; inset:2px; border-radius:2px; background:transparent; }
+.dock-splitter:hover::after, .dock-splitter:focus-visible::after, body.dock-resizing .dock-splitter::after { background:var(--kolto); }
+.dock-splitter-vertical { top:8px; bottom:calc(var(--dock-bottom,18%) + 7px); width:9px; cursor:col-resize; }
+.dock-splitter-vertical[data-dock-split="left"] { left:calc(var(--dock-left,23%) + 4px); }
+.dock-splitter-vertical[data-dock-split="right"] { right:calc(var(--dock-right,24%) + 4px); }
+.dock-splitter-horizontal { left:8px; right:8px; height:9px; cursor:row-resize; }
+.dock-splitter-horizontal[data-dock-split="transport"] { bottom:calc(var(--dock-bottom,18%) + var(--dock-transport,14%) + 3px); }
+.dock-splitter-horizontal[data-dock-split="bottom"] { bottom:calc(var(--dock-bottom,18%) - 1px); }
+.dock-splitter[hidden] { display:none !important; }
+body.dock-dragging, body.dock-resizing { cursor:grabbing; user-select:none; }
+.dock-panel.dock-moving { opacity:.86; }
+.dock-panel.dock-drop-target { outline:2px solid var(--kolto); outline-offset:-3px; }
+.dock-panel:focus-within { scroll-margin:8px; }
+.dock-panel[hidden] { display:none !important; }
+body[data-tas-presentation="overlay"] #cockpit {
+  grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); grid-template-areas:"game"; padding:0; gap:0;
+}
+body[data-tas-presentation="overlay"] #cockpit > [data-dock-id]:not([data-dock-id="game"]):not([data-dock-id="transport"]):not([data-dock-id="piano-roll"]) { display:none !important; }
+body[data-tas-presentation="overlay"] #cockpit > [data-dock-id="game"] { grid-area:game !important; height:100%; border:0; padding:0; }
+body[data-tas-presentation="overlay"] #cockpit > [data-dock-id="transport"] {
+  position:absolute; z-index:40; left:8px; right:8px; bottom:8px; grid-area:auto; max-height:35vh;
+  border:1px solid var(--line); background-color:color-mix(in srgb,var(--panel) 88%,transparent);
+}
+body[data-tas-presentation="overlay"] #cockpit > .dock-splitter { display:none; }
+body.tas-ui-hidden #cockpit { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr); grid-template-areas:"game"; padding:0; gap:0; }
+body.tas-ui-hidden #cockpit > [data-dock-id]:not([data-dock-id="game"]) { display:none !important; }
+body.tas-ui-hidden #cockpit > [data-dock-id="game"] { padding:0; border:0; }
+@media (max-width: 760px) {
+  body.wide, body.compact { height:auto; min-height:100vh; overflow:auto; }
+  #cockpit {
+    height:auto; min-height:0; overflow:visible; grid-template-columns:minmax(0,1fr);
+    grid-template-rows:minmax(320px,58vh) auto auto auto auto;
+    grid-template-areas:"game" "transport" "score" "right" "console"; padding:6px;
+  }
+  #cockpit > .dock-panel { min-height:150px; max-height:80vh; resize:vertical; overflow:auto; }
+  #cockpit > [data-dock-id="transport"] { min-height:58px; }
+  #cockpit > [data-dock-id="console"] { min-height:84px; }
+  .dock-toolbar { padding-inline:6px; }
+  .dock-toolbar .dock-layout-select { min-width:105px; }
+  .dock-toolbar .dock-status { flex-basis:100%; }
+  .dock-splitter { display:none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dock-panel, .dock-panel * { scroll-behavior:auto; transition:none !important; animation:none !important; }
+}
+
+.dock-settings-body[popover]:not(:popover-open) { display:none; }
+.dock-settings-body::backdrop { background:transparent; }
+.dock-grip:focus-visible, .dock-settings > summary:focus-visible { outline:2px solid var(--kolto); outline-offset:2px; }
+.dock-setting input[type="range"]:focus-visible { outline:2px solid var(--kolto); outline-offset:2px; }
+
+body[data-dock-workspace="true"] #cockpit > #p-right { display:none !important; }
+
+/* Keep player actions reachable without raising the game surface over floats. */
+#cockpit > [data-dock-id="game"] > .center-head {
+  z-index:70;
+  background:var(--panel);
+}
+body:not([data-tas-presentation="overlay"]) #cockpit > [data-dock-id="game"] > .center-head {
+  position:relative;
+}
+
+/* Overlay expansion is one roll above the seek line, independent of saved docks. */
+body[data-tas-presentation="overlay"] #cockpit > [data-dock-id="transport"] {
+  position:absolute !important; left:8px !important; right:8px !important;
+  top:auto !important; bottom:8px !important; width:auto !important; height:auto !important;
+  min-height:0; min-width:0; resize:none; z-index:40;
+}
+body[data-tas-presentation="overlay"] #cockpit > [data-dock-id="transport"] > .dock-titlebar { display:none; }
+/* A saved collapsed transport must retain its expand control in overlay mode. */
+body[data-tas-presentation="overlay"] #cockpit > [data-dock-id="transport"][data-collapsed="true"] > .dock-titlebar { display:flex; margin:0; }
+body[data-tas-presentation="overlay"] #cockpit > [data-dock-id="piano-roll"] {
+  position:absolute !important; grid-area:auto; left:8px !important; right:8px !important;
+  top:auto !important; bottom:calc(var(--dock-overlay-transport-height,64px) + 14px) !important;
+  width:auto !important; height:min(32vh,300px) !important;
+  min-width:0; min-height:0; max-height:calc(100% - var(--dock-overlay-transport-height,64px) - 100px);
+  z-index:40; resize:none; overflow:auto; border:1px solid var(--line);
+  background-color:color-mix(in srgb,var(--panel) 92%,transparent);
+}
+
+/* A resized history widget gives its remaining height to the scrollable list. */
+#cockpit > #p-history.dock-panel {
+  display:flex; flex-direction:column; overflow:hidden;
+}
+#cockpit > #p-history.dock-panel > .panel-head {
+  flex:0 0 auto;
+}
+#cockpit > #p-history.dock-panel > .history {
+  flex:1 1 0; min-height:0; max-height:none; overflow:auto;
+}
+#cockpit > #p-history.dock-panel > .history > li {
+  flex-shrink:0;
+}
+
+/* Collapsing retains saved expanded geometry while exposing only panel chrome. */
+#cockpit > .dock-panel[data-collapsed="true"][data-floating="true"] {
+  min-height:34px; max-height:34px; height:34px; resize:none; overflow:hidden;
+}
+.dock-titlebar { cursor:grab; }
+.dock-titlebar:active { cursor:grabbing; }
+.dock-titlebar button, .dock-titlebar summary { cursor:pointer; }
+@media (min-width:761px) {
+  #cockpit[data-dock-left="collapsed"] > [data-collapsed="true"][data-dock-area="score"],
+  #cockpit[data-dock-right="collapsed"] > [data-collapsed="true"][data-dock-area="right"] { padding:2px; overflow:hidden; }
+  #cockpit[data-dock-left="collapsed"] > [data-collapsed="true"][data-dock-area="score"] > .dock-titlebar,
+  #cockpit[data-dock-right="collapsed"] > [data-collapsed="true"][data-dock-area="right"] > .dock-titlebar { flex-direction:column; margin:0; padding:0; }
+  #cockpit[data-dock-left="collapsed"] > [data-collapsed="true"][data-dock-area="score"] .dock-title,
+  #cockpit[data-dock-right="collapsed"] > [data-collapsed="true"][data-dock-area="right"] .dock-title { writing-mode:vertical-rl; flex:none; max-height:160px; }
+  #cockpit[data-dock-left="collapsed"] > [data-collapsed="true"][data-dock-area="score"] .dock-actions,
+  #cockpit[data-dock-right="collapsed"] > [data-collapsed="true"][data-dock-area="right"] .dock-actions { flex-direction:column; }
+}
+@media (max-width:760px) {
+  #cockpit > .dock-panel[data-collapsed="true"] { min-height:34px; height:34px !important; max-height:34px; overflow:hidden; resize:none; }
+}

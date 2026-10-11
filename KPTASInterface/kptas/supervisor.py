@@ -353,14 +353,17 @@ class BundleSink:
             else:
                 reason = PointReason.NONE
             n = text if i == 0 else held
-            inp = meta.get("input")
+            # The wire receipt is separate from semantic/1. Match the exact
+            # epoch and tick; a missing receipt (legacy backend, held interval,
+            # or restore path) remains null rather than borrowing a neighbour.
+            input_sha256 = next((digest for epoch, input_tick, digest in report.input_sha256_by_tick
+                                if epoch == report.epoch and input_tick == t), NULL_DIGEST)
             rec = TickRecord(
                 tick=t, epoch=report.epoch, note=n, verbclass=vc0 if i == 0 else report.verbclass & ~once,
                 server_passes=meta.get("server_passes", report.server_passes if last else 1),
                 subticks=sub, flags=flags, reason=reason, state_root=root,
                 files_root=self.files_root if self.files_root is not None else NULL_DIGEST,
-                input_sha256=(bytes.fromhex(inp) if isinstance(inp, str) and len(inp) == 64
-                              else sha256(n.encode())),
+                input_sha256=input_sha256,
                 journal_sha256=(sha256(journal) if journal else
                                 report.journal_sha256 if last else NULL_DIGEST),
                 pages=refs, journal=journal)
@@ -427,7 +430,7 @@ def _journal_fields(journal: bytes) -> dict[str, Any]:
         return {}
     if not isinstance(obj, dict):
         return {}
-    out = {k: obj[k] for k in ("server_passes", "subticks", "input") if k in obj}
+    out = {k: obj[k] for k in ("server_passes", "subticks") if k in obj}
     for short, name in (("sp", "server_passes"), ("st", "subticks")):   # the shim's short names
         if name not in out and isinstance(obj.get(short), int):
             out[name] = obj[short]
@@ -507,8 +510,13 @@ class Supervisor:
             self.backend.lock_tier(self.tier)
             self.backend.clock(self.mode, self.hz, self.scale)
             rep = self.backend.start()
-        except BaseException:
-            self._drop()
+        except BaseException as exc:
+            # Preserve the failure that prevented startup. A secondary cleanup
+            # error is useful context, but must not replace the original cause.
+            try:
+                self._drop()
+            except BaseException as cleanup_error:
+                exc.add_note(f"startup cleanup also failed: {cleanup_error!r}")
             raise
         self.epoch += 1
         self.offset = (self.tick + 1) - rep.tick
@@ -532,7 +540,19 @@ class Supervisor:
         if self.backend is None:
             return
         files = None if self.epoch_closed else self._files_snap()
-        status = self._drop()
+        try:
+            status = self._drop()
+        except BaseException as exc:
+            # Link shutdown can fail after the backend has already gone away
+            # (for example, process wait/cleanup failure). Still commit the
+            # epoch boundary with an unknown exit status so a durable recording
+            # does not silently end mid-epoch. Then preserve the cleanup error.
+            if not self.epoch_closed:
+                try:
+                    self._end_epoch(reason if self.alive else self._exit_reason(), None, files)
+                except BaseException as end_error:
+                    exc.add_note(f"recording the failed-close epoch also failed: {end_error!r}")
+            raise
         if not self.epoch_closed:
             self._end_epoch(reason if self.alive else self._exit_reason(), status, files)
 
@@ -590,7 +610,11 @@ class Supervisor:
                 self.sink.epoch(self.epoch, self.tick, reason, status, files=files)
 
     def _emit(self, rep: StepReport, note: Any, keep_carry: bool = False) -> StepReport:
+        input_sha256_by_tick = tuple((self.epoch, tick + self.offset, digest)
+                                     for input_epoch, tick, digest in rep.input_sha256_by_tick
+                                     if input_epoch == rep.epoch)
         rep = dataclasses.replace(rep, tick=rep.tick + self.offset, epoch=self.epoch,
+                                  input_sha256_by_tick=input_sha256_by_tick,
                                   events=self._shift(rep.events))
         self.tick = rep.tick
         self.carry = (self.carry if keep_carry else []) + list(rep.events)
@@ -636,10 +660,15 @@ class Supervisor:
     def step(self, n: int, note: Any, keep_carry: bool = False) -> StepReport:
         """keep_carry: this step finishes a note resumed inside it, so the note's earlier events still count.
         A backend with `note_first` is told that the note's first tick has already been played."""
+        if type(n) is not int or n < 1:
+            raise RunError("step needs a positive integer tick count")
         b = self._live()
+        rep = b.step(n, note, first=False) if keep_carry and getattr(b, "note_first", False) else b.step(n, note)
+        # An input one-shot only explains a later process exit if the backend
+        # accepted the step that carries it. Keep failed RPCs/validation from
+        # relabeling a subsequent crash as the requested OS event.
         if note.osev:
             self.last_osev = note.osev
-        rep = b.step(n, note, first=False) if keep_carry and getattr(b, "note_first", False) else b.step(n, note)
         return self._emit(rep, note, keep_carry)
 
     def wait(self, event: str, arg: str | None, timeout: int, note: Any = None) -> StepReport:

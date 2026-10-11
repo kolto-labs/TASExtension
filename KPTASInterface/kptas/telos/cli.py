@@ -256,7 +256,7 @@ def run_from(ctx: Ctx, a: argparse.Namespace, score: CompiledScore) -> int:
         if dest.exists():
             raise TelosError(f"{dest} exists")
         sup = Supervisor(cfg, env=par.env, attach=a.attach, run_name=dest.stem, log=err)
-        sink, ok = None, False
+        child, sink, ok = None, None, False
         try:
             r: Receipt = holo("seek").seek(par, tick, sup, mode=mode, cfg=cfg)
             out(f"seek {r.from_tick} -> {tick}: {r.mode} {r.result}; {r.verifier}; canary {r.canary}"
@@ -282,6 +282,10 @@ def run_from(ctx: Ctx, a: argparse.Namespace, score: CompiledScore) -> int:
             finally:
                 if sink is not None:
                     sink.close(seal=ok, backend_ceiling=sup.caps.tier_ceiling if sup.caps else None)
+                elif child is not None:
+                    # Branch creation can succeed before its receipt or sink is initialized.
+                    # Until the sink takes ownership, this command must release the child itself.
+                    child.close()
     finally:
         par.close()
     out(f"{dest}: branch of {src} at tick {tick}, ticks {tick + 1}..{res.ticks}, stopped at {res.stopped}")
@@ -289,58 +293,64 @@ def run_from(ctx: Ctx, a: argparse.Namespace, score: CompiledScore) -> int:
 
 
 def cmd_play(ctx: Ctx, a: argparse.Namespace) -> int:
-    if is_bundle(a.target):
-        b = open_bundle(a.target)
-        score = compile_score(b.score)
-        cfg = bundle_cfg(ctx, b, run__backend=a.backend, run__max_ticks=a.max_ticks)
-    else:
-        score = ctx.compile(a.target)
-        cfg = ctx.cfg(score.header, run__backend=a.backend, run__max_ticks=a.max_ticks)
-    sup = Supervisor(cfg, attach=a.attach, run_name="play", log=err)
+    b = None
     try:
-        res = sup.run_score(score, max_ticks=cfg["run"]["max_ticks"], on_report=stream())
+        if is_bundle(a.target):
+            b = open_bundle(a.target)
+            score = compile_score(b.score)
+            cfg = bundle_cfg(ctx, b, run__backend=a.backend, run__max_ticks=a.max_ticks)
+        else:
+            score = ctx.compile(a.target)
+            cfg = ctx.cfg(score.header, run__backend=a.backend, run__max_ticks=a.max_ticks)
+        sup = Supervisor(cfg, attach=a.attach, run_name="play", log=err)
+        try:
+            res = sup.run_score(score, max_ticks=cfg["run"]["max_ticks"], on_report=stream())
+        finally:
+            sup.close()
     finally:
-        sup.close()
+        if b is not None:
+            b.close()
     out(f"played ticks 0..{res.ticks}, {res.epochs} epoch(s), stopped at {res.stopped}")
     return 0 if res.stopped != "halted" else 1
 
 
 def cmd_seek(ctx: Ctx, a: argparse.Namespace) -> int:
-    b = open_bundle(a.bundle)
-    cfg = bundle_cfg(ctx, b, run__backend=a.backend)
-    mode = SeekMode.parse(a.mode or cfg["seek"]["mode"])
-    tier = Tier.parse(cfg["run"]["tier"])
-    if not mode.allowed(tier):
-        raise TelosError(f"seek mode {mode} is not allowed in tier {tier}")
-    seek = holo("seek").seek
-    sup = Supervisor(cfg, env=getattr(b, "env", None), attach=a.attach, run_name="seek", log=err)
-    try:
-        sup.open()
-        r: Receipt = seek(b, a.tick, sup, mode=mode, cfg=cfg)
-    finally:
-        sup.close()
-    for line in tv.receipt_lines(r):
-        out(line)
-    return 0 if r.result != "fail" else 1
+    with open_bundle(a.bundle) as b:
+        cfg = bundle_cfg(ctx, b, run__backend=a.backend)
+        mode = SeekMode.parse(a.mode or cfg["seek"]["mode"])
+        tier = Tier.parse(cfg["run"]["tier"])
+        if not mode.allowed(tier):
+            raise TelosError(f"seek mode {mode} is not allowed in tier {tier}")
+        seek = holo("seek").seek
+        sup = Supervisor(cfg, env=getattr(b, "env", None), attach=a.attach, run_name="seek", log=err)
+        try:
+            sup.open()
+            r: Receipt = seek(b, a.tick, sup, mode=mode, cfg=cfg)
+        finally:
+            sup.close()
+        for line in tv.receipt_lines(r):
+            out(line)
+        return 0 if r.result != "fail" else 1
 
 
 def cmd_branch(ctx: Ctx, a: argparse.Namespace) -> int:
-    b = open_bundle(a.bundle)
-    try:
-        b.link_at(a.tick)
-    except KeyError:
-        raise TelosError(f"{a.bundle} has no tick {a.tick}") from None
-    dest = Path(a.out) if a.out else fresh_path(
-        Path(a.bundle).with_name(f"{Path(a.bundle).stem}@{a.tick}.holo"))
-    child = holo("create_branch").create_branch(b, a.tick, dest)
-    child.close()
+    with open_bundle(a.bundle) as b:
+        try:
+            b.link_at(a.tick)
+        except KeyError:
+            raise TelosError(f"{a.bundle} has no tick {a.tick}") from None
+        dest = Path(a.out) if a.out else fresh_path(
+            Path(a.bundle).with_name(f"{Path(a.bundle).stem}@{a.tick}.holo"))
+        child = holo("create_branch").create_branch(b, a.tick, dest)
+        child.close()
     out(f"branched {a.bundle} at tick {a.tick} -> {dest}")
     return 0
 
 
 def cmd_edit(ctx: Ctx, a: argparse.Namespace) -> int:
     if is_bundle(a.target):
-        text = open_bundle(a.target).score
+        with open_bundle(a.target) as b:
+            text = b.score
         path = Path(a.out or f"{Path(a.target).stem}.score")
         if path.exists() and not a.force:
             raise TelosError(f"{path} exists; pass --force or --out")
@@ -359,15 +369,15 @@ def cmd_edit(ctx: Ctx, a: argparse.Namespace) -> int:
 # ---------------------------------------------------------------- inspecting
 
 def cmd_show(ctx: Ctx, a: argparse.Namespace) -> int:
-    b = open_bundle(a.bundle)
-    out(f"{a.bundle}")
-    for line in tv.header_lines(b.header):
-        out(line)
-    if a.legend:
-        out(tv.LEGEND)
-    out()
-    for line in tv.tick_table(records(b), start=a.start, end=a.end, limit=a.limit):
-        out(line)
+    with open_bundle(a.bundle) as b:
+        out(f"{a.bundle}")
+        for line in tv.header_lines(b.header):
+            out(line)
+        if a.legend:
+            out(tv.LEGEND)
+        out()
+        for line in tv.tick_table(records(b), start=a.start, end=a.end, limit=a.limit):
+            out(line)
     return 0
 
 
@@ -378,69 +388,96 @@ def _pair(a: argparse.Namespace) -> tuple[Any, Any, bool]:
     when both share the determinism key and a mask registry qualifies sim_root;
     without one, only journal digests are compared.
     """
-    x, y = open_bundle(a.a), open_bundle(a.b)
-    same_key = x.header.determinism_key == y.header.determinism_key and bool(x.header.determinism_key)
-    qualified = bool(getattr(x.env, "mask_registry", "")) and bool(getattr(y.env, "mask_registry", ""))
-    return x, y, same_key and qualified and not a.no_roots
+    x = open_bundle(a.a)
+    try:
+        y = open_bundle(a.b)
+    except BaseException:
+        x.close()
+        raise
+    try:
+        same_key = x.header.determinism_key == y.header.determinism_key and bool(x.header.determinism_key)
+        qualified = bool(getattr(x.env, "mask_registry", "")) and bool(getattr(y.env, "mask_registry", ""))
+        return x, y, same_key and qualified and not a.no_roots
+    except BaseException:
+        try:
+            y.close()
+        finally:
+            x.close()
+        raise
 
 
 def cmd_diff(ctx: Ctx, a: argparse.Namespace) -> int:
     x, y, roots = _pair(a)
-    n = 0
-    for d in tv.diff_ticks(lineage(x), lineage(y), compare_roots=roots):
+    try:
+        n = 0
+        for d in tv.diff_ticks(lineage(x), lineage(y), compare_roots=roots):
+            if n == 0:
+                out("\n".join(d.lines()))
+                if a.first:
+                    return 1
+                out()
+                out("tick      field")
+            if n < a.limit:
+                out(f"{d.tick:<9} {d.field}")
+            n += 1
         if n == 0:
-            out("\n".join(d.lines()))
-            if a.first:
-                return 1
-            out()
-            out("tick      field")
-        if n < a.limit:
-            out(f"{d.tick:<9} {d.field}")
-        n += 1
-    if n == 0:
-        out(f"no divergence{'' if roots else ' (journal only; roots not compared)'}")
-        return 0
-    if n > a.limit:
-        out(f"... {n - a.limit} more")
-    return 1
+            out(f"no divergence{'' if roots else ' (journal only; roots not compared)'}")
+            return 0
+        if n > a.limit:
+            out(f"... {n - a.limit} more")
+        return 1
+    finally:
+        try:
+            y.close()
+        finally:
+            x.close()
 
 
 def cmd_bisect(ctx: Ctx, a: argparse.Namespace) -> int:
     x, y, roots = _pair(a)
-    ta, tb = {r.tick for r in lineage(x)}, {r.tick for r in lineage(y)}
-    if not ta and not tb:
-        out("both runs are empty")
-        return 0
-    lo, hi = min(ta | tb), max(ta | tb)
-    if not roots:
-        # journal digests are per tick, so a split can reconverge and binary search would miss it
-        d = next(tv.diff_ticks(lineage(x), lineage(y), compare_roots=False), None)
+    try:
+        ta, tb = {r.tick for r in lineage(x)}, {r.tick for r in lineage(y)}
+        if not ta and not tb:
+            out("both runs are empty")
+            return 0
+        lo, hi = min(ta | tb), max(ta | tb)
+        if not roots:
+            # journal digests are per tick, so a split can reconverge and binary search would miss it
+            d = next(tv.diff_ticks(lineage(x), lineage(y), compare_roots=False), None)
+            if d is None:
+                out(f"runs agree at every tick {lo}..{hi} (journal only; roots not compared)")
+                return 0
+            out("\n".join(d.lines()))
+            out(f"linear scan over ticks {lo}..{hi} (journal only; roots not compared)")
+            return 1
+        d, probes = tv.bisect_ticks(lambda t: x.record(t) if t in ta else None,
+                                    lambda t: y.record(t) if t in tb else None, lo, hi, compare_roots=roots)
         if d is None:
-            out(f"runs agree at every tick {lo}..{hi} (journal only; roots not compared)")
+            out(f"runs agree at tick {hi} ({probes} probe(s))")
             return 0
         out("\n".join(d.lines()))
-        out(f"linear scan over ticks {lo}..{hi} (journal only; roots not compared)")
+        out(f"{probes} probe(s) over ticks {lo}..{hi}")
         return 1
-    d, probes = tv.bisect_ticks(lambda t: x.record(t) if t in ta else None,
-                                lambda t: y.record(t) if t in tb else None, lo, hi, compare_roots=roots)
-    if d is None:
-        out(f"runs agree at tick {hi} ({probes} probe(s))")
-        return 0
-    out("\n".join(d.lines()))
-    out(f"{probes} probe(s) over ticks {lo}..{hi}")
-    return 1
+    finally:
+        try:
+            y.close()
+        finally:
+            x.close()
 
 
 def cmd_verify(ctx: Ctx, a: argparse.Namespace) -> int:
-    b = open_bundle(a.bundle)
-    cfg = bundle_cfg(ctx, b, verify__fresh_process=True if a.fresh else None,
-                     verify__compare=a.compare, run__backend=a.backend)
-    if cfg["verify"]["fresh_process"] and not os.environ.get(FRESH_JUDGE):
-        b.close()
+    with open_bundle(a.bundle) as b:
+        cfg = bundle_cfg(ctx, b, verify__fresh_process=True if a.fresh else None,
+                         verify__compare=a.compare, run__backend=a.backend)
+        if cfg["verify"]["fresh_process"] and not os.environ.get(FRESH_JUDGE):
+            fresh = True
+        else:
+            fresh = False
+            r: Receipt = tier_mod("judge").judge(b, cfg)
+            for line in tv.receipt_lines(r):
+                out(line)
+    if fresh:
         return verify_in_child(ctx, a, cfg)
-    r: Receipt = tier_mod("judge").judge(b, cfg)
-    for line in tv.receipt_lines(r):
-        out(line)
     return 0 if r.result in ("pass", "best_effort") else 1
 
 
@@ -461,16 +498,16 @@ def verify_in_child(ctx: Ctx, a: argparse.Namespace, cfg: Mapping[str, Any]) -> 
 
 
 def cmd_tier_show(ctx: Ctx, a: argparse.Namespace) -> int:
-    b = open_bundle(a.bundle)
-    eff = tier_mod("effective").effective(b)
-    out(f"declared {b.header.tier}  effective {Tier.parse(eff)}")
+    with open_bundle(a.bundle) as b:
+        eff = tier_mod("effective").effective(b)
+        out(f"declared {b.header.tier}  effective {Tier.parse(eff)}")
     return 0
 
 
 def cmd_tier_explain(ctx: Ctx, a: argparse.Namespace) -> int:
-    b = open_bundle(a.bundle)
-    for line in tier_mod("explain").explain(b):
-        out(line)
+    with open_bundle(a.bundle) as b:
+        for line in tier_mod("explain").explain(b):
+            out(line)
     return 0
 
 
@@ -497,8 +534,8 @@ def env_diff(want: EnvPin, have: EnvPin) -> Iterable[str]:
 
 def cmd_env_check(ctx: Ctx, a: argparse.Namespace) -> int:
     if is_bundle(a.pin):
-        b = open_bundle(a.pin)
-        want, cfg = b.env, bundle_cfg(ctx, b, run__backend=a.backend)
+        with open_bundle(a.pin) as b:
+            want, cfg = b.env, bundle_cfg(ctx, b, run__backend=a.backend)
     else:
         try:
             want = EnvPin.from_payload(Path(a.pin).read_bytes())
@@ -669,6 +706,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = cmd("repl", cmd_repl, "interactive authoring and inspection")
     backend_opts(s)
+    # Package profile commands live with the Core package host; keeping their
+    # parser adapter there prevents package lifecycle details leaking here.
+    from kptas.core.cli import add_core_subcommands
+    add_core_subcommands(sub)
     return p
 
 

@@ -365,7 +365,7 @@ export function exportHolo(branches, activeId, tier) {
   const byId = new Map(branches.map((b) => [b.id, b]));
   return {
     format: HOLO_FORMAT,
-    note: 'Holorecord for the browser stand-in scene. It holds hashes, not game states. It is not a KotOR bundle.',
+    note: 'Stores per-tick hashes for the deterministic sample scene.',
     tier,
     active: byId.get(activeId) ? byId.get(activeId).name : branches[0].name,
     branches: branches.map((b) => ({

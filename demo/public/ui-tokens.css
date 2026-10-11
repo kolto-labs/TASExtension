@@ -1,0 +1,25 @@
+/* Derived from KPTASInterface/kptas/telos/ui_tokens.json; edit that source. */
+:root {
+  --void: #05070a;
+  --panel: #0b1016;
+  --text: #d7e3ea;
+  --muted: #7f93a0;
+  --active: #19e3c1;
+  --focus: #5ad8ff;
+  --warning: #ffb000;
+  --success: #7dff9a;
+  --divergence: #ff4fd8;
+  --line: rgba(127, 147, 160, 0.22);
+  --raise: rgba(127, 147, 160, 0.08);
+  --raise-2: rgba(127, 147, 160, 0.14);
+  --chrome: rgba(5, 7, 10, 0.56);
+  --selected: rgba(25, 227, 193, 0.14);
+  --font-body: 13px;
+  --font-small: 11px;
+  --space-small: 4px;
+  --space-medium: 8px;
+  --panel-header: 28px;
+  --control-content: 18px;
+  --font-sans: "DejaVu Sans", "Segoe UI", "Arial";
+  --font-mono: "DejaVu Sans Mono", "Consolas", "Liberation Mono";
+}

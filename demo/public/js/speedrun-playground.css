@@ -1,0 +1,15 @@
+.speedrun-playground { display: flex; flex-direction: column; gap: 8px; }
+.speedrun-field { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; font-size: 12px; color: var(--dim); }
+.speedrun-field input { max-width: 120px; }
+.speedrun-transport, .speedrun-files, .speedrun-marks { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
+.speedrun-view { min-height: 100px; }
+.speedrun-view > .help { margin: 16px; }
+.speedrun-twitch { display: block; width: 100%; aspect-ratio: 16 / 9; min-height: 300px; border: 0; }
+.speedrun-twitch iframe { display: block; width: 100%; border: 0; }
+.speedrun-inputs, .speedrun-source { border: 1px solid var(--line); padding: 6px 8px; max-width: 900px; }
+.speedrun-inputs summary, .speedrun-source summary { cursor: pointer; font-size: 12px; color: var(--bacta); }
+.speedrun-inputs[open] > *, .speedrun-source[open] > * { margin-top: 6px; }
+.speedrun-roll-scroll { max-height: 230px; overflow: auto; }
+.speedrun-roll { display: block; width: 100%; min-width: 400px; }
+.speedrun-files .file { overflow: hidden; }
+.speedrun-source a { font-size: 12px; }

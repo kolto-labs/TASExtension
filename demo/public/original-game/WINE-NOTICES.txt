@@ -1,0 +1,57 @@
+Wine runtime provenance and source references
+
+The Wine guest filesystem starts from the upstream BoxedWine web-v13 archive:
+https://boxedwine.org/v2/13/TinyCore15Wine11.0-web.zip
+Base size: 99450694 bytes
+Base SHA256: a14446b27adbaccd4fac25dfb4e951da2dd4978fecfbf6e16aa718871fe4b0c5
+This local candidate replaces only home/username/.wine/drive_c/webgl/wined3d.dll
+with a Wine 11.0 PE32 build at source commit db11d0fe6a169c457e23d007e20404643d067aa8.
+The complete modified source patches and build details are retained with the project.
+The local candidate archive is delivered in bounded chunks after acceptance.
+Original KOTOR installation files and user saves are not part of this archive.
+
+Wine copyright (c) 1993-2026 the Wine project authors (see Wine AUTHORS).
+Wine is licensed under LGPL-2.1-or-later, without warranty.
+License text: wine-notices/usr/local/share/doc/psvoodoo/licenses/LGPL-2.1.txt
+Wine upstream source: https://github.com/wine-mirror/wine/tree/db11d0fe6a169c457e23d007e20404643d067aa8
+Wine source archive: https://github.com/wine-mirror/wine/archive/db11d0fe6a169c457e23d007e20404643d067aa8.tar.gz
+
+The original distributor applied patches to Wine 11.0. The main runtime uses
+setupapi-detach, Explorer-startup, DirectInput-hook, localhost-file-URI,
+WineD3D persistent GDI surface and FAudio OpenAL fixes. The independent PE32
+WineD3D/WebGL DLLs use the v42 patch series. Rebuild recipes, exact source pins,
+patches and configuration:
+https://github.com/danoon2/Boxedwine/tree/509f6a7545e0827a27ed1b4ebab66ac1da4b1ea7/tools/buildWine
+https://github.com/danoon2/Boxedwine/blob/509f6a7545e0827a27ed1b4ebab66ac1da4b1ea7/tools/wineTests/webgl-test-divergences-v42.json
+https://github.com/danoon2/Boxedwine/tree/509f6a7545e0827a27ed1b4ebab66ac1da4b1ea7/tools/wineTests
+
+The TinyCore Linux 15 runtime base includes independently licensed libraries,
+codecs, fonts and BusyBox. Preserve their individual notices and obtain source
+matching their packaged versions from the original distribution source records:
+http://tinycorelinux.net/15.x/x86/tcz/src/
+Base/retained component manifest and web removal policy:
+https://github.com/danoon2/Boxedwine/blob/509f6a7545e0827a27ed1b4ebab66ac1da4b1ea7/tools/buildWine/wine_builds.json
+https://github.com/danoon2/Boxedwine/blob/509f6a7545e0827a27ed1b4ebab66ac1da4b1ea7/tools/buildWine/web_runtime_policy.json
+An index of copied archive notices is provided in wine-notices/notice-index.json.
+These references identify upstream materials; they do not assert that every
+third-party source endpoint has been independently checked for availability.
+
+CNC DDraw 6.9 source and BoxedWine patch:
+https://github.com/FunkyFr3sh/cnc-ddraw/tree/a902db06e9830a9feafda69da05c766a81722b9b
+https://github.com/danoon2/Boxedwine/tree/509f6a7545e0827a27ed1b4ebab66ac1da4b1ea7/tools/cnc-ddraw
+
+psVoodoo retains LGPL notices and separately licensed Glide headers. The
+archive itself includes the actual patched source snapshot, licenses and build
+manifest under usr/local/share/doc/psvoodoo/. Reconstruct the complete archive,
+then retrieve psVoodoo-67fcb0a0eb1be9c5f77d04250ad715b2f481754b-boxedwine.tar.gz
+from that directory. Original source and build adaptations:
+https://github.com/danoon2/psVoodoo/tree/67fcb0a0eb1be9c5f77d04250ad715b2f481754b
+https://github.com/danoon2/Boxedwine/tree/509f6a7545e0827a27ed1b4ebab66ac1da4b1ea7/tools/psVoodoo
+
+Gecko, DXVK and Vulkan are omitted from this upstream web archive; they are not
+new components redistributed by this runtime publication.
+
+Our modified BoxedWine emulator and gl4es source package is separate from this
+unchanged guest filesystem. Its publication provides SOURCE.txt, COPYING,
+source-manifest.json and bounded source archive parts beside the runtime.
+No license here changes the terms of the original game or its assets.

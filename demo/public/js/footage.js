@@ -1,6 +1,5 @@
-// "Recorded in the real game": plays back a capture described by
-// media/swoop/manifest.json. The browser only shows the recording; it does
-// not simulate the real game. Nothing here claims the toolkit made it.
+// Plays back captures described by the media manifests, with input
+// observations where available.
 //
 // Manifest fields: title, source_note, video, poster, frames[] {t, src},
 // inputs[] {t, keys}. Times are in seconds from the start of the recording.
@@ -8,6 +7,7 @@
 const RECORDINGS = [
   { label: 'Taris swoop race', url: 'media/swoop/manifest.json' },
   { label: 'Ebon Hawk turret fight', url: 'media/fighter/manifest.json' },
+  { label: 'K1 speedruns', playground: true },
 ];
 const MONO = 'ui-monospace, "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace';
 const LANE_ORDER = ['w', 'a', 's', 'd', 'q', 'e', 'space', 'tab', 'esc', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'lmb', 'rmb'];
@@ -79,10 +79,34 @@ export class Footage {
     if (this.loaded) return;
     this.loaded = true;
     this.current ??= 0;
-    this.root.replaceChildren(el('p', 'status', 'Loading the capture.'));
-    this.m = await fetchManifest(RECORDINGS[this.current].url);
+    const generation = this.loadGeneration = (this.loadGeneration || 0) + 1;
+    this.video?.pause();
+    this.playground?.dispose();
+    this.playground = null;
+    const pick = el('label', 'footage-pick', 'Capture ');
+    const sel = document.createElement('select');
+    RECORDINGS.forEach((r, i) => sel.append(new Option(r.label, String(i), false, i === this.current)));
+    sel.addEventListener('change', () => { this.current = Number(sel.value); this.loaded = false; this.open(); });
+    pick.append(sel);
+    const body = el('section', RECORDINGS[this.current].playground ? 'speedrun-playground' : '');
+    body.append(el('p', 'status', 'Loading captured evidence…'));
+    this.root.replaceChildren(pick, body);
+    if (RECORDINGS[this.current].playground) {
+      try {
+        const { SpeedrunPlayground } = await import('./speedrun-playground.js');
+        if (generation !== this.loadGeneration) return;
+        this.playground = new SpeedrunPlayground(body);
+        await this.playground.open();
+      } catch {
+        if (generation === this.loadGeneration) body.textContent = 'The input-observation viewer could not load. Choose another capture to return.';
+      }
+      return;
+    }
+    const manifest = await fetchManifest(RECORDINGS[this.current].url);
+    if (generation !== this.loadGeneration) return;
+    this.m = manifest;
     if (!this.m) {
-      this.root.replaceChildren(el('p', 'footage-empty', 'Real game capture is on the way.'));
+      body.replaceChildren(el('p', 'footage-empty', 'No captured KOTOR evidence is currently available.'));
       return;
     }
     this.build();
@@ -94,14 +118,14 @@ export class Footage {
     this.video = null;
     this.img = null;
     const frag = document.createDocumentFragment();
-    const pick = el('label', 'footage-pick', 'Recording ');
+    const pick = el('label', 'footage-pick', 'Capture ');
     const sel = document.createElement('select');
     RECORDINGS.forEach((r, i) => sel.append(new Option(r.label, String(i), false, i === this.current)));
     sel.addEventListener('change', () => { this.current = Number(sel.value); this.loaded = false; this.open(); });
     pick.append(sel);
     frag.append(pick);
     frag.append(el('h3', 'footage-title', m.title || 'Recording'));
-    frag.append(el('p', 'honest', 'This is a recording of the real game. Your browser plays it back. It does not simulate it.'));
+    frag.append(el('p', 'honest', 'Browse captured KOTOR footage and its available input observations.'));
     if (m.note) frag.append(el('p', 'help', m.note));
     const view = el('div', 'footage-view');
     if (m.video) {
@@ -112,14 +136,14 @@ export class Footage {
       v.preload = 'metadata';
       v.playsInline = true;
       v.muted = true;
-      v.setAttribute('aria-label', 'Recording of the real game');
+      v.setAttribute('aria-label', 'Captured KOTOR gameplay footage; playback only');
       v.addEventListener('timeupdate', () => this.setTime(v.currentTime, 'video'));
       v.addEventListener('loadedmetadata', () => { this.duration(); this.render(); });
       this.video = v;
       view.append(v);
     } else {
       const img = document.createElement('img');
-      img.alt = 'Frame from the recording of the real game';
+      img.alt = 'Frame from captured KOTOR gameplay';
       this.img = img;
       view.append(img);
     }
@@ -131,7 +155,7 @@ export class Footage {
     range.step = '0.01';
     range.value = '0';
     range.id = 'footage-range';
-    range.setAttribute('aria-label', 'Scrub the recording');
+    range.setAttribute('aria-label', 'Scrub captured gameplay footage');
     range.addEventListener('input', () => this.setTime(+range.value, 'range'));
     this.range = range;
     this.clock = el('span', 'mono footage-clock', '00:00.00');
@@ -159,7 +183,7 @@ export class Footage {
       this.strip = strip;
       frag.append(strip);
     }
-    const laneHead = el('h4', 'sub', 'Recorded inputs (read only)');
+    const laneHead = el('h4', 'sub', 'Input observations');
     frag.append(laneHead);
     if (m.inputs.length) {
       const lane = document.createElement('canvas');
@@ -170,7 +194,7 @@ export class Footage {
         const ia = LANE_ORDER.indexOf(a), ib = LANE_ORDER.indexOf(b);
         return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
       }).slice(0, 24);
-      lane.setAttribute('aria-label', `Recorded inputs over time for ${this.keys.join(', ')}. Read only.`);
+      lane.setAttribute('aria-label', `Input observations over time for ${this.keys.join(', ')}`);
       lane.addEventListener('pointerdown', (ev) => {
         const r = lane.getBoundingClientRect();
         this.setTime(((ev.clientX - r.left - 44) / Math.max(1, r.width - 52)) * this.dur, 'lane');
@@ -179,7 +203,7 @@ export class Footage {
       this.held = el('p', 'mono help');
       this.held.setAttribute('aria-live', 'off');
       frag.append(this.held);
-    } else frag.append(el('p', 'help', 'The capture lists no inputs.'));
+    } else frag.append(el('p', 'help', 'No input observations are attached to this capture.'));
     this.root.replaceChildren(frag);
     this.duration();
     this.setTime(0, 'init');

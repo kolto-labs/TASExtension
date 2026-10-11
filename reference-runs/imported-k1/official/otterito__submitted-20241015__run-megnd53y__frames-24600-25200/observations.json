@@ -1,0 +1,2373 @@
+{
+  "schema": "kptas.speedrun-segment-evidence/v1",
+  "read_only": true,
+  "executable_score": false,
+  "replay_qualified": false,
+  "source": {
+    "artifact_id": "otterito__submitted-20241015__acquired-20261004T072747.150864Z__run-megnd53y__observed-controls",
+    "observation_schema": "kptas.browser-visible-inputs/v1",
+    "observation_sha256": "1499a05eb38abc9a95c908feef43b942dec5d5959c9c96177399c2fb58b2235b",
+    "observation_bytes": 8383752,
+    "catalog_sha256": "96eac2ebb2e6d8e58d1df7fb0ab3b52a11ac3e1e4c84aa7463943e1be99b6aff",
+    "run_id": "otterito__submitted-20241015__acquired-20261004T072747.150864Z__run-megnd53y__observed-controls",
+    "runner": "Otterito",
+    "submitted": "2024-10-15T19:02:09Z",
+    "category": "Any% No Major Glitches",
+    "submission_url": "https://www.speedrun.com/kotor1/runs/megnd53y",
+    "source_video_url": "https://www.twitch.tv/videos/2276846593",
+    "source_relationship": "This video is directly linked in the verified submission. The read-only observation sequence contains 385,259 selected video frames and 109 visible cells. Sixteen bindings remain unresolved. Global player timing and physical input replay are unqualified; browse observations independently of the video.",
+    "source_primary_correspondence_verified": true,
+    "submission_video_match_verified": true
+  },
+  "span": {
+    "coordinate": "zero-based selected-observation ordinal; inclusive start, exclusive end",
+    "from_frame": 24600,
+    "to_frame_exclusive": 25200,
+    "frame_count": 600,
+    "timeline_mode": "selected-observations",
+    "coordinate_fps": 60,
+    "time_mapping": null,
+    "player_alignment_qualified": false,
+    "physical_inputs_complete": false,
+    "source_parts": []
+  },
+  "state_at_start": {
+    "frame": 24517,
+    "held": [],
+    "unknown": [],
+    "source": {
+      "source_frame": 24517,
+      "source_part": 0,
+      "source_local_frame": 24517,
+      "source_clock_offset": "43577/125",
+      "decoder_pts": 273569850,
+      "decoder_time_base": "1/90000",
+      "first_selected_frame": 24517,
+      "last_selected_frame": 24603,
+      "frame_count": 87
+    }
+  },
+  "events": [
+    {
+      "frame": 24604,
+      "held": [
+        "lmb"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24604,
+        "source_part": 0,
+        "source_local_frame": 24604,
+        "source_clock_offset": "175033/500",
+        "decoder_pts": 273700350,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24604,
+        "last_selected_frame": 24609,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24610,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24610,
+        "source_part": 0,
+        "source_local_frame": 24610,
+        "source_clock_offset": "175083/500",
+        "decoder_pts": 273709350,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24610,
+        "last_selected_frame": 24612,
+        "frame_count": 3
+      }
+    },
+    {
+      "frame": 24613,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24613,
+        "source_part": 0,
+        "source_local_frame": 24613,
+        "source_clock_offset": "43777/125",
+        "decoder_pts": 273713850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24613,
+        "last_selected_frame": 24615,
+        "frame_count": 3
+      }
+    },
+    {
+      "frame": 24616,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24616,
+        "source_part": 0,
+        "source_local_frame": 24616,
+        "source_clock_offset": "175133/500",
+        "decoder_pts": 273718350,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24616,
+        "last_selected_frame": 24618,
+        "frame_count": 3
+      }
+    },
+    {
+      "frame": 24619,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24619,
+        "source_part": 0,
+        "source_local_frame": 24619,
+        "source_clock_offset": "87579/250",
+        "decoder_pts": 273722850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24619,
+        "last_selected_frame": 24621,
+        "frame_count": 3
+      }
+    },
+    {
+      "frame": 24622,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24622,
+        "source_part": 0,
+        "source_local_frame": 24622,
+        "source_clock_offset": "175183/500",
+        "decoder_pts": 273727350,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24622,
+        "last_selected_frame": 24632,
+        "frame_count": 11
+      }
+    },
+    {
+      "frame": 24633,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24633,
+        "source_part": 0,
+        "source_local_frame": 24633,
+        "source_clock_offset": "7011/20",
+        "decoder_pts": 273743910,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24633,
+        "last_selected_frame": 24637,
+        "frame_count": 5
+      }
+    },
+    {
+      "frame": 24638,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24638,
+        "source_part": 0,
+        "source_local_frame": 24638,
+        "source_clock_offset": "350633/1000",
+        "decoder_pts": 273751380,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24638,
+        "last_selected_frame": 24679,
+        "frame_count": 42
+      }
+    },
+    {
+      "frame": 24680,
+      "held": [
+        "lmb"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24680,
+        "source_part": 0,
+        "source_local_frame": 24680,
+        "source_clock_offset": "351333/1000",
+        "decoder_pts": 273814380,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24680,
+        "last_selected_frame": 24685,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24686,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24686,
+        "source_part": 0,
+        "source_local_frame": 24686,
+        "source_clock_offset": "351433/1000",
+        "decoder_pts": 273823380,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24686,
+        "last_selected_frame": 24691,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24692,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24692,
+        "source_part": 0,
+        "source_local_frame": 24692,
+        "source_clock_offset": "351533/1000",
+        "decoder_pts": 273832380,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24692,
+        "last_selected_frame": 24696,
+        "frame_count": 5
+      }
+    },
+    {
+      "frame": 24697,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24697,
+        "source_part": 0,
+        "source_local_frame": 24697,
+        "source_clock_offset": "43952/125",
+        "decoder_pts": 273839850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24697,
+        "last_selected_frame": 24713,
+        "frame_count": 17
+      }
+    },
+    {
+      "frame": 24714,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24714,
+        "source_part": 0,
+        "source_local_frame": 24714,
+        "source_clock_offset": "3519/10",
+        "decoder_pts": 273865410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24714,
+        "last_selected_frame": 24719,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24720,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24720,
+        "source_part": 0,
+        "source_local_frame": 24720,
+        "source_clock_offset": "352",
+        "decoder_pts": 273874410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24720,
+        "last_selected_frame": 24738,
+        "frame_count": 19
+      }
+    },
+    {
+      "frame": 24739,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24739,
+        "source_part": 0,
+        "source_local_frame": 24739,
+        "source_clock_offset": "88079/250",
+        "decoder_pts": 273902850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24739,
+        "last_selected_frame": 24744,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24745,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24745,
+        "source_part": 0,
+        "source_local_frame": 24745,
+        "source_clock_offset": "44052/125",
+        "decoder_pts": 273911850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24745,
+        "last_selected_frame": 24756,
+        "frame_count": 12
+      }
+    },
+    {
+      "frame": 24757,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24757,
+        "source_part": 0,
+        "source_local_frame": 24757,
+        "source_clock_offset": "44077/125",
+        "decoder_pts": 273929850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24757,
+        "last_selected_frame": 24761,
+        "frame_count": 5
+      }
+    },
+    {
+      "frame": 24762,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24762,
+        "source_part": 0,
+        "source_local_frame": 24762,
+        "source_clock_offset": "3527/10",
+        "decoder_pts": 273937410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24762,
+        "last_selected_frame": 24773,
+        "frame_count": 12
+      }
+    },
+    {
+      "frame": 24774,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24774,
+        "source_part": 0,
+        "source_local_frame": 24774,
+        "source_clock_offset": "3529/10",
+        "decoder_pts": 273955410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24774,
+        "last_selected_frame": 24775,
+        "frame_count": 2
+      }
+    },
+    {
+      "frame": 24776,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24776,
+        "source_part": 0,
+        "source_local_frame": 24776,
+        "source_clock_offset": "352933/1000",
+        "decoder_pts": 273958380,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24776,
+        "last_selected_frame": 24786,
+        "frame_count": 11
+      }
+    },
+    {
+      "frame": 24787,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24787,
+        "source_part": 0,
+        "source_local_frame": 24787,
+        "source_clock_offset": "88279/250",
+        "decoder_pts": 273974850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24787,
+        "last_selected_frame": 24792,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24793,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24793,
+        "source_part": 0,
+        "source_local_frame": 24793,
+        "source_clock_offset": "44152/125",
+        "decoder_pts": 273983850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24793,
+        "last_selected_frame": 24803,
+        "frame_count": 11
+      }
+    },
+    {
+      "frame": 24804,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24804,
+        "source_part": 0,
+        "source_local_frame": 24804,
+        "source_clock_offset": "1767/5",
+        "decoder_pts": 274000410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24804,
+        "last_selected_frame": 24809,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24810,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24810,
+        "source_part": 0,
+        "source_local_frame": 24810,
+        "source_clock_offset": "707/2",
+        "decoder_pts": 274009410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24810,
+        "last_selected_frame": 24820,
+        "frame_count": 11
+      }
+    },
+    {
+      "frame": 24821,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24821,
+        "source_part": 0,
+        "source_local_frame": 24821,
+        "source_clock_offset": "353683/1000",
+        "decoder_pts": 274025880,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24821,
+        "last_selected_frame": 24826,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24827,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24827,
+        "source_part": 0,
+        "source_local_frame": 24827,
+        "source_clock_offset": "353783/1000",
+        "decoder_pts": 274034880,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24827,
+        "last_selected_frame": 24837,
+        "frame_count": 11
+      }
+    },
+    {
+      "frame": 24838,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24838,
+        "source_part": 0,
+        "source_local_frame": 24838,
+        "source_clock_offset": "176983/500",
+        "decoder_pts": 274051350,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24838,
+        "last_selected_frame": 24843,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24844,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24844,
+        "source_part": 0,
+        "source_local_frame": 24844,
+        "source_clock_offset": "177033/500",
+        "decoder_pts": 274060350,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24844,
+        "last_selected_frame": 24854,
+        "frame_count": 11
+      }
+    },
+    {
+      "frame": 24855,
+      "held": [
+        "enter"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24855,
+        "source_part": 0,
+        "source_local_frame": 24855,
+        "source_clock_offset": "1417/4",
+        "decoder_pts": 274076910,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24855,
+        "last_selected_frame": 24859,
+        "frame_count": 5
+      }
+    },
+    {
+      "frame": 24860,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24860,
+        "source_part": 0,
+        "source_local_frame": 24860,
+        "source_clock_offset": "354333/1000",
+        "decoder_pts": 274084380,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24860,
+        "last_selected_frame": 24893,
+        "frame_count": 34
+      }
+    },
+    {
+      "frame": 24894,
+      "held": [
+        "lmb"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24894,
+        "source_part": 0,
+        "source_local_frame": 24894,
+        "source_clock_offset": "3549/10",
+        "decoder_pts": 274135410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24894,
+        "last_selected_frame": 24899,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24900,
+      "held": [],
+      "unknown": [],
+      "source": {
+        "source_frame": 24900,
+        "source_part": 0,
+        "source_local_frame": 24900,
+        "source_clock_offset": "355",
+        "decoder_pts": 274144410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24900,
+        "last_selected_frame": 24905,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 24906,
+      "held": [
+        "lmb",
+        "rmb"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24906,
+        "source_part": 0,
+        "source_local_frame": 24906,
+        "source_clock_offset": "3551/10",
+        "decoder_pts": 274153410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24906,
+        "last_selected_frame": 24936,
+        "frame_count": 31
+      }
+    },
+    {
+      "frame": 24937,
+      "held": [
+        "lmb",
+        "rmb",
+        "y_or_z_top"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24937,
+        "source_part": 0,
+        "source_local_frame": 24937,
+        "source_clock_offset": "44452/125",
+        "decoder_pts": 274199850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24937,
+        "last_selected_frame": 24947,
+        "frame_count": 11
+      }
+    },
+    {
+      "frame": 24948,
+      "held": [
+        "lmb",
+        "rmb"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 24948,
+        "source_part": 0,
+        "source_local_frame": 24948,
+        "source_clock_offset": "1779/5",
+        "decoder_pts": 274216410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 24948,
+        "last_selected_frame": 25028,
+        "frame_count": 81
+      }
+    },
+    {
+      "frame": 25029,
+      "held": [
+        "lmb",
+        "rmb",
+        "y_or_z_top"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 25029,
+        "source_part": 0,
+        "source_local_frame": 25029,
+        "source_clock_offset": "7143/20",
+        "decoder_pts": 274337910,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 25029,
+        "last_selected_frame": 25037,
+        "frame_count": 9
+      }
+    },
+    {
+      "frame": 25038,
+      "held": [
+        "lmb",
+        "rmb"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 25038,
+        "source_part": 0,
+        "source_local_frame": 25038,
+        "source_clock_offset": "3573/10",
+        "decoder_pts": 274351410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 25038,
+        "last_selected_frame": 25043,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 25044,
+      "held": [
+        "lmb",
+        "rmb",
+        "y_or_z_top"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 25044,
+        "source_part": 0,
+        "source_local_frame": 25044,
+        "source_clock_offset": "1787/5",
+        "decoder_pts": 274360410,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 25044,
+        "last_selected_frame": 25051,
+        "frame_count": 8
+      }
+    },
+    {
+      "frame": 25052,
+      "held": [
+        "lmb",
+        "rmb"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 25052,
+        "source_part": 0,
+        "source_local_frame": 25052,
+        "source_clock_offset": "357533/1000",
+        "decoder_pts": 274372380,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 25052,
+        "last_selected_frame": 25056,
+        "frame_count": 5
+      }
+    },
+    {
+      "frame": 25057,
+      "held": [
+        "lmb",
+        "rmb",
+        "y_or_z_top"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 25057,
+        "source_part": 0,
+        "source_local_frame": 25057,
+        "source_clock_offset": "44702/125",
+        "decoder_pts": 274379850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 25057,
+        "last_selected_frame": 25062,
+        "frame_count": 6
+      }
+    },
+    {
+      "frame": 25063,
+      "held": [
+        "lmb",
+        "rmb"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 25063,
+        "source_part": 0,
+        "source_local_frame": 25063,
+        "source_clock_offset": "89429/250",
+        "decoder_pts": 274388850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 25063,
+        "last_selected_frame": 25110,
+        "frame_count": 48
+      }
+    },
+    {
+      "frame": 25111,
+      "held": [
+        "lmb",
+        "rmb",
+        "a"
+      ],
+      "unknown": [],
+      "source": {
+        "source_frame": 25111,
+        "source_part": 0,
+        "source_local_frame": 25111,
+        "source_clock_offset": "89629/250",
+        "decoder_pts": 274460850,
+        "decoder_time_base": "1/90000",
+        "first_selected_frame": 25111,
+        "last_selected_frame": 25206,
+        "frame_count": 96
+      }
+    }
+  ],
+  "lanes": [
+    {
+      "id": "esc",
+      "label": "esc",
+      "kind": "key",
+      "score_token": "esc",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "esc",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 27,
+        "canonical_dik": 1
+      }
+    },
+    {
+      "id": "f1",
+      "label": "f1",
+      "kind": "key",
+      "score_token": "f1",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f1",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 112,
+        "canonical_dik": 59
+      }
+    },
+    {
+      "id": "f2",
+      "label": "f2",
+      "kind": "key",
+      "score_token": "f2",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f2",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 113,
+        "canonical_dik": 60
+      }
+    },
+    {
+      "id": "f3",
+      "label": "f3",
+      "kind": "key",
+      "score_token": "f3",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f3",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 114,
+        "canonical_dik": 61
+      }
+    },
+    {
+      "id": "f4",
+      "label": "f4",
+      "kind": "key",
+      "score_token": "f4",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f4",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 115,
+        "canonical_dik": 62
+      }
+    },
+    {
+      "id": "f5",
+      "label": "f5",
+      "kind": "key",
+      "score_token": "f5",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f5",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 116,
+        "canonical_dik": 63
+      }
+    },
+    {
+      "id": "f6",
+      "label": "f6",
+      "kind": "key",
+      "score_token": "f6",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f6",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 117,
+        "canonical_dik": 64
+      }
+    },
+    {
+      "id": "f7",
+      "label": "f7",
+      "kind": "key",
+      "score_token": "f7",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f7",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 118,
+        "canonical_dik": 65
+      }
+    },
+    {
+      "id": "f8",
+      "label": "f8",
+      "kind": "key",
+      "score_token": "f8",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f8",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 119,
+        "canonical_dik": 66
+      }
+    },
+    {
+      "id": "f9",
+      "label": "f9",
+      "kind": "key",
+      "score_token": "f9",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f9",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 120,
+        "canonical_dik": 67
+      }
+    },
+    {
+      "id": "f10",
+      "label": "f10",
+      "kind": "key",
+      "score_token": "f10",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f10",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 121,
+        "canonical_dik": 68
+      }
+    },
+    {
+      "id": "f11",
+      "label": "f11",
+      "kind": "key",
+      "score_token": "f11",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f11",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 122,
+        "canonical_dik": 87
+      }
+    },
+    {
+      "id": "f12",
+      "label": "f12",
+      "kind": "key",
+      "score_token": "f12",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f12",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 123,
+        "canonical_dik": 88
+      }
+    },
+    {
+      "id": "prtsc",
+      "label": "prtsc",
+      "kind": "key",
+      "score_token": "prtsc",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "prtsc",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 44,
+        "canonical_dik": 183
+      }
+    },
+    {
+      "id": "scrolllock",
+      "label": "scrolllock",
+      "kind": "key",
+      "score_token": "scrolllock",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "scrolllock",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 145,
+        "canonical_dik": 70
+      }
+    },
+    {
+      "id": "pause",
+      "label": "pause",
+      "kind": "key",
+      "score_token": "pause",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "pause",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 19,
+        "canonical_dik": 197
+      }
+    },
+    {
+      "id": "mouse_extra_label",
+      "label": "IMS-like label before LMB; function unresolved",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "label_and_binding_unqualified",
+        "detail": "IMS-like mouse-area label does not establish a mouse button, wheel quantity, movement, or another physical channel.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "lmb",
+      "label": "LMB",
+      "kind": "mouse_button",
+      "score_token": "lmb",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "lmb",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs."
+      }
+    },
+    {
+      "id": "mmb",
+      "label": "MMB",
+      "kind": "mouse_button",
+      "score_token": "mmb",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "mmb",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs."
+      }
+    },
+    {
+      "id": "rmb",
+      "label": "RMB",
+      "kind": "mouse_button",
+      "score_token": "rmb",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "rmb",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs."
+      }
+    },
+    {
+      "id": "caret",
+      "label": "^",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "A visible punctuation cell is not a typed character. US char_token chords would invent modifiers; layout-specific VK/DIK identity needs source configuration.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "1",
+      "label": "1",
+      "kind": "key",
+      "score_token": "1",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "1",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 49,
+        "canonical_dik": 2
+      }
+    },
+    {
+      "id": "2",
+      "label": "2",
+      "kind": "key",
+      "score_token": "2",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "2",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 50,
+        "canonical_dik": 3
+      }
+    },
+    {
+      "id": "3",
+      "label": "3",
+      "kind": "key",
+      "score_token": "3",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "3",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 51,
+        "canonical_dik": 4
+      }
+    },
+    {
+      "id": "4",
+      "label": "4",
+      "kind": "key",
+      "score_token": "4",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "4",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 52,
+        "canonical_dik": 5
+      }
+    },
+    {
+      "id": "5",
+      "label": "5",
+      "kind": "key",
+      "score_token": "5",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "5",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 53,
+        "canonical_dik": 6
+      }
+    },
+    {
+      "id": "6",
+      "label": "6",
+      "kind": "key",
+      "score_token": "6",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "6",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 54,
+        "canonical_dik": 7
+      }
+    },
+    {
+      "id": "7",
+      "label": "7",
+      "kind": "key",
+      "score_token": "7",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "7",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 55,
+        "canonical_dik": 8
+      }
+    },
+    {
+      "id": "8",
+      "label": "8",
+      "kind": "key",
+      "score_token": "8",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "8",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 56,
+        "canonical_dik": 9
+      }
+    },
+    {
+      "id": "9",
+      "label": "9",
+      "kind": "key",
+      "score_token": "9",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "9",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 57,
+        "canonical_dik": 10
+      }
+    },
+    {
+      "id": "0",
+      "label": "0",
+      "kind": "key",
+      "score_token": "0",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "0",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 48,
+        "canonical_dik": 11
+      }
+    },
+    {
+      "id": "eszett",
+      "label": "ß-like glyph",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "A visible punctuation cell is not a typed character. US char_token chords would invent modifiers; layout-specific VK/DIK identity needs source configuration.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "acute",
+      "label": "acute-accent glyph",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "A visible punctuation cell is not a typed character. US char_token chords would invent modifiers; layout-specific VK/DIK identity needs source configuration.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "backspace",
+      "label": "backspace",
+      "kind": "key",
+      "score_token": "backspace",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "backspace",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 8,
+        "canonical_dik": 14
+      }
+    },
+    {
+      "id": "ins",
+      "label": "ins",
+      "kind": "key",
+      "score_token": "ins",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "ins",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 45,
+        "canonical_dik": 210
+      }
+    },
+    {
+      "id": "home",
+      "label": "home",
+      "kind": "key",
+      "score_token": "home",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "home",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 36,
+        "canonical_dik": 199
+      }
+    },
+    {
+      "id": "pgup",
+      "label": "pgup",
+      "kind": "key",
+      "score_token": "pgup",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "pgup",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 33,
+        "canonical_dik": 201
+      }
+    },
+    {
+      "id": "numlock",
+      "label": "numlock",
+      "kind": "key",
+      "score_token": "numlock",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "numlock",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 144,
+        "canonical_dik": 69
+      }
+    },
+    {
+      "id": "numdiv",
+      "label": "numdiv",
+      "kind": "key",
+      "score_token": "numdiv",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "numdiv",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 111,
+        "canonical_dik": 181
+      }
+    },
+    {
+      "id": "nummul",
+      "label": "nummul",
+      "kind": "key",
+      "score_token": "nummul",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "nummul",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 106,
+        "canonical_dik": 55
+      }
+    },
+    {
+      "id": "numsub",
+      "label": "numsub",
+      "kind": "key",
+      "score_token": "numsub",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "numsub",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 109,
+        "canonical_dik": 74
+      }
+    },
+    {
+      "id": "tab",
+      "label": "tab",
+      "kind": "key",
+      "score_token": "tab",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "tab",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 9,
+        "canonical_dik": 15
+      }
+    },
+    {
+      "id": "q",
+      "label": "q",
+      "kind": "key",
+      "score_token": "q",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "q",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 81,
+        "canonical_dik": 16
+      }
+    },
+    {
+      "id": "w",
+      "label": "w",
+      "kind": "key",
+      "score_token": "w",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "w",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 87,
+        "canonical_dik": 17
+      }
+    },
+    {
+      "id": "e",
+      "label": "e",
+      "kind": "key",
+      "score_token": "e",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "e",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 69,
+        "canonical_dik": 18
+      }
+    },
+    {
+      "id": "r",
+      "label": "r",
+      "kind": "key",
+      "score_token": "r",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "r",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 82,
+        "canonical_dik": 19
+      }
+    },
+    {
+      "id": "t",
+      "label": "t",
+      "kind": "key",
+      "score_token": "t",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "t",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 84,
+        "canonical_dik": 20
+      }
+    },
+    {
+      "id": "y_or_z_top",
+      "label": "Y/Z upper-row glyph; locale unresolved",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "Retained glyph and displayed position do not establish the source VK/DIK pair; y and z bind different pairs.",
+        "unaccepted_canonical_alternatives": [
+          {
+            "token": "y",
+            "vk": 89,
+            "dik": 21
+          },
+          {
+            "token": "z",
+            "vk": 90,
+            "dik": 44
+          }
+        ]
+      }
+    },
+    {
+      "id": "u",
+      "label": "u",
+      "kind": "key",
+      "score_token": "u",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "u",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 85,
+        "canonical_dik": 22
+      }
+    },
+    {
+      "id": "i",
+      "label": "i",
+      "kind": "key",
+      "score_token": "i",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "i",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 73,
+        "canonical_dik": 23
+      }
+    },
+    {
+      "id": "o",
+      "label": "o",
+      "kind": "key",
+      "score_token": "o",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "o",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 79,
+        "canonical_dik": 24
+      }
+    },
+    {
+      "id": "p",
+      "label": "p",
+      "kind": "key",
+      "score_token": "p",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "p",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 80,
+        "canonical_dik": 25
+      }
+    },
+    {
+      "id": "u_umlaut",
+      "label": "upper-row umlaut glyph",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "A visible punctuation cell is not a typed character. US char_token chords would invent modifiers; layout-specific VK/DIK identity needs source configuration.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "plus",
+      "label": "+",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "A visible punctuation cell is not a typed character. US char_token chords would invent modifiers; layout-specific VK/DIK identity needs source configuration.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "enter",
+      "label": "enter",
+      "kind": "key",
+      "score_token": "enter",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "enter",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 13,
+        "canonical_dik": 28
+      }
+    },
+    {
+      "id": "del",
+      "label": "del",
+      "kind": "key",
+      "score_token": "del",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "del",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 46,
+        "canonical_dik": 211
+      }
+    },
+    {
+      "id": "end",
+      "label": "end",
+      "kind": "key",
+      "score_token": "end",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "end",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 35,
+        "canonical_dik": 207
+      }
+    },
+    {
+      "id": "pgdn",
+      "label": "pgdn",
+      "kind": "key",
+      "score_token": "pgdn",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "pgdn",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 34,
+        "canonical_dik": 209
+      }
+    },
+    {
+      "id": "num7",
+      "label": "num7",
+      "kind": "key",
+      "score_token": "num7",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "num7",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 103,
+        "canonical_dik": 71
+      }
+    },
+    {
+      "id": "num8",
+      "label": "num8",
+      "kind": "key",
+      "score_token": "num8",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "num8",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 104,
+        "canonical_dik": 72
+      }
+    },
+    {
+      "id": "num9",
+      "label": "num9",
+      "kind": "key",
+      "score_token": "num9",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "num9",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 105,
+        "canonical_dik": 73
+      }
+    },
+    {
+      "id": "numadd",
+      "label": "numadd",
+      "kind": "key",
+      "score_token": "numadd",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "numadd",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 107,
+        "canonical_dik": 78
+      }
+    },
+    {
+      "id": "capslock",
+      "label": "capslock",
+      "kind": "key",
+      "score_token": "capslock",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "capslock",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 20,
+        "canonical_dik": 58
+      }
+    },
+    {
+      "id": "a",
+      "label": "a",
+      "kind": "key",
+      "score_token": "a",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "a",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 65,
+        "canonical_dik": 30
+      }
+    },
+    {
+      "id": "s",
+      "label": "s",
+      "kind": "key",
+      "score_token": "s",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "s",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 83,
+        "canonical_dik": 31
+      }
+    },
+    {
+      "id": "d",
+      "label": "d",
+      "kind": "key",
+      "score_token": "d",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "d",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 68,
+        "canonical_dik": 32
+      }
+    },
+    {
+      "id": "f",
+      "label": "f",
+      "kind": "key",
+      "score_token": "f",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "f",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 70,
+        "canonical_dik": 33
+      }
+    },
+    {
+      "id": "g",
+      "label": "g",
+      "kind": "key",
+      "score_token": "g",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "g",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 71,
+        "canonical_dik": 34
+      }
+    },
+    {
+      "id": "h",
+      "label": "h",
+      "kind": "key",
+      "score_token": "h",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "h",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 72,
+        "canonical_dik": 35
+      }
+    },
+    {
+      "id": "j",
+      "label": "j",
+      "kind": "key",
+      "score_token": "j",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "j",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 74,
+        "canonical_dik": 36
+      }
+    },
+    {
+      "id": "k",
+      "label": "k",
+      "kind": "key",
+      "score_token": "k",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "k",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 75,
+        "canonical_dik": 37
+      }
+    },
+    {
+      "id": "l",
+      "label": "l",
+      "kind": "key",
+      "score_token": "l",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "l",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 76,
+        "canonical_dik": 38
+      }
+    },
+    {
+      "id": "o_umlaut",
+      "label": "Ö-like glyph",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "A visible punctuation cell is not a typed character. US char_token chords would invent modifiers; layout-specific VK/DIK identity needs source configuration.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "a_umlaut",
+      "label": "Ä-like glyph",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "A visible punctuation cell is not a typed character. US char_token chords would invent modifiers; layout-specific VK/DIK identity needs source configuration.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "hash",
+      "label": "#-like glyph",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "A visible punctuation cell is not a typed character. US char_token chords would invent modifiers; layout-specific VK/DIK identity needs source configuration.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "num4",
+      "label": "num4",
+      "kind": "key",
+      "score_token": "num4",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "num4",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 100,
+        "canonical_dik": 75
+      }
+    },
+    {
+      "id": "num5",
+      "label": "num5",
+      "kind": "key",
+      "score_token": "num5",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "num5",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 101,
+        "canonical_dik": 76
+      }
+    },
+    {
+      "id": "num6",
+      "label": "num6",
+      "kind": "key",
+      "score_token": "num6",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "num6",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 102,
+        "canonical_dik": 77
+      }
+    },
+    {
+      "id": "lshift",
+      "label": "lshift",
+      "kind": "key",
+      "score_token": "lshift",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "lshift",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 160,
+        "canonical_dik": 42
+      }
+    },
+    {
+      "id": "iso_less_than",
+      "label": "< >",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "A visible punctuation cell is not a typed character. US char_token chords would invent modifiers; layout-specific VK/DIK identity needs source configuration.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "y_or_z_bottom",
+      "label": "Y/Z lower-row glyph; locale unresolved",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "Retained glyph and displayed position do not establish the source VK/DIK pair; y and z bind different pairs.",
+        "unaccepted_canonical_alternatives": [
+          {
+            "token": "y",
+            "vk": 89,
+            "dik": 21
+          },
+          {
+            "token": "z",
+            "vk": 90,
+            "dik": 44
+          }
+        ]
+      }
+    },
+    {
+      "id": "x",
+      "label": "x",
+      "kind": "key",
+      "score_token": "x",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "x",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 88,
+        "canonical_dik": 45
+      }
+    },
+    {
+      "id": "c",
+      "label": "c",
+      "kind": "key",
+      "score_token": "c",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "c",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 67,
+        "canonical_dik": 46
+      }
+    },
+    {
+      "id": "v",
+      "label": "v",
+      "kind": "key",
+      "score_token": "v",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "v",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 86,
+        "canonical_dik": 47
+      }
+    },
+    {
+      "id": "b",
+      "label": "b",
+      "kind": "key",
+      "score_token": "b",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "b",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 66,
+        "canonical_dik": 48
+      }
+    },
+    {
+      "id": "n",
+      "label": "n",
+      "kind": "key",
+      "score_token": "n",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "n",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 78,
+        "canonical_dik": 49
+      }
+    },
+    {
+      "id": "m",
+      "label": "m",
+      "kind": "key",
+      "score_token": "m",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "m",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 77,
+        "canonical_dik": 50
+      }
+    },
+    {
+      "id": "comma",
+      "label": "comma",
+      "kind": "key",
+      "score_token": "comma",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "comma",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 188,
+        "canonical_dik": 51
+      }
+    },
+    {
+      "id": "period",
+      "label": "period",
+      "kind": "key",
+      "score_token": "period",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "period",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 190,
+        "canonical_dik": 52
+      }
+    },
+    {
+      "id": "minus",
+      "label": "- at lower-row position; locale mapping unresolved",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "layout_identity_unqualified",
+        "detail": "A visible punctuation cell is not a typed character. US char_token chords would invent modifiers; layout-specific VK/DIK identity needs source configuration.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "rshift",
+      "label": "rshift",
+      "kind": "key",
+      "score_token": "rshift",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "rshift",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 161,
+        "canonical_dik": 54
+      }
+    },
+    {
+      "id": "up",
+      "label": "up",
+      "kind": "key",
+      "score_token": "up",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "up",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 38,
+        "canonical_dik": 200
+      }
+    },
+    {
+      "id": "num1",
+      "label": "num1",
+      "kind": "key",
+      "score_token": "num1",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "num1",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 97,
+        "canonical_dik": 79
+      }
+    },
+    {
+      "id": "num2",
+      "label": "num2",
+      "kind": "key",
+      "score_token": "num2",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "num2",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 98,
+        "canonical_dik": 80
+      }
+    },
+    {
+      "id": "num3",
+      "label": "num3",
+      "kind": "key",
+      "score_token": "num3",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "num3",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 99,
+        "canonical_dik": 81
+      }
+    },
+    {
+      "id": "numenter",
+      "label": "numenter",
+      "kind": "key",
+      "score_token": "numenter",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "numenter",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 13,
+        "canonical_dik": 156
+      }
+    },
+    {
+      "id": "lctrl",
+      "label": "lctrl",
+      "kind": "key",
+      "score_token": "lctrl",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "lctrl",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 162,
+        "canonical_dik": 29
+      }
+    },
+    {
+      "id": "left_system_label",
+      "label": "Stl-like system-key label",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "label_and_binding_unqualified",
+        "detail": "Stl-like label is not an established canonical key. Position between Ctrl and Alt does not prove its binding.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "lalt",
+      "label": "lalt",
+      "kind": "key",
+      "score_token": "lalt",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "lalt",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 164,
+        "canonical_dik": 56
+      }
+    },
+    {
+      "id": "space",
+      "label": "space",
+      "kind": "key",
+      "score_token": "space",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "space",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 32,
+        "canonical_dik": 57
+      }
+    },
+    {
+      "id": "ralt",
+      "label": "ralt",
+      "kind": "key",
+      "score_token": "ralt",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "ralt",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 165,
+        "canonical_dik": 184
+      }
+    },
+    {
+      "id": "rwin",
+      "label": "Win",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "canonical_token_missing",
+        "detail": "The visible Win label has no right-Windows token in the current canonical key table; source binding is still unqualified.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "menu",
+      "label": "Menu",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "binding": {
+        "status": "unresolved",
+        "canonical_token": null,
+        "physical_binding_qualified": false,
+        "reason": "canonical_token_missing",
+        "detail": "The visible Menu label has no application-menu token in the current canonical key table; source binding is still unqualified.",
+        "unaccepted_canonical_alternatives": []
+      }
+    },
+    {
+      "id": "rctrl",
+      "label": "rctrl",
+      "kind": "key",
+      "score_token": "rctrl",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "rctrl",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 163,
+        "canonical_dik": 157
+      }
+    },
+    {
+      "id": "left",
+      "label": "left",
+      "kind": "key",
+      "score_token": "left",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "left",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 37,
+        "canonical_dik": 203
+      }
+    },
+    {
+      "id": "down",
+      "label": "down",
+      "kind": "key",
+      "score_token": "down",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "down",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 40,
+        "canonical_dik": 208
+      }
+    },
+    {
+      "id": "right",
+      "label": "right",
+      "kind": "key",
+      "score_token": "right",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "right",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 39,
+        "canonical_dik": 205
+      }
+    },
+    {
+      "id": "num0",
+      "label": "num0",
+      "kind": "key",
+      "score_token": "num0",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "num0",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 96,
+        "canonical_dik": 82
+      }
+    },
+    {
+      "id": "numdec",
+      "label": "numdec",
+      "kind": "key",
+      "score_token": "numdec",
+      "binding": {
+        "status": "inherited_visible_projection",
+        "canonical_token": "numdec",
+        "physical_binding_qualified": false,
+        "scope": "Existing assembly interpretation retained; this export does not newly qualify physical inputs.",
+        "canonical_vk": 110,
+        "canonical_dik": 83
+      }
+    }
+  ],
+  "state_semantics": {
+    "true": "visible cell highlighted",
+    "false": "visible cell unhighlighted",
+    "null": "visible cell unclassified",
+    "physical_limit": "Visible state is not physical input state or polling timing."
+  },
+  "unknown": [
+    "Source keyboard locale and Y/Z correspondence",
+    "nonliteral/locale-specific glyph scan codes",
+    "system keys unsupported by score notation",
+    "IMS-like mouse-area label function",
+    "all controls absent from overlay",
+    "mouse movement units, sensitivity and absolute/relative mapping",
+    "wheel count and direction semantics",
+    "input overlay latency and minimum highlight persistence",
+    "exact initial game state, executable/settings and polling boundaries"
+  ],
+  "playback_alignment": {
+    "qualified": false,
+    "scope": "Browse selected observation ordinals independently. No player-clock mapping is asserted."
+  },
+  "binding_summary": {
+    "inherited": 93,
+    "unresolved": 16,
+    "new_bindings": 0,
+    "active_unmapped_frames": 4110
+  },
+  "provenance_warnings": [
+    "Frame ordinals are observation coordinates, not qualified player timestamps or game ticks.",
+    "Visible overlay highlights do not establish physical key state, hold duration, or engine sampling boundaries."
+  ],
+  "segment_counts": {
+    "unresolved_visible_frames": 0,
+    "active_unmapped_frames": 34,
+    "active_unmapped_lane_ids": [
+      "y_or_z_top"
+    ]
+  }
+}

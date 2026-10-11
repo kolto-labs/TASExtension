@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import dataclasses
 import datetime
 import json
@@ -53,8 +54,12 @@ def read_meta(root: str | os.PathLike[str]) -> dict[str, Any]:
 
 def _write_meta(root: Path, meta: dict[str, Any]) -> None:
     tmp = root / f"{META_NAME}.tmp{os.getpid()}"
-    tmp.write_text(json.dumps(meta, indent=1, sort_keys=True), encoding="utf-8")
+    with tmp.open("w", encoding="utf-8") as f:
+        f.write(json.dumps(meta, indent=1, sort_keys=True))
+        f.flush()
+        os.fsync(f.fileno())
     os.replace(tmp, root / META_NAME)
+    fsync_dir(root)
 
 
 def meta_append(root: str | os.PathLike[str], key: str, entry: dict[str, Any]) -> None:
@@ -67,6 +72,27 @@ def meta_append(root: str | os.PathLike[str], key: str, entry: dict[str, Any]) -
         meta = read_meta(root)
         meta.setdefault(key, []).append(entry)
         _write_meta(root, meta)
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def meta_remove(root: str | os.PathLike[str], key: str, entry: dict[str, Any]) -> None:
+    """Remove one exact metadata entry under the same lock used by :func:`meta_append`."""
+    root = Path(root)
+    fd = os.open(root, os.O_RDONLY) if fcntl is not None else None
+    try:
+        if fd is not None:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        meta = read_meta(root)
+        entries = meta.get(key)
+        if not isinstance(entries, list):
+            return
+        for i, existing in enumerate(entries):
+            if existing == entry:
+                del entries[i]
+                _write_meta(root, meta)
+                break
     finally:
         if fd is not None:
             os.close(fd)
@@ -123,28 +149,34 @@ class Bundle:
         for d in ("pages", "keyframes", "files", "index"):
             (root / d).mkdir()
         b = cls(root, True, config, budget_bytes)
-        b.journal = Journal(root / "journal", True, create=True)
-        for fourcc, payload in ((b"HOLO", header.to_payload()), (b"SCOR", score.encode("utf-8")),
-                                (b"ENVP", env.to_payload())):
-            b.chain.feed(fourcc, payload)
-            b.tail_offset = b.journal.append_raw(fourcc, payload)[0]
-        b.journal.fsync()
-        meta: dict[str, Any] = {
-            "format": "holo-meta/1",
-            "created": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
-            "host": {"node": platform.node(), "platform": platform.platform(), "python": sys.version.split()[0]},
-            "parent_path": None, "parent_abspath": None,
-            "branches": [], "spills": [], "evictions": [], "thinning": [],
-        }
-        if parent is not None:
-            meta["parent_path"] = os.path.relpath(parent.root.resolve(), root.resolve())
-            meta["parent_abspath"] = str(parent.root.resolve())
-        _write_meta(root, meta)
-        fsync_dir(root)
-        b._attach(parent, owns=False)
-        b.store.rebuild()
-        b._ready = True
-        return b
+        try:
+            b.journal = Journal(root / "journal", True, create=True)
+            for fourcc, payload in ((b"HOLO", header.to_payload()), (b"SCOR", score.encode("utf-8")),
+                                    (b"ENVP", env.to_payload())):
+                b._append(fourcc, payload)
+            b.journal.fsync()
+            meta: dict[str, Any] = {
+                "format": "holo-meta/1",
+                "created": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
+                "host": {"node": platform.node(), "platform": platform.platform(), "python": sys.version.split()[0]},
+                "parent_path": None, "parent_abspath": None,
+                "branches": [], "spills": [], "evictions": [], "thinning": [],
+            }
+            if parent is not None:
+                meta["parent_path"] = os.path.relpath(parent.root.resolve(), root.resolve())
+                meta["parent_abspath"] = str(parent.root.resolve())
+            _write_meta(root, meta)
+            fsync_dir(root)
+            b._attach(parent, owns=False)
+            b.store.rebuild()
+            b._ready = True
+            return b
+        except BaseException as exc:
+            try:
+                b.close()
+            except BaseException as cleanup_error:
+                exc.add_note(f"holorecord creation cleanup also failed: {cleanup_error!r}")
+            raise
 
     @classmethod
     def open(cls, path: str | os.PathLike[str], *, writable: bool = False,
@@ -188,8 +220,11 @@ class Bundle:
             b._ready = True
             if not fresh and writable:
                 b.save_index()
-        except BaseException:
-            b.close()
+        except BaseException as exc:
+            try:
+                b.close()
+            except BaseException as cleanup_error:
+                exc.add_note(f"holorecord open recovery cleanup also failed: {cleanup_error!r}")
             raise
         return b
 
@@ -212,8 +247,10 @@ class Bundle:
 
     def close(self) -> None:
         """Store pending payloads, fsync, write the index and release the lock."""
+        failure: BaseException | None = None
         try:
-            if self.writable and self._ready and not self.journal.f.closed:
+            if (self.writable and self._ready and not self.journal.f.closed
+                    and self.journal.write_failure is None and self.store.write_failure is None):
                 try:
                     self._flush_pending()
                 except BudgetError:
@@ -225,14 +262,27 @@ class Bundle:
                 self.store.fsync()
                 self.journal.fsync()
                 self.save_index()
+        except BaseException as exc:
+            failure = exc
         finally:
             self._ready = False
+            cleanup = []
             if self.store is not None:
-                self.store.close_handles()
+                cleanup.append(("page-store handles", self.store.close_handles))
             if self.journal is not None:
-                self.journal.close()
+                cleanup.append(("journal handle", self.journal.close))
             if self.parent is not None and self._owns_parent:
-                self.parent.close()
+                cleanup.append(("owned parent bundle", self.parent.close))
+            for label, close_one in cleanup:
+                try:
+                    close_one()
+                except BaseException as exc:
+                    if failure is None:
+                        failure = exc
+                    else:
+                        failure.add_note(f"closing {label} also failed: {exc!r}")
+        if failure is not None:
+            raise failure.with_traceback(failure.__traceback__)
 
     def __enter__(self) -> Bundle:
         return self
@@ -307,6 +357,8 @@ class Bundle:
         return True
 
     def save_index(self) -> None:
+        _need(self.journal.write_failure is None, "cannot publish an index after a journal writer failure")
+        _need(self.store.write_failure is None, "cannot publish an index after a page store writer failure")
         try:
             kindex.save(self.root, self._index_state(), self.store.locs, self.rows)
         except OSError:
@@ -386,14 +438,19 @@ class Bundle:
         return self.store.get(key)
 
     def _pinned(self) -> set[bytes]:
-        """Page keys of every branch-point map recorded in meta.json; budget eviction keeps them."""
+        """Page keys of committed and in-progress branch points; eviction keeps them."""
         if self._pins is None:
             pins: set[bytes] = set()
-            for pin in read_meta(self.root).get("branches", []):
-                try:
-                    pins |= self.map_at(pin["tick"]).keys()
-                except (FormatError, KeyError):
-                    pass  # an uncaptured branch point has no map
+            meta = read_meta(self.root)
+            for key in ("branches", "branch_pins"):
+                entries = meta.get(key, [])
+                if not isinstance(entries, list):
+                    continue
+                for pin in entries:
+                    try:
+                        pins |= self.map_at(pin["tick"]).keys()
+                    except (FormatError, KeyError, TypeError):
+                        pass  # an uncaptured branch point has no map
             self._pins = pins
         return self._pins
 
@@ -463,15 +520,25 @@ class Bundle:
 
     def _check_writable(self, allow_sealed: bool = False) -> None:
         _need(self.writable, "bundle is open read-only")
+        _need(self.journal.write_failure is None,
+              "bundle journal writer failed; close and recover before writing")
+        _need(self.store.write_failure is None,
+              "bundle page store writer failed; close and recover before writing")
         _need(allow_sealed or self.chain.seal is None, "bundle is sealed; only RCPT may follow SEAL")
 
     def _append(self, fourcc: bytes, body: bytes, sync: bool = False) -> bytes:
         payload, link = chained_payload(self.chain.link, fourcc, body)
-        _b, _l, dec = self.chain.feed(fourcc, payload)
+        # Keep the accepted in-memory boundary unchanged until the framed write
+        # and any requested durability barrier both succeed.
+        candidate = copy.copy(self.chain)
+        candidate.genesis = list(self.chain.genesis)
+        candidate.counts = dict(self.chain.counts)
+        _b, _l, dec = candidate.feed(fourcc, payload)
         off, _end = self.journal.append_raw(fourcc, payload)
-        self._note(off, fourcc, dec, link)
         if sync:
             self.journal.fsync()
+        self.chain = candidate
+        self._note(off, fourcc, dec, link)
         return link
 
     def _sync_now(self, flags: TickFlag) -> bool:
@@ -586,7 +653,13 @@ class Bundle:
             self.budget_log.append({"step": "evict_detached", "skipped": "nothing detached"})
             return
         hit = [r.tick for r in self.rows if r.flags & _CAP and any(p.key in drop for p in self.record(r.tick).pages)]
-        freed, frames = self.store.compact(drop, local, base_of)
+        try:
+            freed, frames = self.store.compact(drop, local, base_of)
+        except BaseException as exc:
+            # Compaction rewrites packs before its MARK commit. Do not let a later
+            # append trust partially replaced packs in this open writer.
+            self.store.write_failure = exc
+            raise
         self._compactions += 1
         name = f"{EVICT_MARK}{hit[0]}-{hit[-1]}" if hit else f"{EVICT_MARK}unreferenced"
         at = max(self.chain.last_tick, 0)

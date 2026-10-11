@@ -1,6 +1,7 @@
 // Canvas drawing for the stand-in scene, the HUD and the holorecord strip.
 
 import { TILE, COLS, ROWS, W, H, MAPS, BIT, DOOR_US, LOAD_US, toPx } from './sim.js';
+import { KEY_ORDER, BUTTONS } from './score.js';
 
 export const C = {
   void: '#05070a', panel: '#0b1016', kolto: '#19e3c1', bacta: '#5ad8ff', ok: '#7dff9a',
@@ -200,7 +201,7 @@ function drawLoading(ctx, g) {
   ctx.fillRect(W / 2 - 119, H / 2 - 3, Math.round(238 * p), 6);
   ctx.fillStyle = C.dim;
   ctx.font = `11px ${MONO}`;
-  ctx.fillText(`stand-in area 2   ${Math.round(p * 100)}%`, W / 2, H / 2 + 24);
+  ctx.fillText(`sample area 2   ${Math.round(p * 100)}%`, W / 2, H / 2 + 24);
 }
 
 function panel(ctx, x, y, w, h) {
@@ -224,6 +225,197 @@ function key(ctx, x, y, w, label, on) {
 
 export const TIER_COLOR = { lab: C.warn, tas: C.kolto, 'hands-off': C.ok };
 
+const KEY_COLORS = { w: C.kolto, a: C.bacta, s: C.ok, d: C.text };
+const TIMELINE_ACTIONS = [...KEY_ORDER, ...BUTTONS].map((name, index) => ({
+  name,
+  color: KEY_COLORS[name] || `hsl(${Math.round((index * 137.508) % 360)} 82% 67%)`,
+  shape: name === 'lmb' ? 'mouse-left' : name === 'rmb' ? 'mouse-right' : 'key',
+}));
+const ACTION_INDEX = new Map(TIMELINE_ACTIONS.map((action, index) => [action.name, index]));
+const MOUSE_POSITION_SHAPE = 'mouse-position';
+const timelineInputCaches = new WeakMap();
+
+function packTimelineInput(input = {}) {
+  let mask = 0;
+  TIMELINE_ACTIONS.forEach((action, i) => { if (input[action.name]) mask |= (1 << i); });
+  return { mask, mx: Number.isFinite(input.mx) ? input.mx : null, my: Number.isFinite(input.my) ? input.my : null };
+}
+
+function packRecordedInput(rec = {}) {
+  let mask = 0;
+  for (const name of ['w', 'a', 's', 'd', 'lmb', 'rmb']) {
+    const lane = ACTION_INDEX.get(name);
+    if (lane >= 0 && ((rec.bits || 0) & BIT[name])) mask |= (1 << lane);
+  }
+  return { mask, mx: null, my: null };
+}
+
+function sameTimelineInput(a, b) {
+  return !!a && a.mask === b.mask && a.mx === b.mx && a.my === b.my;
+}
+
+function buildTimelineInputCache(info, head, span) {
+  const inputAt = typeof info.inputAt === 'function' ? info.inputAt : (tick) => packRecordedInput(info.recs[tick]);
+  const source = info.inputSource || info.recs;
+  if (!source || typeof source !== 'object') return null;
+  let cache = timelineInputCaches.get(source);
+  const fresh = !cache || cache.prog !== info.prog;
+  if (fresh) {
+    cache = { prog: info.prog, states: [], tickEvents: [], buckets: new Map(), head: -1, dirtyBuckets: true };
+    timelineInputCaches.set(source, cache);
+  }
+
+  let invalidate = Infinity;
+  if (!fresh) {
+    if (head < cache.head) invalidate = Math.max(0, head + 1);
+    for (let k = Math.max(1, cache.head + 1); k <= head; k++) {
+      if (Boolean(info.recs[k]?.c?.wait) !== Boolean(info.recs[k - 1]?.c?.wait)) invalidate = Math.min(invalidate, k);
+    }
+  }
+  const current = typeof info.inputAt === 'function' ? packTimelineInput(inputAt(head)) : inputAt(head);
+  if (cache.states[head] && !sameTimelineInput(cache.states[head], current)) invalidate = Math.min(invalidate, head);
+  if (Number.isFinite(invalidate)) {
+    cache.states.length = invalidate;
+    cache.tickEvents.length = invalidate;
+    cache.dirtyBuckets = true;
+  }
+  if (cache.states.length > span + 1) {
+    cache.states.length = span + 1;
+    cache.tickEvents.length = span + 1;
+    cache.dirtyBuckets = true;
+  }
+
+  const oldLength = cache.states.length;
+  for (let k = cache.states.length; k <= span; k++) {
+    const state = k === head ? current : (typeof info.inputAt === 'function' ? packTimelineInput(inputAt(k)) : inputAt(k));
+    const previous = cache.states[k - 1];
+    cache.states[k] = state;
+  }
+  if (cache.states.length !== oldLength) cache.dirtyBuckets = true;
+  if (cache.span !== span || cache.width !== info.width || cache.v0 !== info.v0) cache.dirtyBuckets = true;
+  if (cache.dirtyBuckets) {
+    cache.buckets.clear();
+    const bucketFor = (tick) => {
+      const x = Math.round(info.X(tick));
+      let bucket = cache.buckets.get(x);
+      if (!bucket) {
+        bucket = { x, count: 0, presses: 0, releases: 0, first: null, runCount: 0, futureCount: 0 };
+        cache.buckets.set(x, bucket);
+      }
+      return bucket;
+    };
+    cache.tickEvents.length = cache.states.length;
+    for (let k = 0; k < cache.states.length; k++) {
+      const state = cache.states[k], previous = cache.states[k - 1];
+      const changed = previous ? previous.mask ^ state.mask : state.mask;
+      const mouseChanged = previous ? previous.mx !== state.mx || previous.my !== state.my : state.mx !== null && state.my !== null;
+      let tickEvent = null;
+      const addAction = (action, pressed) => {
+        const bucket = bucketFor(k);
+        if (!tickEvent) tickEvent = cache.tickEvents[k] = { x: bucket.x, count: 0, presses: 0, releases: 0, first: null };
+        tickEvent.count++;
+        if (!tickEvent.first) tickEvent.first = { action, pressed };
+        if (!bucket.first) bucket.first = tickEvent.first;
+        bucket.count++;
+        if (k <= head) bucket.runCount++; else bucket.futureCount++;
+        if (pressed) { tickEvent.presses++; bucket.presses++; }
+        else { tickEvent.releases++; bucket.releases++; }
+      };
+      for (let i = 0; i < TIMELINE_ACTIONS.length; i++) {
+        const bit = 1 << i;
+        if (!(changed & bit)) continue;
+        addAction(TIMELINE_ACTIONS[i], !!(state.mask & bit));
+      }
+      if (mouseChanged) {
+        const action = { shape: MOUSE_POSITION_SHAPE, color: C.bacta };
+        const pressed = state.mx !== null && state.my !== null;
+        addAction(action, pressed);
+      }
+    }
+    cache.span = span;
+    cache.width = info.width;
+    cache.v0 = info.v0;
+    cache.dirtyBuckets = false;
+  } else if (cache.head !== head) {
+    for (let k = Math.max(0, cache.head + 1); k <= head; k++) {
+      const event = cache.tickEvents[k];
+      if (!event) continue;
+      const bucket = cache.buckets.get(event.x);
+      if (!bucket) continue;
+      bucket.runCount += event.count;
+      bucket.futureCount -= event.count;
+    }
+  }
+  cache.head = head;
+  return cache;
+}
+
+function drawActionShape(ctx, x, y, action, pressed, alpha = 1) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  if (action.shape === 'key') ctx.arc(x, y, 2.15, 0, Math.PI * 2);
+  else if (action.shape === 'mouse-left') {
+    ctx.moveTo(x, y - 2.5); ctx.lineTo(x + 2.5, y + 2); ctx.lineTo(x - 2.5, y + 2); ctx.closePath();
+  } else if (action.shape === 'mouse-right') {
+    ctx.moveTo(x, y - 2.5); ctx.lineTo(x + 2.5, y); ctx.lineTo(x, y + 2.5); ctx.lineTo(x - 2.5, y); ctx.closePath();
+  } else {
+    ctx.moveTo(x - 2.5, y); ctx.lineTo(x + 2.5, y); ctx.moveTo(x, y - 2.5); ctx.lineTo(x, y + 2.5);
+  }
+  if (action.shape === MOUSE_POSITION_SHAPE) {
+    ctx.strokeStyle = C.bacta;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  } else if (pressed) {
+    ctx.fillStyle = action.color;
+    ctx.fill();
+  } else {
+    ctx.strokeStyle = action.color;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTimelineInputEvents(ctx, buckets, y) {
+  for (const bucket of buckets.values()) {
+    const alpha = bucket.runCount && bucket.futureCount ? 0.72 : bucket.runCount ? 1 : 0.48;
+    if (bucket.count === 1) drawActionShape(ctx, bucket.x, y + 2, bucket.first.action, bucket.first.pressed, alpha);
+    else {
+      const label = `${bucket.presses ? `+${bucket.presses}` : ''}${bucket.presses && bucket.releases ? ' ' : ''}${bucket.releases ? `−${bucket.releases}` : ''}`;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.font = `7px ${MONO}`;
+      ctx.fillStyle = bucket.releases && !bucket.presses ? C.panel : 'rgba(5, 7, 10, 0.92)';
+      ctx.strokeStyle = bucket.presses && !bucket.releases ? C.kolto : C.text;
+      ctx.lineWidth = 1;
+      const badgeW = Math.max(14, ctx.measureText(label).width + 4);
+      ctx.fillRect(bucket.x - badgeW / 2, y - 1, badgeW, 10);
+      ctx.strokeRect(bucket.x - badgeW / 2 + 0.5, y - 0.5, badgeW - 1, 9);
+      ctx.fillStyle = C.text;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, bucket.x, y + 4);
+      ctx.restore();
+    }
+  }
+}
+
+function timelineInputDescription(input, previous, tick, head) {
+  const held = TIMELINE_ACTIONS.filter((action) => input?.[action.name]).map((action) => action.name);
+  const pressed = previous ? TIMELINE_ACTIONS.filter((action) => input?.[action.name] && !previous[action.name]).map((action) => action.name) : [];
+  const released = previous ? TIMELINE_ACTIONS.filter((action) => !input?.[action.name] && previous[action.name]).map((action) => action.name) : [];
+  const parts = [`Tick ${tick}`];
+  parts.push(tick <= head ? 'recorded branch' : 'authored score ahead; not recorded yet');
+  parts.push(held.length ? `held ${held.join(', ')}` : 'no buttons held');
+  if (pressed.length) parts.push(`pressed ${pressed.join(', ')}`);
+  if (released.length) parts.push(`released ${released.join(', ')}`);
+  if (input?.mx !== null && input?.my !== null) parts.push('mouse position command set; coordinates are not plotted as a movement path');
+  return parts.join('; ');
+}
+
+const TIMELINE_MARKER_HELP = 'Score-input markers: keyboard actions use colored circles; left mouse is a triangle; right mouse is a diamond; a crosshair is an authored mouse-position command, not a movement path. Filled shapes are presses and outlines are releases. Full opacity marks ticks within the recorded branch; muted opacity marks authored input beyond its head. Chords and pixel-colliding ticks use a count badge; hover or focus a tick for its exact held, pressed, and released input names.';
+
 // Returns the watermark box so the page can show its hover text.
 function drawHud(ctx, g, o) {
   // Tick and virtual time.
@@ -244,7 +436,7 @@ function drawHud(ctx, g, o) {
   // Scene label.
   ctx.textAlign = 'center';
   ctx.fillStyle = C.dim;
-  ctx.fillText(`stand-in scene · area ${g.area}${g.mode === 'load' ? ' · loading' : ''}`, W / 2, 16);
+  ctx.fillText(`sample scene · area ${g.area}${g.mode === 'load' ? ' · loading' : ''}`, W / 2, 16);
   // Tier badge.
   const tier = o.tier || 'lab';
   const label = tier.toUpperCase();
@@ -313,6 +505,60 @@ export function drawTimeline(ctx, w, h, info) {
   const head = recs.length - 1;
   const n = Math.max(1, v1 - v0);
   const X = (tick) => ((tick - v0) / n) * (w - 16) + 8;
+  if (info.compact) {
+    const y = Math.round((h - 4) / 2), trackH = 4;
+    ctx.fillStyle = C.panel;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(5, 7, 10, 0.85)';
+    ctx.fillRect(8, y, w - 16, trackH);
+    const areaColor = (rec) => rec.load ? 'rgba(255, 176, 0, 0.76)' : rec.area === 1 ? 'rgba(90, 216, 255, 0.78)' : 'rgba(25, 227, 193, 0.78)';
+    const last = Math.min(head, v1);
+    let start = Math.max(0, v0);
+    for (let k = start + 1; k <= last + 1; k++) {
+      if (k === last + 1 || areaColor(recs[k]) !== areaColor(recs[start])) {
+        const kindColor = areaColor(recs[start]);
+        ctx.fillStyle = kindColor;
+        ctx.fillRect(X(start), y, Math.max(1, X(k) - X(start)), trackH);
+        start = k;
+      }
+    }
+    const actionCache = buildTimelineInputCache({ ...info, X, width: w }, head, Math.max(v1, 0));
+    const describeTick = Number.isSafeInteger(info.hover) && info.hover >= 0 ? info.hover : t;
+    const describedInput = typeof info.inputAt === 'function' ? info.inputAt(describeTick) : null;
+    const previousInput = describedInput && describeTick > 0 ? info.inputAt(describeTick - 1) : null;
+    const markerHelp = describedInput
+      ? `${timelineInputDescription(describedInput, previousInput, describeTick, head)}. ${TIMELINE_MARKER_HELP}`
+      : `Only recorded WASD and mouse-button transitions are available for this timeline. ${TIMELINE_MARKER_HELP}`;
+    if (ctx.canvas.title !== markerHelp) ctx.canvas.title = markerHelp;
+    if (ctx.canvas.getAttribute('aria-description') !== markerHelp) ctx.canvas.setAttribute('aria-description', markerHelp);
+    if (head < v1) {
+      ctx.fillStyle = 'rgba(127, 147, 160, 0.5)';
+      for (let x = X(head + 1); x < w - 8; x += 6) ctx.fillRect(x, y, 1, trackH);
+    }
+    if (actionCache) drawTimelineInputEvents(ctx, actionCache.buckets, y);
+    for (const mark of marks) {
+      if (mark.tick < v0 || mark.tick > v1 || mark.tick < 0) continue;
+      const x = Math.round(X(mark.tick));
+      ctx.fillStyle = C.warn;
+      ctx.fillRect(x, y - 2, 2, trackH + 4);
+    }
+    if (info.div != null && info.div >= v0 && info.div <= v1) {
+      const x = Math.round(X(info.div));
+      ctx.fillStyle = C.accent;
+      ctx.fillRect(x, y - 3, 2, trackH + 6);
+    }
+    if (info.hover >= 0) {
+      const x = Math.round(X(info.hover));
+      ctx.fillStyle = 'rgba(215, 227, 234, 0.6)';
+      ctx.fillRect(x, y - 2, 1, trackH + 4);
+    }
+    if (t >= v0 && t <= v1) {
+      const x = Math.round(X(t));
+      ctx.fillStyle = C.ok;
+      ctx.fillRect(x - 1, 1, 3, h - 2);
+    }
+    return { X, tickAt: (x) => Math.round(v0 + ((x - 8) / (w - 16)) * n) };
+  }
   ctx.fillStyle = C.panel;
   ctx.fillRect(0, 0, w, h);
   const bandY = 4, bandH = 12, trackY = 20, trackH = 26;

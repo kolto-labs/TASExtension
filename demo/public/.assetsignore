@@ -1,0 +1,27 @@
+# Local-only full archives exceed Workers' 25 MiB individual asset limit.
+/original-game/wine-root.zip
+/original-game/wine-roots/*/.local-root.zip
+/original-game/wine-roots/*/.local-root.zip.mybook-original-*
+/original-game/wine-roots/.stage-*/**
+/original-game/runtime-releases/.stage-*/**
+/original-game/runtime-local.json
+/original-game/.runtime-local-*.json
+
+# Retired shared bootstraps are outside the immutable qualification gate.
+/original-game/runtime/
+/original-game/owned-install.js
+/original-game/NOTICE.txt
+
+# Original installations, browser profiles and generated guest state are local.
+**/private/**
+**/installs/**
+**/installation/**
+**/saves/**
+**/profiles/**
+**/jit-cache/**
+**/tmp-jit-modules/**
+**/swkotor.exe
+**/chitin.key
+**/dialog.tlk
+**/*.sav
+**/*.bif

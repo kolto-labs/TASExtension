@@ -1,0 +1,5 @@
+:root { color-scheme: dark; font-family: system-ui, sans-serif; background: #091017; color: #d9e9f0; }
+body { margin: 0; } main { margin: 1.2rem auto; max-width: 1100px; padding: 0 1rem; }
+a { color: #69cbe4; } h1 { font-size: 1.3rem; font-weight: 500; }
+button { border: 1px solid #34505d; background: #142631; color: inherit; padding: .5rem .75rem; margin-right: .5rem; cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; } .status { font-size: .9rem; line-height: 1.5; color: #a5bdc9; }

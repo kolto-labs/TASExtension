@@ -1,0 +1,126 @@
+/* The manager uses the workspace palette and remains usable outside the dock. */
+.extension-manager {
+  box-sizing: border-box;
+  padding: 12px;
+  overflow: auto;
+  min-width: 0;
+  color: var(--text, #e4edf2);
+  overflow-wrap: anywhere;
+}
+.extension-manager[hidden] { display: none !important; }
+.extension-manager h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.extension-manager h3 { margin: 0; font-size: 1rem; }
+.extension-manager p { margin-block: 8px; line-height: 1.5; }
+.extension-manager .extension-note { color: var(--muted, #a7b6bf); font-size: .875rem; }
+.extension-manager .extension-core {
+  margin-block: 12px 16px;
+  padding-block: 10px;
+  border-block: 1px solid var(--line, #33434c);
+}
+.extension-manager article {
+  min-width: 0;
+  border: 1px solid var(--line, #33434c);
+  border-radius: 6px;
+  padding: 12px;
+  margin-block: 12px;
+}
+.extension-manager .extension-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 12px;
+  flex-wrap: wrap;
+}
+.extension-manager .extension-state {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid var(--line, #33434c);
+  border-radius: 4px;
+  font-size: .8rem;
+  line-height: 1.5;
+}
+.extension-manager .extension-error,
+.extension-manager .extension-state[data-state="error"] { color: var(--bad, #ff9b9b); }
+.extension-manager .extension-metadata {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  gap: 4px 12px;
+  margin-block: 12px;
+  font-size: .875rem;
+  line-height: 1.5;
+}
+.extension-manager .extension-metadata dt { color: var(--muted, #a7b6bf); }
+.extension-manager .extension-metadata dd { margin: 0; min-width: 0; }
+.extension-manager .extension-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.extension-manager .extension-actions button { min-height: 36px; white-space: normal; }
+.extension-manager .extension-actions button:disabled { opacity: .55; cursor: not-allowed; }
+.extension-manager .extension-tools:not(:empty) {
+  padding-block: 8px 12px;
+  margin-block: 8px 12px;
+  border-block: 1px solid var(--line, #33434c);
+}
+.extension-manager .extension-details { margin-top: 12px; }
+.extension-manager .extension-details summary { cursor: pointer; font-size: .875rem; }
+.extension-manager .extension-details[open] summary { margin-bottom: 8px; }
+.extension-manager :is(button, a, summary):focus-visible {
+  outline: 2px solid var(--accent, #8bd4ff);
+  outline-offset: 3px;
+}
+.extension-manager :is(.extension-status, [role="status"]):empty { display: none; }
+.extension-manager :is(.extension-status, [role="status"]) { font-size: .875rem; }
+@media (max-width: 480px) {
+  .extension-manager { padding: 10px; }
+  .extension-manager article { padding: 10px; }
+  .extension-manager .extension-metadata { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .extension-manager .extension-metadata dd { margin-bottom: 6px; }
+}
+body[data-tas-extension="disabled"] :is(#p-console, #p-score, #p-roll, #p-branches, #p-right, #live-tas-workspace, #scene-pane, #tab-scene, #rs-tabs, #tab-score, #tab-roll, #hstat, #key-settings, #b-show-workspace, header.top .files, #b-tas-presentation, [data-dock-id="score"], [data-dock-id="piano-roll"], [data-dock-id="transport"], [data-dock-id="branches"], [data-dock-id="score-history"], [data-dock-id="sample-state"], [data-dock-id="sample-hex"]) { display: none !important; }
+
+.extension-manager .extension-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-block: 16px 8px;
+}
+.extension-manager .extension-filters label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: .875rem;
+}
+.extension-manager .extension-filters label:first-child { flex: 1 1 180px; }
+.extension-manager .extension-filters :is(input, select) {
+  box-sizing: border-box;
+  min-height: 36px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  color: inherit;
+  background: var(--panel, #131b21);
+  border: 1px solid var(--line, #33434c);
+  border-radius: 4px;
+  font: inherit;
+}
+.extension-manager :is(input, select, article):focus-visible {
+  outline: 2px solid var(--accent, #8bd4ff);
+  outline-offset: 3px;
+}
+.extension-manager .extension-related {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: .875rem;
+}
+.extension-manager .extension-related > span { color: var(--muted, #a7b6bf); }
+.extension-manager .extension-related button { min-height: 32px; white-space: normal; }
+.extension-manager .extension-empty { padding-block: 12px; }
+.extension-manager .extension-empty[hidden] { display: none; }
+

@@ -29,6 +29,23 @@ void clock_defaults(void) {
     g_clk.uptime0_ms = 3600000ull;
 }
 
+/* clock.hz is also constrained to 1..1000 by the Python config contract.
+ * Parse it here without k_parse_u64's intentional wrap-on-overflow behavior:
+ * this value becomes the denominator for every virtual clock tick. */
+static int parse_clock_hz(const char *s, const char *end, u32 *out) {
+    u32 value = 0;
+    if (s == end) return 0;
+    for (; s < end; s++) {
+        if (*s < '0' || *s > '9') return 0;
+        u32 digit = (u32)(*s - '0');
+        if (value > (1000u - digit) / 10u) return 0;
+        value = value * 10u + digit;
+    }
+    if (value < 1 || value > 1000) return 0;
+    *out = value;
+    return 1;
+}
+
 int clock_parse_env(const char *s) {
     g_clk.initial_ft = DEFAULT_FT;
     if (!s) return 1;
@@ -42,7 +59,11 @@ int clock_parse_env(const char *s) {
         while (*s && *s != ';') s++;
         u64 num = k_parse_u64(v, 0);
         if (kl == 4 && k_strneq(k, "mode", 4)) g_clk.mode = k_strneq(v, "wall", 4) ? 1 : 0;
-        else if (kl == 2 && k_strneq(k, "hz", 2)) g_clk.hz = num ? (u32)num : 60;
+        else if (kl == 2 && k_strneq(k, "hz", 2)) {
+            u32 hz;
+            if (parse_clock_hz(v, s, &hz)) g_clk.hz = hz;
+            else slog("invalid KPTAS_CLOCK hz; keeping default %u", g_clk.hz);
+        }
         else if (kl == 6 && k_strneq(k, "qpf_hz", 6)) g_clk.qpf = num ? num : 10000000ull;
         else if (kl == 10 && k_strneq(k, "uptime0_ms", 10)) g_clk.uptime0_ms = num;
         else if (kl == 10 && k_strneq(k, "initial_ft", 10)) g_clk.initial_ft = num;

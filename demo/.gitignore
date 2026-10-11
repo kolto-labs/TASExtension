@@ -1,0 +1,11 @@
+# Local runtime staging; packaging requires reviewed redistributable notices.
+/public/original-game/runtime/
+/public/original-game/owned-install.js
+/public/original-game/wine-root.zip
+/public/original-game/NOTICE.txt
+
+# Immutable local qualification releases and descriptors; not publication proof.
+/public/original-game/runtime-releases/
+/public/original-game/runtime-local.json
+/public/original-game/.runtime-local-*.json
+/public/original-game/wine-roots/

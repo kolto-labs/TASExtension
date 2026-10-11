@@ -122,13 +122,33 @@ i64 __moddi3(i64 a, i64 b) {
 }
 
 /* ---- bounded buffer ---- */
-void b_init(buf_t *b, char *mem, u32 cap) { b->p = mem; b->n = 0; b->cap = cap; b->overflow = 0; }
+void b_init(buf_t *b, char *mem, u32 cap) {
+    if (!b) return;
+    b->p = mem;
+    b->n = 0;
+    b->cap = cap;
+    b->overflow = (!mem || !cap) ? 1 : 0;
+    if (mem && cap) mem[0] = 0;
+}
 void b_raw(buf_t *b, const char *s, u32 n) {
-    if (b->n + n + 1 > b->cap) { b->overflow = 1; n = b->cap > b->n + 1 ? b->cap - b->n - 1 : 0; }
+    if (!b) return;
+    if (!b->p || !b->cap || (n && !s) || b->n >= b->cap) {
+        b->overflow = 1;
+        return;
+    }
+    /* Subtraction-based bounds checks avoid wrapping b->n + n + 1 when a
+     * caller supplies an extreme length. Always reserve one byte for NUL. */
+    u32 available = b->cap - b->n - 1;
+    if (n > available) { b->overflow = 1; n = available; }
     memcpy(b->p + b->n, s, n);
     b->n += n;
+    b->p[b->n] = 0;
 }
-void b_str(buf_t *b, const char *s) { b_raw(b, s, (u32)strlen(s)); }
+void b_str(buf_t *b, const char *s) {
+    if (!b) return;
+    if (!s) { b->overflow = 1; return; }
+    b_raw(b, s, (u32)strlen(s));
+}
 void b_ch(buf_t *b, char c) { b_raw(b, &c, 1); }
 void b_u64(buf_t *b, u64 v) {
     char t[24];
@@ -138,7 +158,11 @@ void b_u64(buf_t *b, u64 v) {
     b_str(b, t + i);
 }
 void b_i64(buf_t *b, i64 v) {
-    if (v < 0) { b_ch(b, '-'); b_u64(b, (u64)(-v)); } else b_u64(b, (u64)v);
+    if (v < 0) {
+        b_ch(b, '-');
+        /* Avoid signed overflow for INT64_MIN. */
+        b_u64(b, (u64)(-(v + 1)) + 1);
+    } else b_u64(b, (u64)v);
 }
 static const char HEX[] = "0123456789abcdef";
 void b_hex(buf_t *b, const u8 *p, u32 n) {
@@ -152,6 +176,8 @@ void b_hexu32(buf_t *b, u32 v) {
     b_str(b, t);
 }
 void b_jstrn(buf_t *b, const char *s, u32 n) {
+    if (!b) return;
+    if (!s) { b->overflow = 1; return; }
     b_ch(b, '"');
     for (u32 i = 0; i < n && s[i]; i++) {
         u8 c = (u8)s[i];
@@ -179,7 +205,11 @@ void b_b64(buf_t *b, const u8 *p, u32 n) {
         b_ch(b, B64[v >> 18]); b_ch(b, B64[(v >> 12) & 63]); b_ch(b, B64[(v >> 6) & 63]); b_ch(b, '=');
     }
 }
-void b_term(buf_t *b) { b->p[b->n < b->cap ? b->n : b->cap - 1] = 0; }
+void b_term(buf_t *b) {
+    if (!b) return;
+    if (!b->p || !b->cap) { b->overflow = 1; return; }
+    b->p[b->n < b->cap ? b->n : b->cap - 1] = 0;
+}
 
 /* ---- log: appends to <session>\kptas_shim.log. Diagnostics only; never part of the journal. ---- */
 static char g_logpath[300];

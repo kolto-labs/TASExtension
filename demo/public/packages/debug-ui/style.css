@@ -1,0 +1,9 @@
+[data-extension-owner="telos.debug"] .debug-memory-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; align-items: end; }
+[data-extension-owner="telos.debug"] .debug-memory-form label { display: grid; gap: 5px; color: var(--dim); font-size: 11px; }
+[data-extension-owner="telos.debug"] .debug-memory-form :is(input, select) { box-sizing: border-box; width: 100%; min-width: 0; padding: 7px; background: var(--void); color: var(--ink); border: 1px solid var(--line); font: 12px var(--mono); }
+[data-extension-owner="telos.debug"] .debug-memory-form :disabled { opacity: .6; }
+[data-extension-owner="telos.debug"] .debug-memory-results { overflow: auto; max-height: 440px; scrollbar-gutter: stable; }
+[data-extension-owner="telos.debug"] .debug-memory-results td { max-width: 420px; white-space: pre-wrap; }
+[data-extension-owner="telos.debug"] .debug-memory-results th { position: sticky; top: 0; background: var(--panel); }
+[data-extension-owner="telos.debug"] .debug-memory-results td:first-child { white-space: nowrap; }
+[data-extension-owner="telos.debug"] :is(.debug-memory-form :focus-visible, .debug-memory-results:focus-visible) { outline: 2px solid var(--bacta); outline-offset: 2px; }

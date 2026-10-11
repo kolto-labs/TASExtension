@@ -96,6 +96,8 @@ int state_init_early(void) {
     SH->save_ms = SAVE_MS_DEFAULT;
     clock_defaults();
     di_init_objects();
+    input_t empty_input = {0};
+    di_stage(&empty_input, 0, 0, g_input_hash, g_input_sha256);
     slog("state: arena %x+%x hg %x+%x shim_hg %x (%u bytes)", ARENA_BASE, ARENA_SIZE, HG_BASE, HG_SIZE,
          (u32)(uintptr_t)SH, (u32)sizeof(shim_hg));
     return 1;

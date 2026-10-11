@@ -262,6 +262,8 @@ class ShimBackend:
         self._msgs: list[str] = []                        # os events for the next tick
         self.logs: deque[dict[str, Any]] = deque(maxlen=1000)
         self.ticks: deque[dict[str, Any]] = deque(maxlen=1000)
+        self._input_sha256_by_tick: dict[tuple[int, int], bytes] = {}
+        self._restore_ticks: set[tuple[int, int]] = set()
         self.last_waited: Any = None
 
     # ------------------------------------------------------------------ lifecycle
@@ -381,16 +383,33 @@ class ShimBackend:
     def _handshake(self, conn: socket.socket) -> None:
         conn.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         self.wire = Wire(conn)
+        # Wire epochs are scoped to one native process. A relaunch may reuse
+        # the same numeric epoch/tick pair, so discard any unconsumed receipts
+        # from the prior connection rather than risking a false match.
+        self._input_sha256_by_tick.clear()
+        self._restore_ticks.clear()
         hello = self.wire.request("hello", {"proto": WIRE_PROTO})
         if hello.get("proto") != WIRE_PROTO:
             raise BackendError(f"shim speaks {hello.get('proto')!r}, not {WIRE_PROTO}")
-        # build is the loaded DLL's sha256 prefix (older builds sent a game name): it must match the pin
+        # A configured build pin is an integrity boundary. Accept the complete
+        # SHA-256 when available, otherwise the documented 16-hex build prefix;
+        # never silently downgrade a missing or malformed receipt to unpinned.
         want = str(self.cfg.get("shim", {}).get("dll_sha256", "")).lower()
-        got = str(hello.get("build", "")).lower()
-        if self.name == "shim" and want and got and all(c in "0123456789abcdef" for c in got):
-            n = min(len(want), len(got))
-            if want[:n] != got[:n]:
-                raise BackendError(f"the game loaded shim build {got}, not the pinned {want[:16]}")
+        if self.name == "shim" and want:
+            if not (1 <= len(want) <= 64 and all(c in "0123456789abcdef" for c in want)):
+                raise BackendError("shim.dll_sha256 must be a 1-to-64 character hexadecimal SHA-256 prefix")
+            full = str(hello.get("shim_sha256", "")).lower()
+            prefix = str(hello.get("build", "")).lower()
+            if full:
+                if len(full) != 64 or not all(c in "0123456789abcdef" for c in full):
+                    raise BackendError("the shim returned a malformed full SHA-256 required by shim.dll_sha256")
+                candidate = full
+            elif len(prefix) == 16 and all(c in "0123456789abcdef" for c in prefix):
+                candidate = prefix
+            else:
+                raise BackendError("the shim did not provide a verifiable build hash required by shim.dll_sha256")
+            if len(want) > len(candidate) or not candidate.startswith(want):
+                raise BackendError(f"the game loaded shim build {candidate}, not the pinned {want}")
         self.hello = hello
         self._epoch = int(hello.get("epoch", self._epoch))
         self._caps = _caps(hello, self.name)
@@ -434,6 +453,7 @@ class ShimBackend:
             batch, self._open = self._open, []
             if rec.flags & RecordFlag.RESTORE:
                 self.restore_batches += 1
+                self._restore_ticks.add((self._epoch, rec.tick))
                 continue
             self._last_end = rec.tick
             self._pending.extend(batch)
@@ -464,6 +484,7 @@ class ShimBackend:
         self._ensure_ring()
         if self.cfg.get("capture", {}).get("enabled", "auto") is not False:
             self._call("capture", {"enabled": True})
+        self.subscribe(("tick",))
         rep = self._report(self._call("start"))
         self._started = True
         self._scan_files(rep.tick)
@@ -506,8 +527,37 @@ class ShimBackend:
             pushed.append(self._events.popleft())
         if pushed:
             rep = dataclasses.replace(rep, events=(*rep.events, *pushed))
+        rep = dataclasses.replace(rep, input_sha256_by_tick=self._take_input_sha256(rep.epoch, rep.tick))
         self._tick = rep.tick
         return rep
+
+    def _take_input_sha256(self, epoch: int, through_tick: int) -> tuple[tuple[int, int, bytes], ...]:
+        """Consume only observed digests at or before this report's exact gate.
+
+        The wire push is advisory and may be absent on older shims. RESTORE
+        batches are deliberately excluded; replaying a restored tick will
+        produce a fresh, separately keyed receipt.
+        """
+        keys = sorted(key for key in self._input_sha256_by_tick
+                      if key[0] == epoch and key[1] <= through_tick)
+        rows = []
+        for key in keys:
+            digest = self._input_sha256_by_tick.pop(key)
+            if key not in self._restore_ticks:
+                rows.append((key[0], key[1], digest))
+            self._restore_ticks.discard(key)
+        self._restore_ticks = {
+            key for key in self._restore_ticks
+            if key[0] != epoch or key[1] > through_tick
+        }
+        # A stale candidate must never be retained indefinitely or reused in
+        # a later epoch. It is safe to discard only after its epoch ended.
+        if len(self._input_sha256_by_tick) > 8192:
+            self._input_sha256_by_tick = {
+                key: value for key, value in self._input_sha256_by_tick.items()
+                if key[0] == epoch and key[1] > through_tick
+            }
+        return tuple(rows)
 
     def _scan_files(self, tick: int) -> None:
         if self._files is None:
@@ -525,14 +575,21 @@ class ShimBackend:
     def _exited(self) -> StepReport:
         """The connection ended during a step: the process is gone. Ticks it finished are in the ring."""
         if self.wire is not None:
+            # Preserve complete pushes already decoded before EOF; the ring is
+            # drained first so any restore markers are known before pairing.
+            self._drain_ring()
+            self._drain_pushes()
             self.wire.close()
             self.wire = None
-        self._drain_ring()
+        else:
+            self._drain_ring()
         self._open = []
         tick = max(self._last_end, self._tick)
         self._tick = tick
         return StepReport(tick=tick, epoch=self._epoch, server_passes=1, subticks=0,
-                          verbclass=VerbClass.GATE | VerbClass.CLOCK | VerbClass.INPUT, outcome=ProcOutcome.EXITED)
+                          verbclass=VerbClass.GATE | VerbClass.CLOCK | VerbClass.INPUT,
+                          outcome=ProcOutcome.EXITED,
+                          input_sha256_by_tick=self._take_input_sha256(self._epoch, tick))
 
     def _one(self, verb: str, args: Mapping[str, Any]) -> StepReport:
         try:
@@ -554,11 +611,16 @@ class ShimBackend:
 
     @staticmethod
     def _merge(reps: Sequence[StepReport]) -> StepReport:
-        vc, evs = VerbClass.NONE, []
+        vc, evs, input_sha256_by_tick = VerbClass.NONE, [], {}
         for r in reps:
             vc |= r.verbclass
             evs.extend(r.events)
-        return dataclasses.replace(reps[-1], verbclass=vc, events=tuple(evs))
+            for epoch, tick, digest in r.input_sha256_by_tick:
+                input_sha256_by_tick[(epoch, tick)] = digest
+        hashes = tuple((epoch, tick, digest)
+                       for (epoch, tick), digest in sorted(input_sha256_by_tick.items()))
+        return dataclasses.replace(reps[-1], verbclass=vc, events=tuple(evs),
+                                   input_sha256_by_tick=hashes)
 
     def step(self, n: int, note: Any = None, first: bool = True) -> StepReport:
         """Run n ticks holding note. first=False: the note's first tick already ran (a resumed note)."""
@@ -608,7 +670,11 @@ class ShimBackend:
         return dataclasses.replace(rep, verbclass=rep.verbclass | VerbClass.WAIT)
 
     def input(self, note: Any) -> int:
-        return int(self._call("input", note_args(note))["for_tick"])
+        result = self._call("input", note_args(note))
+        tick = result.get("for_tick")
+        if type(tick) is not int or tick < 0:
+            raise BackendError("input acknowledgement has an invalid for_tick value")
+        return tick
 
     def gate(self, on: bool) -> dict[str, Any]:
         return self._call("gate", {"on": on})
@@ -758,6 +824,30 @@ class ShimBackend:
             elif kind == "log":
                 self.logs.append(p)
             elif kind == "tick":
+                raw_digest = p.get("input_sha256")
+                if raw_digest is not None:
+                    if not isinstance(raw_digest, str) or len(raw_digest) != 64:
+                        raise BackendError("tick push input_sha256 must be 64 hexadecimal characters")
+                    try:
+                        digest = bytes.fromhex(raw_digest)
+                    except ValueError:
+                        raise BackendError("tick push input_sha256 is not hexadecimal") from None
+                    if len(digest) != 32:
+                        raise BackendError("tick push input_sha256 must decode to 32 bytes")
+                    tick = p.get("tick")
+                    epoch = p.get("epoch", self._epoch)
+                    if type(tick) is not int or tick < 0 or type(epoch) is not int or epoch < 0:
+                        raise BackendError("tick push input_sha256 has an invalid epoch/tick key")
+                    key = (epoch, tick)
+                    # Restore flags are learned from the staging ring before
+                    # pushes are drained. Never attach a restore-time digest.
+                    if key in self._restore_ticks:
+                        self._restore_ticks.discard(key)
+                    else:
+                        previous = self._input_sha256_by_tick.get(key)
+                        if previous is not None and previous != digest:
+                            raise BackendError(f"conflicting input_sha256 receipts for epoch {epoch}, tick {tick}")
+                        self._input_sha256_by_tick[key] = digest
                 self.ticks.append(p)
 
     def events(self) -> Iterator[EngineEvent]:

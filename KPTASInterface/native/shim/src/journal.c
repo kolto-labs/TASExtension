@@ -10,6 +10,7 @@
 
 char g_note[256] = ".";
 u8 g_input_hash[16];
+u8 g_input_sha256[32];
 
 #define NPAGES ((EXE_DATA_END - EXE_DATA_VA) / 4096)
 static u8 g_pages[NPAGES][16];

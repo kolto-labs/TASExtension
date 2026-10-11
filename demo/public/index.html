@@ -3,254 +3,61 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>InputInterfaceTelos prototype</title>
-<meta name="description" content="Try the KPTASInterface TAS tools on a small stand-in scene in your browser.">
+<title>Stasis | Game workspace</title>
+<meta name="description" content="Run your game, inspect its state, and add tools with extension packages.">
 <meta name="color-scheme" content="dark">
 <meta name="theme-color" content="#05070a">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="ui-tokens.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="js/speedrun-playground.css">
+<link rel="stylesheet" href="js/debugger-workbench.css">
 <script type="module" src="js/app.js"></script>
+<script type="module" src="js/ui-shell.js"></script>
 </head>
-<body>
-<a class="skip" href="#roll">Skip to the piano roll</a>
+<body data-tas-extension="disabled" data-debug-extension="disabled">
+<a class="skip" href="#original-game">Skip to game</a>
+
 <header class="top">
   <div class="brand">
-    <h1>InputInterfaceTelos</h1>
-    <p class="honest">Prototype. A small stand-in scene runs in your browser so you can try the tools. It is not KotOR.</p>
+    <h1>Stasis</h1>
+    <p class="honest">Run your game. Add debugging and input tools from Extensions.</p>
   </div>
-  <div class="hstat" id="hstat" role="group" aria-label="Run status">
-    <span class="chip mono" id="h-name" title="Score name">example.score</span>
-    <label class="chip" id="h-tier-wrap"><span>Tier</span>
-      <select id="tier" aria-describedby="tier-help">
-        <option value="lab">lab</option>
-        <option value="tas">tas</option>
-        <option value="hands-off">hands-off</option>
-      </select>
-    </label>
-    <span class="chip mono" id="h-tick">tick 0</span>
-    <span class="chip mono" id="h-ep">ep 1</span>
-    <span class="chip mono" id="h-hz">60 Hz</span>
-    <label class="chip" id="h-seek-wrap"><span>Seek</span>
-      <select id="seek-mode">
-        <option value="replay">replay</option>
-        <option value="restore">restore</option>
-        <option value="hybrid">hybrid</option>
-        <option value="semantic">semantic</option>
-      </select>
-    </label>
-    <label class="chip wm" id="wm-wrap"><input type="checkbox" id="wm" checked><span class="dot" aria-hidden="true"></span><span>Watermark</span></label>
-    <button type="button" class="btn icon ovf-btn" id="ovf-btn" aria-expanded="false" aria-controls="ovf-menu" aria-label="Show epoch and seek mode">⋯</button>
-    <div class="ovf-menu" id="ovf-menu" hidden></div>
-    <p class="sr-only" id="tier-help">lab allows every seek mode and lets you hide the watermark. tas and hands-off keep the watermark on. hands-off allows replay only.</p>
-  </div>
-  <div class="files" role="group" aria-label="Files">
-    <button type="button" class="btn" id="b-export-score" title="Save score (Ctrl+S)">Export score</button>
-    <button type="button" class="btn" id="b-export-holo">Export holorecord</button>
-    <label class="btn file" id="import-label">Import<input type="file" id="f-import" accept=".score,.txt,.json" class="file-in"></label>
-  </div>
+
+  
+
 </header>
 
 <main class="cockpit" id="cockpit">
-  <section class="panel p-score" id="p-score" aria-labelledby="score-h">
-    <div class="panel-head">
-      <h2 id="score-h">Score</h2>
-      <span class="status" id="score-status" role="status"></span>
-    </div>
-    <div class="editor">
-      <div class="gutter" id="gutter" aria-hidden="true"></div>
-      <div class="edit-wrap">
-        <div class="backdrop" id="backdrop" aria-hidden="true"></div>
-        <textarea id="score" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-label="Score text" aria-describedby="score-help score-errors"></textarea>
-      </div>
-    </div>
-    <ul class="errors" id="score-errors" aria-live="polite"></ul>
-    <p class="help" id="score-help">One note per line: a tick count, then the keys held, or . for none. Lines that start with @ are directives. A # starts a comment. The lit line is the one playing.</p>
-  </section>
 
-  <section class="p-center" id="p-center" aria-label="Scene and piano roll">
+  <section class="p-center" id="p-center" aria-label="Game and captured footage">
     <div class="center-head">
-      <div class="tabs" role="tablist" aria-label="Center view">
-        <button type="button" role="tab" id="tab-scene" aria-selected="true" aria-controls="scene-pane">Stand-in scene</button>
-        <button type="button" role="tab" id="tab-real" aria-selected="false" aria-controls="real-pane" tabindex="-1">Recorded in the real game</button>
+      <div class="tabs" role="tablist" aria-label="Game and evidence views">
+        <button type="button" role="tab" id="tab-original" aria-selected="true" aria-controls="original-pane">Play KOTOR</button>
+
+        <button type="button" role="tab" id="tab-real" aria-selected="false" aria-controls="real-pane" tabindex="-1">Proof of Concept</button>
       </div>
-      <button type="button" class="btn small hide-scene" id="b-hide-scene" aria-pressed="false" aria-controls="stage-row">Hide scene</button>
+
+      
     </div>
-    <div class="scene-pane" id="scene-pane" role="tabpanel" aria-labelledby="tab-scene">
-      <div class="stage-row" id="stage-row">
-        <div class="canvas-wrap" id="canvas-wrap">
-          <canvas id="view" width="640" height="360" role="img" aria-label="Stand-in game view. The HUD shows the tick, virtual time, held inputs and tier. The corner watermark reads TAS, with a line of glyphs that reads tool assisted."></canvas>
-        </div>
-        <div class="side">
-          <div class="transport" role="toolbar" aria-label="Transport">
-            <button type="button" class="btn icon" id="b-start" aria-label="Go to start" title="Go to start (Home)">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3h2v10H3zM13 3v10L6 8z" fill="currentColor"/></svg>
-            </button>
-            <button type="button" class="btn icon" id="b-back" aria-label="Step back one tick" title="Step back one tick (,)">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3v10L4 8z" fill="currentColor"/><path d="M12 3h2v10h-2z" fill="currentColor"/></svg>
-            </button>
-            <button type="button" class="btn primary" id="b-play" aria-pressed="false" title="Play or pause (K)">
-              <svg viewBox="0 0 16 16" aria-hidden="true" id="i-play"><path d="M4 3v10l9-5z" fill="currentColor"/></svg>
-              <svg viewBox="0 0 16 16" aria-hidden="true" id="i-pause" hidden><path d="M4 3h3v10H4zM9 3h3v10H9z" fill="currentColor"/></svg>
-              <span id="play-label">Play</span>
-            </button>
-            <button type="button" class="btn icon" id="b-step" aria-label="Step one tick" title="Step one tick (.)">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 3h2v10H2zM5 3v10l7-5z" fill="currentColor"/></svg>
-            </button>
-            <button type="button" class="btn icon" id="b-end" aria-label="Go to end" title="Go to the end of the score (End)">
-              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M11 3h2v10h-2zM3 3v10l7-5z" fill="currentColor"/></svg>
-            </button>
-            <label class="field"><span>Speed</span>
-              <select id="speed">
-                <option value="0.25">0.25x</option>
-                <option value="0.5">0.5x</option>
-                <option value="1" selected>1x</option>
-                <option value="2">2x</option>
-                <option value="4">4x</option>
-                <option value="16">16x</option>
-              </select>
-            </label>
-          </div>
-          <div class="rec" role="group" aria-label="Record">
-            <button type="button" class="btn rec-btn" id="b-rec" aria-pressed="false" aria-describedby="rec-help">Record</button>
-            <div class="pad" id="pad" role="group" aria-label="Keys to record">
-              <button type="button" class="padk" data-k="w" aria-pressed="false" disabled>w</button>
-              <button type="button" class="padk" data-k="a" aria-pressed="false" disabled>a</button>
-              <button type="button" class="padk" data-k="s" aria-pressed="false" disabled>s</button>
-              <button type="button" class="padk" data-k="d" aria-pressed="false" disabled>d</button>
-              <button type="button" class="padk" data-k="lmb" aria-pressed="false" disabled>lmb</button>
-              <button type="button" class="padk" data-k="rmb" aria-pressed="false" disabled>rmb</button>
-            </div>
-          </div>
-          <p class="help compact-sr" id="rec-help">Record writes the pad keys into the score at each new tick. Click a pad key to hold or release it. Your keyboard never sends game input.</p>
-          <div class="row">
-            <label class="field"><span>Path budget</span>
-              <select id="budget" title="The thug may expand this many nodes per path search. The real game uses 10 ms of wall time instead, so its path can change from run to run.">
-                <option value="8">8 nodes</option>
-                <option value="32" selected>32 nodes</option>
-                <option value="128">128 nodes</option>
-              </select>
-            </label>
-            <label class="check"><input type="checkbox" id="show-path" checked> <span>Show the search</span></label>
-          </div>
-          <p class="readout mono" id="readout"></p>
-          <p class="status line" id="seek-report" role="status"></p>
-        </div>
-      </div>
-      <div class="timeline">
-        <canvas id="timeline" height="56" tabindex="0" role="slider" aria-label="Holorecord strip. Arrows step, drag to seek." aria-valuemin="0" aria-valuemax="0" aria-valuenow="0"></canvas>
-        <p class="status line" id="stage-status" role="status"></p>
-      </div>
-      <div class="tabs compact-only" role="tablist" aria-label="Roll or score" id="rs-tabs">
-        <button type="button" role="tab" id="tab-roll" aria-selected="true" aria-controls="p-roll">Roll</button>
-        <button type="button" role="tab" id="tab-score" aria-selected="false" aria-controls="p-score" tabindex="-1">Score</button>
-      </div>
-      <section class="panel p-roll" id="p-roll" aria-labelledby="roll-h">
-        <div class="panel-head">
-          <h2 id="roll-h">Piano roll</h2>
-          <p class="legend compact-sr">
-            <span class="sw sw-green"></span>greenzone
-            <span class="sw sw-rp"></span>restore point
-            <span class="sw sw-load"></span>wait or load
-            <span class="sw sw-mark"></span>@mark
-            <span class="sw sw-div"></span>first divergence
-            <span class="sw sw-empty"></span>not played
-          </p>
-          <div class="row">
-            <button type="button" class="btn small" id="b-find" title="Find a mark (Ctrl+F in the roll)">Find mark</button>
-            <button type="button" class="btn small" id="b-branch" title="Branch at the selected tick (Ctrl+B in the roll)">Branch here</button>
-          </div>
-        </div>
-        <div class="roll" id="roll" tabindex="0" role="application" aria-roledescription="piano roll" aria-label="Piano roll" aria-describedby="roll-help">
-          <div class="roll-scroll">
-            <div class="roll-head" aria-hidden="true"></div>
-            <canvas class="roll-canvas"></canvas>
-            <div class="roll-spacer"></div>
-          </div>
-        </div>
-        <p class="help compact-sr" id="roll-help">Click a cell to toggle it, or drag to paint. Click a tick number to seek. Keys: arrows move, Shift+left or right moves 10, Shift+up or down extends, [ and ] change column, T toggles, Delete clears, N adds a mark, Enter seeks, Shift+F10 opens the menu.</p>
-        <p class="sr-only" id="roll-live" aria-live="polite"></p>
-      </section>
-    </div>
+    <p class="target-scope" id="target-scope" role="status" aria-live="polite">Target: KOTOR · Connecting</p>
+
+    <div class="original-pane" id="original-pane" role="tabpanel" aria-labelledby="tab-original"><div id="original-game" tabindex="-1"></div></div>
     <div class="real-pane" id="real-pane" role="tabpanel" aria-labelledby="tab-real" hidden>
+      <aside class="panel methodology-note proof-note" aria-labelledby="proof-heading">
+        <h2 id="proof-heading">Proof of Concept · Recorded footage</h2>
+        <p>Explore captured KOTOR footage alongside its available input observations. Source and timing details are shown with each capture.</p>
+      </aside>
       <div class="footage" id="footage"></div>
     </div>
+
   </section>
 
-  <aside class="p-right" id="p-right" aria-label="Branches and memory">
-    <div class="tabs compact-only" role="tablist" aria-label="Branches or memory" id="bm-tabs">
-      <button type="button" role="tab" id="tab-branches" aria-selected="true" aria-controls="p-branches">Branches</button>
-      <button type="button" role="tab" id="tab-memory" aria-selected="false" aria-controls="p-memory" tabindex="-1">Memory</button>
-    </div>
-    <section class="panel p-branches" id="p-branches" aria-labelledby="br-h">
-      <div class="panel-head">
-        <h2 id="br-h">Branches</h2>
-        <button type="button" class="btn small" id="b-branch2" title="Branch at the selected tick">Branch here</button>
-      </div>
-      <ul class="branches" id="branches"></ul>
-      <div class="panel-head hist-head">
-        <h3 id="hist-h">History</h3>
-        <div class="row">
-          <button type="button" class="btn small" id="b-undo" title="Undo (Ctrl+Z)">Undo</button>
-          <button type="button" class="btn small" id="b-redo" title="Redo (Ctrl+Shift+Z)">Redo</button>
-        </div>
-      </div>
-      <ol class="history" id="history" aria-labelledby="hist-h"></ol>
-    </section>
-    <section class="panel p-memory" id="p-memory" aria-labelledby="mem-h">
-      <div class="panel-head">
-        <h2 id="mem-h">Memory</h2>
-        <div class="tabs small" role="tablist" aria-label="Memory view">
-          <button type="button" role="tab" id="tab-watch" aria-selected="true" aria-controls="watch-pane">Watch</button>
-          <button type="button" role="tab" id="tab-hex" aria-selected="false" aria-controls="hex-pane" tabindex="-1">Hex</button>
-        </div>
-      </div>
-      <p class="help warn" id="mem-note" hidden></p>
-      <div id="watch-pane" role="tabpanel" aria-labelledby="tab-watch">
-        <table class="watch">
-          <caption class="sr-only">Watched values at the playhead</caption>
-          <thead><tr><th scope="col">Expression</th><th scope="col">Value</th><th scope="col">Last 64 ticks</th><th scope="col"><span class="sr-only">Remove</span></th></tr></thead>
-          <tbody id="watch-body"></tbody>
-        </table>
-        <div class="row add-watch">
-          <label class="sr-only" for="watch-in">New watch expression</label>
-          <input id="watch-in" class="mono" placeholder="pc.hp, ents[2].x, rng" autocomplete="off" spellcheck="false">
-          <button type="button" class="btn small" id="b-watch">Add watch</button>
-        </div>
-        <p class="help">Double-click an expression to edit it. Values are read at the playhead.</p>
-      </div>
-      <div id="hex-pane" role="tabpanel" aria-labelledby="tab-hex" hidden>
-        <p class="help">Bytes of the canonical state string at the playhead. Bytes that changed on this tick are lit. A real backend lists page refs here instead.</p>
-        <pre class="hex" id="hex" tabindex="0" aria-label="State bytes"></pre>
-      </div>
-    </section>
-  </aside>
-
-  <section class="panel p-console" id="p-console" aria-labelledby="con-h">
-    <h2 class="sr-only" id="con-h">Console</h2>
-    <div class="con-out" id="con-out" role="log" aria-live="polite" tabindex="0" aria-label="Console output"></div>
-    <div class="con-in">
-      <label for="cli" class="mono prompt">telos&gt;</label>
-      <input id="cli" class="mono" autocomplete="off" spellcheck="false" aria-describedby="cli-help" aria-controls="cli-sugg">
-      <div class="cli-sugg" id="cli-sugg" role="group" aria-label="Seek modes" hidden></div>
-      <p class="sr-only" id="cli-help">Type a score line or a telos command, then press Enter. Type help for the list. Up and down step through history.</p>
-    </div>
-  </section>
 </main>
 
 <footer class="foot">
-  <p>Part of KPHarness by Kolto Labs. Not affiliated with Lucasfilm, Disney, BioWare, Obsidian or Aspyr.</p>
+  <p>Part of Kolto Tank by Kolto Labs. Not affiliated with Lucasfilm, Disney, BioWare, Obsidian or Aspyr.</p>
 </footer>
-<div class="menu" id="ctx-menu" role="menu" aria-label="Roll actions" hidden></div>
-<dialog id="dlg" aria-labelledby="dlg-msg">
-  <p id="dlg-msg"></p>
-  <input id="dlg-in" class="mono" autocomplete="off" spellcheck="false" list="dlg-list" aria-labelledby="dlg-msg">
-  <datalist id="dlg-list"></datalist>
-  <div class="row dlg-buttons">
-    <button type="button" class="btn primary" id="dlg-ok">OK</button>
-    <button type="button" class="btn" id="dlg-cancel">Cancel</button>
-  </div>
-</dialog>
-<div class="tip" id="tip" role="tooltip" hidden></div>
-<div class="thumb-pop" id="thumb-pop" hidden><img id="thumb-img" alt=""><span id="thumb-cap" class="mono"></span></div>
+
 </body>
 </html>

@@ -1,0 +1,3236 @@
+{
+  "schema": "kptas.browser-visible-inputs/v1",
+  "artifact": "r4ng3__submitted-20230725__acquired-20261011T003106Z__run-y4ol3jkz__official-vod__frames-7200-10800",
+  "read_only": true,
+  "projection_execution_disabled": true,
+  "replay_qualified": false,
+  "timeline_mode": "selected-observations",
+  "frame_count": 3600,
+  "source_frame_origin": 7200,
+  "nominal_source_fps": 60,
+  "source_primary_correspondence_verified": true,
+  "physical_inputs_complete": false,
+  "source": {
+    "run_id": "y4ol3jkz",
+    "runner": "R4NG3",
+    "submission_date": "2023-07-25",
+    "acquired_at_utc": "2026-10-11T00:31:06Z",
+    "submission_url": "https://www.speedrun.com/kotor1/runs/y4ol3jkz",
+    "source_video_url": "https://www.youtube.com/watch?v=zdoG5XK6wl0",
+    "source_relationship": "official video linked by the verified submission record",
+    "video_sha256": "5400e414b292a3830cabec3e3b7f39c2ccb2c623f9d51d5f7b8583cd14b7e5b2",
+    "video_bytes": 543926163,
+    "video_file_name": "k1-r4ng3-official-1080p60.mp4",
+    "video_codec": "H.264",
+    "dimensions": [
+      1920,
+      1080
+    ],
+    "frame_rate": "60/1",
+    "container_duration_seconds": 1447.933333,
+    "decoder_frame_count": 86876,
+    "observed_source_frame_range": [
+      7200,
+      10800
+    ],
+    "capture_method": "OpenCV sequential decode from exact sought source frame; source frame index retained"
+  },
+  "parts": [
+    {
+      "source_part": 1,
+      "artifact": "r4ng3__submitted-20230725__acquired-20261011T003106Z__run-y4ol3jkz__official-vod__frames-7200-10800",
+      "first_source_frame": 7200,
+      "last_source_frame": 10799,
+      "selected_frame_count": 3600,
+      "observation_path": "observations.json",
+      "source_video_url": "https://www.youtube.com/watch?v=zdoG5XK6wl0"
+    }
+  ],
+  "state_semantics": {
+    "held": "visualizer cells classified as white-highlighted in this video frame; this is not asserted to be a physical key hold",
+    "unknown": "cell mean luminance fell in the undecidable interval between inactive and active thresholds",
+    "event_compression": "complete state emitted at frame 0 and whenever held/unknown sets change"
+  },
+  "playback_alignment": {
+    "coordinate": "zero-based decoded source-video frame index",
+    "approximate_seconds": "source_frame / 60",
+    "source_video_frame_alignment": "sequential frame index; CFR 60/1 reported by ffprobe",
+    "player_alignment_qualified": false,
+    "game_frame_alignment_qualified": false,
+    "game_input_sampling_boundary_qualified": false,
+    "physical_hold_semantics_qualified": false
+  },
+  "visual_extraction": {
+    "method": "mean grayscale luminance over manually calibrated visualizer cell interior",
+    "roi_coordinate_system": "1920x1080 absolute pixel coordinates, x0/y0 inclusive, x1/y1 exclusive",
+    "sampling_inset_pixels": 5,
+    "active_threshold_inclusive": 205.0,
+    "inactive_threshold_exclusive": 145.0,
+    "ambiguous_range": [
+      145.0,
+      205.0
+    ],
+    "roi_calibration_reference_source_frame": 18000,
+    "calibration_reference_time_seconds": 300,
+    "calibration_note": "manual inspection confirms the lower-left keyboard/mouse panel and W highlight; cell captions change with game state, so variable action cells are represented by stable visual-slot IDs rather than guessed keys",
+    "manual_caption_samples": [
+      {
+        "source_frame": 18000,
+        "caption_note": "action cells show key-like captions including A/S/D/F/G and Z/X/C/V/B"
+      },
+      {
+        "source_frame": 21600,
+        "caption_note": "same cells instead show action captions including Items/QS/Equip/Cncl/Opts/Lvl/Round/Swing/Walk"
+      }
+    ],
+    "undecidable_cell_frame_observations": 58,
+    "active_frames_by_lane": {
+      "esc": 125,
+      "f1": 0,
+      "f2": 0,
+      "f3": 0,
+      "f4": 102,
+      "grave": 0,
+      "1": 5,
+      "2": 6,
+      "3": 0,
+      "4": 8,
+      "5": 0,
+      "6": 0,
+      "7": 0,
+      "tab": 40,
+      "q": 35,
+      "w": 957,
+      "e": 165,
+      "tabadj_1": 13,
+      "tabadj_2": 0,
+      "solo": 11,
+      "action_row_1_slot_1": 0,
+      "action_row_1_slot_2": 0,
+      "action_row_1_slot_3": 140,
+      "action_row_1_slot_4": 27,
+      "action_row_1_slot_5": 0,
+      "enter": 340,
+      "action_row_2_slot_1": 0,
+      "action_row_2_slot_2": 22,
+      "action_row_2_slot_3": 11,
+      "action_row_2_slot_4": 0,
+      "action_row_2_slot_5": 0,
+      "action_row_2_slot_6": 0,
+      "ctrl": 0,
+      "win": 0,
+      "alt": 126,
+      "space": 6,
+      "lmb": 244,
+      "rmb": 237,
+      "left": 0,
+      "down": 0,
+      "right": 0,
+      "up": 21
+    }
+  },
+  "lanes": [
+    {
+      "id": "esc",
+      "label": "Esc",
+      "kind": "key",
+      "score_token": "esc",
+      "visual_roi": [
+        7,
+        870,
+        39,
+        902
+      ]
+    },
+    {
+      "id": "f1",
+      "label": "F1",
+      "kind": "key",
+      "score_token": "f1",
+      "visual_roi": [
+        72,
+        870,
+        104,
+        902
+      ]
+    },
+    {
+      "id": "f2",
+      "label": "F2",
+      "kind": "key",
+      "score_token": "f2",
+      "visual_roi": [
+        106,
+        870,
+        138,
+        902
+      ]
+    },
+    {
+      "id": "f3",
+      "label": "F3",
+      "kind": "key",
+      "score_token": "f3",
+      "visual_roi": [
+        139,
+        870,
+        171,
+        902
+      ]
+    },
+    {
+      "id": "f4",
+      "label": "F4",
+      "kind": "key",
+      "score_token": "f4",
+      "visual_roi": [
+        172,
+        870,
+        204,
+        902
+      ]
+    },
+    {
+      "id": "grave",
+      "label": "unlabeled key cell",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "visual_roi": [
+        7,
+        911,
+        39,
+        943
+      ]
+    },
+    {
+      "id": "1",
+      "label": "1",
+      "kind": "key",
+      "score_token": "1",
+      "visual_roi": [
+        39,
+        911,
+        70,
+        943
+      ]
+    },
+    {
+      "id": "2",
+      "label": "2",
+      "kind": "key",
+      "score_token": "2",
+      "visual_roi": [
+        72,
+        911,
+        103,
+        943
+      ]
+    },
+    {
+      "id": "3",
+      "label": "3",
+      "kind": "key",
+      "score_token": "3",
+      "visual_roi": [
+        105,
+        911,
+        136,
+        943
+      ]
+    },
+    {
+      "id": "4",
+      "label": "4",
+      "kind": "key",
+      "score_token": "4",
+      "visual_roi": [
+        138,
+        911,
+        169,
+        943
+      ]
+    },
+    {
+      "id": "5",
+      "label": "5",
+      "kind": "key",
+      "score_token": "5",
+      "visual_roi": [
+        171,
+        911,
+        202,
+        943
+      ]
+    },
+    {
+      "id": "6",
+      "label": "6",
+      "kind": "key",
+      "score_token": "6",
+      "visual_roi": [
+        204,
+        911,
+        235,
+        943
+      ]
+    },
+    {
+      "id": "7",
+      "label": "7",
+      "kind": "key",
+      "score_token": "7",
+      "visual_roi": [
+        237,
+        911,
+        268,
+        943
+      ]
+    },
+    {
+      "id": "tab",
+      "label": "Tab",
+      "kind": "key",
+      "score_token": "tab",
+      "visual_roi": [
+        7,
+        944,
+        55,
+        976
+      ]
+    },
+    {
+      "id": "q",
+      "label": "Q",
+      "kind": "key",
+      "score_token": "q",
+      "visual_roi": [
+        57,
+        944,
+        88,
+        976
+      ]
+    },
+    {
+      "id": "w",
+      "label": "W",
+      "kind": "key",
+      "score_token": "w",
+      "visual_roi": [
+        90,
+        944,
+        120,
+        976
+      ]
+    },
+    {
+      "id": "e",
+      "label": "E",
+      "kind": "key",
+      "score_token": "e",
+      "visual_roi": [
+        122,
+        944,
+        153,
+        976
+      ]
+    },
+    {
+      "id": "tabadj_1",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        155,
+        944,
+        186,
+        976
+      ]
+    },
+    {
+      "id": "tabadj_2",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        188,
+        944,
+        218,
+        976
+      ]
+    },
+    {
+      "id": "solo",
+      "label": "SoloMode",
+      "kind": "semantic_label",
+      "score_token": null,
+      "visual_roi": [
+        7,
+        982,
+        64,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_1_slot_1",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        66,
+        982,
+        97,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_1_slot_2",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        99,
+        982,
+        129,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_1_slot_3",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        131,
+        982,
+        162,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_1_slot_4",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        164,
+        982,
+        195,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_1_slot_5",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        196,
+        982,
+        227,
+        1015
+      ]
+    },
+    {
+      "id": "enter",
+      "label": "Enter",
+      "kind": "key",
+      "score_token": "enter",
+      "visual_roi": [
+        230,
+        982,
+        302,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_2_slot_1",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        7,
+        1017,
+        80,
+        1049
+      ]
+    },
+    {
+      "id": "action_row_2_slot_2",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        81,
+        1017,
+        112,
+        1049
+      ]
+    },
+    {
+      "id": "action_row_2_slot_3",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        114,
+        1017,
+        145,
+        1049
+      ]
+    },
+    {
+      "id": "action_row_2_slot_4",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        147,
+        1017,
+        178,
+        1049
+      ]
+    },
+    {
+      "id": "action_row_2_slot_5",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        180,
+        1017,
+        211,
+        1049
+      ]
+    },
+    {
+      "id": "action_row_2_slot_6",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        212,
+        1017,
+        243,
+        1049
+      ]
+    },
+    {
+      "id": "ctrl",
+      "label": "Ctrl",
+      "kind": "unresolved_modifier",
+      "score_token": null,
+      "visual_roi": [
+        7,
+        1049,
+        48,
+        1078
+      ]
+    },
+    {
+      "id": "win",
+      "label": "Win",
+      "kind": "unresolved_modifier",
+      "score_token": null,
+      "visual_roi": [
+        50,
+        1049,
+        96,
+        1078
+      ]
+    },
+    {
+      "id": "alt",
+      "label": "Alt",
+      "kind": "unresolved_modifier",
+      "score_token": null,
+      "visual_roi": [
+        98,
+        1049,
+        138,
+        1078
+      ]
+    },
+    {
+      "id": "space",
+      "label": "Space",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "visual_roi": [
+        140,
+        1049,
+        333,
+        1078
+      ]
+    },
+    {
+      "id": "lmb",
+      "label": "LMB",
+      "kind": "mouse_button",
+      "score_token": "lmb",
+      "visual_roi": [
+        410,
+        944,
+        442,
+        976
+      ]
+    },
+    {
+      "id": "rmb",
+      "label": "RMB",
+      "kind": "mouse_button",
+      "score_token": "rmb",
+      "visual_roi": [
+        446,
+        944,
+        478,
+        976
+      ]
+    },
+    {
+      "id": "left",
+      "label": "Left",
+      "kind": "key",
+      "score_token": "left",
+      "visual_roi": [
+        365,
+        1027,
+        398,
+        1059
+      ]
+    },
+    {
+      "id": "down",
+      "label": "Down",
+      "kind": "key",
+      "score_token": "down",
+      "visual_roi": [
+        400,
+        1027,
+        433,
+        1059
+      ]
+    },
+    {
+      "id": "right",
+      "label": "Right",
+      "kind": "key",
+      "score_token": "right",
+      "visual_roi": [
+        435,
+        1027,
+        468,
+        1059
+      ]
+    },
+    {
+      "id": "up",
+      "label": "Up",
+      "kind": "key",
+      "score_token": "up",
+      "visual_roi": [
+        400,
+        1008,
+        433,
+        1040
+      ]
+    }
+  ],
+  "events": [
+    {
+      "frame": 0,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 18,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 24,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 29,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 32,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 35,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 40,
+      "held": [
+        "action_row_2_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 46,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 49,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 54,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 60,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 66,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 68,
+      "held": [
+        "esc",
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 71,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 74,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 77,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 80,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 83,
+      "held": [
+        "action_row_1_slot_3",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 85,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 88,
+      "held": [
+        "action_row_1_slot_3",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 91,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 94,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 97,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 99,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 102,
+      "held": [
+        "esc",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 105,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 108,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 111,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 116,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 122,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 125,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 128,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 131,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 136,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 139,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 142,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 147,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 150,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 155,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 158,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 161,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 167,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 176,
+      "held": [
+        "action_row_1_slot_3",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 179,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 184,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 187,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 190,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 193,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 198,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 203,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 206,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 209,
+      "held": [
+        "action_row_1_slot_3",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 212,
+      "held": [
+        "action_row_1_slot_3",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 215,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 218,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 221,
+      "held": [
+        "esc",
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 224,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 226,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 232,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 234,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 237,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 243,
+      "held": [
+        "action_row_1_slot_3",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 246,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 249,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 252,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 257,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 263,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 266,
+      "held": [
+        "action_row_1_slot_3",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 271,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 274,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 276,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 279,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 282,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 288,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 291,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 294,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 299,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 305,
+      "held": [
+        "action_row_1_slot_3",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 311,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 313,
+      "held": [
+        "esc",
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 316,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 319,
+      "held": [
+        "esc",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 322,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 324,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 327,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 330,
+      "held": [
+        "action_row_1_slot_3",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 333,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 336,
+      "held": [
+        "action_row_1_slot_3",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 339,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 341,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 344,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 347,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 352,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 358,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 361,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 364,
+      "held": [
+        "action_row_1_slot_3",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 367,
+      "held": [
+        "action_row_1_slot_3",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 372,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 375,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 378,
+      "held": [
+        "esc",
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 381,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 384,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 386,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 389,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 392,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 395,
+      "held": [
+        "action_row_1_slot_3",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 397,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 403,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 406,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 409,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 412,
+      "held": [
+        "esc",
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 414,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 417,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 420,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 423,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 428,
+      "held": [
+        "action_row_1_slot_3",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 431,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 434,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 440,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 442,
+      "held": [
+        "esc",
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 445,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 448,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 459,
+      "held": [
+        "action_row_1_slot_3",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 462,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 465,
+      "held": [
+        "action_row_1_slot_3",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 469,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 471,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 473,
+      "held": [
+        "esc",
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 476,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 479,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 485,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 488,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 493,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 502,
+      "held": [
+        "action_row_1_slot_3",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 505,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 508,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 511,
+      "held": [
+        "esc",
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 513,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 518,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 521,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 527,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 533,
+      "held": [
+        "action_row_2_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 538,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 552,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 558,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 561,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 566,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 572,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 575,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 580,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 586,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 589,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 592,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 594,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 600,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 606,
+      "held": [],
+      "unknown": [
+        "right"
+      ]
+    },
+    {
+      "frame": 611,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 614,
+      "held": [
+        "enter",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 617,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 620,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 625,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 631,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 651,
+      "held": [
+        "action_row_1_slot_4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 657,
+      "held": [
+        "tab",
+        "action_row_1_slot_4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 659,
+      "held": [
+        "tab"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 662,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 668,
+      "held": [],
+      "unknown": [
+        "down",
+        "right"
+      ]
+    },
+    {
+      "frame": 670,
+      "held": [],
+      "unknown": [
+        "right"
+      ]
+    },
+    {
+      "frame": 673,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 679,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 682,
+      "held": [
+        "enter",
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 684,
+      "held": [
+        "e",
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 687,
+      "held": [
+        "q",
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 690,
+      "held": [
+        "tab",
+        "q",
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 693,
+      "held": [
+        "tab"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 696,
+      "held": [
+        "enter",
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 701,
+      "held": [
+        "e",
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 704,
+      "held": [
+        "tab",
+        "q",
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 710,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 715,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 721,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 724,
+      "held": [
+        "action_row_1_slot_4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 727,
+      "held": [
+        "tab",
+        "action_row_1_slot_4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 729,
+      "held": [
+        "tab",
+        "space"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 735,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 744,
+      "held": [
+        "w",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 785,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 805,
+      "held": [
+        "esc",
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 808,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 811,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 814,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 817,
+      "held": [
+        "enter"
+      ],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 822,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 836,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 862,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 864,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 867,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1003,
+      "held": [
+        "w",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1009,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1020,
+      "held": [
+        "w",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1025,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1037,
+      "held": [
+        "w",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1040,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1051,
+      "held": [
+        "w",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1054,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1063,
+      "held": [
+        "w",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1068,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1085,
+      "held": [
+        "w",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1091,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1124,
+      "held": [
+        "q",
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1130,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1135,
+      "held": [
+        "q",
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1141,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1150,
+      "held": [
+        "q",
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1155,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1166,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1169,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1172,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1178,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1181,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1186,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1189,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1192,
+      "held": [
+        "1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1194,
+      "held": [
+        "1",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1197,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1200,
+      "held": [
+        "2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1203,
+      "held": [
+        "2",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1206,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1209,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1212,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1217,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1220,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1223,
+      "held": [
+        "4",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1226,
+      "held": [
+        "4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1231,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1234,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1239,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1245,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1281,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1287,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1301,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1304,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1310,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1315,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1318,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1324,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1327,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1332,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1335,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1341,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1350,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1352,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1366,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1369,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1375,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1377,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1383,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1433,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1436,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1439,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1442,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1448,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1462,
+      "held": [
+        "lmb",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1468,
+      "held": [
+        "esc",
+        "lmb",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1476,
+      "held": [
+        "lmb",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1496,
+      "held": [
+        "w",
+        "lmb",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1518,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1833,
+      "held": [
+        "w",
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1881,
+      "held": [
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1884,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2027,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2035,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2069,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2075,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2083,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2089,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2176,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2185,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2191,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2193,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2201,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2213,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2219,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2232,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2235,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2260,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2266,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2291,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 2300,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2308,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2314,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2319,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2322,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2325,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2328,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2525,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 2528,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2533,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 2539,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2541,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 2547,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2722,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2727,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2739,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2741,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2753,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2758,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2761,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2764,
+      "held": [
+        "action_row_1_slot_3",
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2766,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2770,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2797,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2803,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2823,
+      "held": [
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2826,
+      "held": [
+        "enter",
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2831,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2834,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2845,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2854,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2868,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2873,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2896,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2899,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2905,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2908,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2913,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2918,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3079,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3084,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3124,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3127,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3135,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3141,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3267,
+      "held": [
+        "action_row_1_slot_4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3273,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3276,
+      "held": [
+        "enter"
+      ],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 3278,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 3281,
+      "held": [
+        "enter"
+      ],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 3284,
+      "held": [
+        "action_row_1_slot_4",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3287,
+      "held": [
+        "action_row_1_slot_4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3292,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3307,
+      "held": [
+        "solo"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3318,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3321,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3326,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3329,
+      "held": [
+        "tab",
+        "q"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3335,
+      "held": [
+        "tab"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3338,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3346,
+      "held": [
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3352,
+      "held": [
+        "lmb",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3363,
+      "held": [
+        "w",
+        "lmb",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3377,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3399,
+      "held": [
+        "w",
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3402,
+      "held": [
+        "w",
+        "e",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3422,
+      "held": [
+        "w",
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3459,
+      "held": [
+        "w",
+        "e",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3464,
+      "held": [
+        "w",
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3467,
+      "held": [
+        "w",
+        "e",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3472,
+      "held": [
+        "w",
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3475,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3481,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3484,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3490,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3493,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3495,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3501,
+      "held": [
+        "tab"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3504,
+      "held": [
+        "tab",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3507,
+      "held": [
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3509,
+      "held": [
+        "lmb",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3512,
+      "held": [
+        "w",
+        "lmb",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3565,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3579,
+      "held": [
+        "w",
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3599,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    }
+  ],
+  "unknown": [
+    "Overlay state may represent highlight/tap display rather than sustained physical input.",
+    "Frame index follows the official video only; run start, game start, and pauses/loading transitions are not globally aligned.",
+    "Game input polling, simulation frame boundary, and hold/release duration are unqualified.",
+    "Some visual cells are semantic/ambiguous and intentionally have no score token.",
+    "Mouse movement position is not extracted; only labeled LMB/RMB and arrow-like key cells are sampled."
+  ],
+  "binding_summary": {
+    "tokenized_cells_not_replay_qualified": [
+      "esc",
+      "f1",
+      "f2",
+      "f3",
+      "f4",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "tab",
+      "q",
+      "w",
+      "e",
+      "enter",
+      "lmb",
+      "rmb",
+      "left",
+      "down",
+      "right",
+      "up"
+    ],
+    "unmapped_or_semantic_cells": [
+      "grave",
+      "tabadj_1",
+      "tabadj_2",
+      "solo",
+      "action_row_1_slot_1",
+      "action_row_1_slot_2",
+      "action_row_1_slot_3",
+      "action_row_1_slot_4",
+      "action_row_1_slot_5",
+      "action_row_2_slot_1",
+      "action_row_2_slot_2",
+      "action_row_2_slot_3",
+      "action_row_2_slot_4",
+      "action_row_2_slot_5",
+      "action_row_2_slot_6",
+      "ctrl",
+      "win",
+      "alt",
+      "space"
+    ],
+    "replay_disabled_reason": "visual highlight semantics, physical hold duration, game-frame alignment, and initial game state are not qualified"
+  }
+}

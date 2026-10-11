@@ -1,0 +1,2580 @@
+{
+  "schema": "kptas.browser-visible-inputs/v1",
+  "artifact": "r4ng3__submitted-20230725__acquired-20261011T003106Z__run-y4ol3jkz__official-vod__frames-50400-54000",
+  "read_only": true,
+  "projection_execution_disabled": true,
+  "replay_qualified": false,
+  "timeline_mode": "selected-observations",
+  "frame_count": 3600,
+  "source_frame_origin": 50400,
+  "nominal_source_fps": 60,
+  "source_primary_correspondence_verified": true,
+  "physical_inputs_complete": false,
+  "source": {
+    "run_id": "y4ol3jkz",
+    "runner": "R4NG3",
+    "submission_date": "2023-07-25",
+    "acquired_at_utc": "2026-10-11T00:31:06Z",
+    "submission_url": "https://www.speedrun.com/kotor1/runs/y4ol3jkz",
+    "source_video_url": "https://www.youtube.com/watch?v=zdoG5XK6wl0",
+    "source_relationship": "official video linked by the verified submission record",
+    "video_sha256": "5400e414b292a3830cabec3e3b7f39c2ccb2c623f9d51d5f7b8583cd14b7e5b2",
+    "video_bytes": 543926163,
+    "video_file_name": "k1-r4ng3-official-1080p60.mp4",
+    "video_codec": "H.264",
+    "dimensions": [
+      1920,
+      1080
+    ],
+    "frame_rate": "60/1",
+    "container_duration_seconds": 1447.933333,
+    "decoder_frame_count": 86876,
+    "observed_source_frame_range": [
+      50400,
+      54000
+    ],
+    "capture_method": "OpenCV sequential decode from exact sought source frame; source frame index retained"
+  },
+  "parts": [
+    {
+      "source_part": 1,
+      "artifact": "r4ng3__submitted-20230725__acquired-20261011T003106Z__run-y4ol3jkz__official-vod__frames-50400-54000",
+      "first_source_frame": 50400,
+      "last_source_frame": 53999,
+      "selected_frame_count": 3600,
+      "observation_path": "observations.json",
+      "source_video_url": "https://www.youtube.com/watch?v=zdoG5XK6wl0"
+    }
+  ],
+  "state_semantics": {
+    "held": "visualizer cells classified as white-highlighted in this video frame; this is not asserted to be a physical key hold",
+    "unknown": "cell mean luminance fell in the undecidable interval between inactive and active thresholds",
+    "event_compression": "complete state emitted at frame 0 and whenever held/unknown sets change"
+  },
+  "playback_alignment": {
+    "coordinate": "zero-based decoded source-video frame index",
+    "approximate_seconds": "source_frame / 60",
+    "source_video_frame_alignment": "sequential frame index; CFR 60/1 reported by ffprobe",
+    "player_alignment_qualified": false,
+    "game_frame_alignment_qualified": false,
+    "game_input_sampling_boundary_qualified": false,
+    "physical_hold_semantics_qualified": false
+  },
+  "visual_extraction": {
+    "method": "mean grayscale luminance over manually calibrated visualizer cell interior",
+    "roi_coordinate_system": "1920x1080 absolute pixel coordinates, x0/y0 inclusive, x1/y1 exclusive",
+    "sampling_inset_pixels": 5,
+    "active_threshold_inclusive": 205.0,
+    "inactive_threshold_exclusive": 145.0,
+    "ambiguous_range": [
+      145.0,
+      205.0
+    ],
+    "roi_calibration_reference_source_frame": 18000,
+    "calibration_reference_time_seconds": 300,
+    "calibration_note": "manual inspection confirms the lower-left keyboard/mouse panel and W highlight; cell captions change with game state, so variable action cells are represented by stable visual-slot IDs rather than guessed keys",
+    "manual_caption_samples": [
+      {
+        "source_frame": 18000,
+        "caption_note": "action cells show key-like captions including A/S/D/F/G and Z/X/C/V/B"
+      },
+      {
+        "source_frame": 21600,
+        "caption_note": "same cells instead show action captions including Items/QS/Equip/Cncl/Opts/Lvl/Round/Swing/Walk"
+      }
+    ],
+    "undecidable_cell_frame_observations": 114,
+    "active_frames_by_lane": {
+      "esc": 35,
+      "f1": 0,
+      "f2": 0,
+      "f3": 0,
+      "f4": 48,
+      "grave": 0,
+      "1": 29,
+      "2": 12,
+      "3": 18,
+      "4": 14,
+      "5": 6,
+      "6": 0,
+      "7": 0,
+      "tab": 0,
+      "q": 43,
+      "w": 390,
+      "e": 5,
+      "tabadj_1": 46,
+      "tabadj_2": 0,
+      "solo": 0,
+      "action_row_1_slot_1": 0,
+      "action_row_1_slot_2": 0,
+      "action_row_1_slot_3": 38,
+      "action_row_1_slot_4": 0,
+      "action_row_1_slot_5": 0,
+      "enter": 131,
+      "action_row_2_slot_1": 0,
+      "action_row_2_slot_2": 45,
+      "action_row_2_slot_3": 0,
+      "action_row_2_slot_4": 0,
+      "action_row_2_slot_5": 0,
+      "action_row_2_slot_6": 0,
+      "ctrl": 0,
+      "win": 0,
+      "alt": 38,
+      "space": 0,
+      "lmb": 258,
+      "rmb": 88,
+      "left": 0,
+      "down": 0,
+      "right": 0,
+      "up": 41
+    }
+  },
+  "lanes": [
+    {
+      "id": "esc",
+      "label": "Esc",
+      "kind": "key",
+      "score_token": "esc",
+      "visual_roi": [
+        7,
+        870,
+        39,
+        902
+      ]
+    },
+    {
+      "id": "f1",
+      "label": "F1",
+      "kind": "key",
+      "score_token": "f1",
+      "visual_roi": [
+        72,
+        870,
+        104,
+        902
+      ]
+    },
+    {
+      "id": "f2",
+      "label": "F2",
+      "kind": "key",
+      "score_token": "f2",
+      "visual_roi": [
+        106,
+        870,
+        138,
+        902
+      ]
+    },
+    {
+      "id": "f3",
+      "label": "F3",
+      "kind": "key",
+      "score_token": "f3",
+      "visual_roi": [
+        139,
+        870,
+        171,
+        902
+      ]
+    },
+    {
+      "id": "f4",
+      "label": "F4",
+      "kind": "key",
+      "score_token": "f4",
+      "visual_roi": [
+        172,
+        870,
+        204,
+        902
+      ]
+    },
+    {
+      "id": "grave",
+      "label": "unlabeled key cell",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "visual_roi": [
+        7,
+        911,
+        39,
+        943
+      ]
+    },
+    {
+      "id": "1",
+      "label": "1",
+      "kind": "key",
+      "score_token": "1",
+      "visual_roi": [
+        39,
+        911,
+        70,
+        943
+      ]
+    },
+    {
+      "id": "2",
+      "label": "2",
+      "kind": "key",
+      "score_token": "2",
+      "visual_roi": [
+        72,
+        911,
+        103,
+        943
+      ]
+    },
+    {
+      "id": "3",
+      "label": "3",
+      "kind": "key",
+      "score_token": "3",
+      "visual_roi": [
+        105,
+        911,
+        136,
+        943
+      ]
+    },
+    {
+      "id": "4",
+      "label": "4",
+      "kind": "key",
+      "score_token": "4",
+      "visual_roi": [
+        138,
+        911,
+        169,
+        943
+      ]
+    },
+    {
+      "id": "5",
+      "label": "5",
+      "kind": "key",
+      "score_token": "5",
+      "visual_roi": [
+        171,
+        911,
+        202,
+        943
+      ]
+    },
+    {
+      "id": "6",
+      "label": "6",
+      "kind": "key",
+      "score_token": "6",
+      "visual_roi": [
+        204,
+        911,
+        235,
+        943
+      ]
+    },
+    {
+      "id": "7",
+      "label": "7",
+      "kind": "key",
+      "score_token": "7",
+      "visual_roi": [
+        237,
+        911,
+        268,
+        943
+      ]
+    },
+    {
+      "id": "tab",
+      "label": "Tab",
+      "kind": "key",
+      "score_token": "tab",
+      "visual_roi": [
+        7,
+        944,
+        55,
+        976
+      ]
+    },
+    {
+      "id": "q",
+      "label": "Q",
+      "kind": "key",
+      "score_token": "q",
+      "visual_roi": [
+        57,
+        944,
+        88,
+        976
+      ]
+    },
+    {
+      "id": "w",
+      "label": "W",
+      "kind": "key",
+      "score_token": "w",
+      "visual_roi": [
+        90,
+        944,
+        120,
+        976
+      ]
+    },
+    {
+      "id": "e",
+      "label": "E",
+      "kind": "key",
+      "score_token": "e",
+      "visual_roi": [
+        122,
+        944,
+        153,
+        976
+      ]
+    },
+    {
+      "id": "tabadj_1",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        155,
+        944,
+        186,
+        976
+      ]
+    },
+    {
+      "id": "tabadj_2",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        188,
+        944,
+        218,
+        976
+      ]
+    },
+    {
+      "id": "solo",
+      "label": "SoloMode",
+      "kind": "semantic_label",
+      "score_token": null,
+      "visual_roi": [
+        7,
+        982,
+        64,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_1_slot_1",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        66,
+        982,
+        97,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_1_slot_2",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        99,
+        982,
+        129,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_1_slot_3",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        131,
+        982,
+        162,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_1_slot_4",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        164,
+        982,
+        195,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_1_slot_5",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        196,
+        982,
+        227,
+        1015
+      ]
+    },
+    {
+      "id": "enter",
+      "label": "Enter",
+      "kind": "key",
+      "score_token": "enter",
+      "visual_roi": [
+        230,
+        982,
+        302,
+        1015
+      ]
+    },
+    {
+      "id": "action_row_2_slot_1",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        7,
+        1017,
+        80,
+        1049
+      ]
+    },
+    {
+      "id": "action_row_2_slot_2",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        81,
+        1017,
+        112,
+        1049
+      ]
+    },
+    {
+      "id": "action_row_2_slot_3",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        114,
+        1017,
+        145,
+        1049
+      ]
+    },
+    {
+      "id": "action_row_2_slot_4",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        147,
+        1017,
+        178,
+        1049
+      ]
+    },
+    {
+      "id": "action_row_2_slot_5",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        180,
+        1017,
+        211,
+        1049
+      ]
+    },
+    {
+      "id": "action_row_2_slot_6",
+      "label": "variable action label slot (caption changes)",
+      "kind": "variable_label_slot",
+      "score_token": null,
+      "visual_roi": [
+        212,
+        1017,
+        243,
+        1049
+      ]
+    },
+    {
+      "id": "ctrl",
+      "label": "Ctrl",
+      "kind": "unresolved_modifier",
+      "score_token": null,
+      "visual_roi": [
+        7,
+        1049,
+        48,
+        1078
+      ]
+    },
+    {
+      "id": "win",
+      "label": "Win",
+      "kind": "unresolved_modifier",
+      "score_token": null,
+      "visual_roi": [
+        50,
+        1049,
+        96,
+        1078
+      ]
+    },
+    {
+      "id": "alt",
+      "label": "Alt",
+      "kind": "unresolved_modifier",
+      "score_token": null,
+      "visual_roi": [
+        98,
+        1049,
+        138,
+        1078
+      ]
+    },
+    {
+      "id": "space",
+      "label": "Space",
+      "kind": "unresolved_label",
+      "score_token": null,
+      "visual_roi": [
+        140,
+        1049,
+        333,
+        1078
+      ]
+    },
+    {
+      "id": "lmb",
+      "label": "LMB",
+      "kind": "mouse_button",
+      "score_token": "lmb",
+      "visual_roi": [
+        410,
+        944,
+        442,
+        976
+      ]
+    },
+    {
+      "id": "rmb",
+      "label": "RMB",
+      "kind": "mouse_button",
+      "score_token": "rmb",
+      "visual_roi": [
+        446,
+        944,
+        478,
+        976
+      ]
+    },
+    {
+      "id": "left",
+      "label": "Left",
+      "kind": "key",
+      "score_token": "left",
+      "visual_roi": [
+        365,
+        1027,
+        398,
+        1059
+      ]
+    },
+    {
+      "id": "down",
+      "label": "Down",
+      "kind": "key",
+      "score_token": "down",
+      "visual_roi": [
+        400,
+        1027,
+        433,
+        1059
+      ]
+    },
+    {
+      "id": "right",
+      "label": "Right",
+      "kind": "key",
+      "score_token": "right",
+      "visual_roi": [
+        435,
+        1027,
+        468,
+        1059
+      ]
+    },
+    {
+      "id": "up",
+      "label": "Up",
+      "kind": "key",
+      "score_token": "up",
+      "visual_roi": [
+        400,
+        1008,
+        433,
+        1040
+      ]
+    }
+  ],
+  "events": [
+    {
+      "frame": 0,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 47,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 53,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 56,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 75,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 81,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 103,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 109,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 117,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 123,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 129,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 134,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 140,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 143,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 148,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 154,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 156,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 162,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 311,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 317,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 390,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 393,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 398,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 401,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 421,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 429,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 435,
+      "held": [
+        "tabadj_1",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 438,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 441,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 443,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 449,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 452,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 457,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 483,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 488,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 491,
+      "held": [
+        "enter",
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 500,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 503,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 506,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 511,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 643,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 649,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 652,
+      "held": [
+        "esc",
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 654,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 660,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 694,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 697,
+      "held": [
+        "esc",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 699,
+      "held": [
+        "enter"
+      ],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 702,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 708,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 711,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 716,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 719,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 725,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 727,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 730,
+      "held": [
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 736,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 739,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 742,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 748,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 751,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 753,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 876,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 882,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 888,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 908,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 910,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 938,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 941,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 952,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 955,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 964,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 967,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 972,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 978,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 983,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 995,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1149,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1158,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1197,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1200,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1203,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1205,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1259,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1265,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1270,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1276,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1279,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1282,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1284,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1290,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1315,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1318,
+      "held": [
+        "enter",
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1321,
+      "held": [
+        "enter",
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1324,
+      "held": [
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1330,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1332,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1335,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1341,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1470,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1475,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1478,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1481,
+      "held": [
+        "esc",
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1484,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1487,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1521,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1524,
+      "held": [
+        "esc",
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1526,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1529,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 1535,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1538,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 1541,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1544,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 1549,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1554,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1557,
+      "held": [
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1563,
+      "held": [
+        "enter",
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1566,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1574,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1703,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1710,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1712,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1729,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1735,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1751,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1757,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1763,
+      "held": [
+        "tabadj_1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1765,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1771,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 1774,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1779,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 1785,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1788,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 1791,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 1923,
+      "held": [
+        "q"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1937,
+      "held": [
+        "q",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1943,
+      "held": [
+        "q",
+        "w",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1946,
+      "held": [
+        "q",
+        "w",
+        "lmb",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 1954,
+      "held": [
+        "w",
+        "lmb",
+        "rmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2025,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2193,
+      "held": [
+        "w",
+        "e"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2198,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2302,
+      "held": [
+        "q",
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2314,
+      "held": [
+        "w"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2333,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2376,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2379,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2387,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2390,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2392,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2395,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2401,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2404,
+      "held": [
+        "3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2407,
+      "held": [
+        "3",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2410,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2412,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2418,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2421,
+      "held": [
+        "3",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2424,
+      "held": [
+        "3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2427,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2429,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2432,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2435,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2437,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2440,
+      "held": [
+        "3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2446,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2449,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2455,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2457,
+      "held": [
+        "2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2463,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2469,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2471,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2477,
+      "held": [
+        "2",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2480,
+      "held": [
+        "2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2483,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2485,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2488,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2491,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2494,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2497,
+      "held": [
+        "1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2500,
+      "held": [
+        "1",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2502,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2505,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2508,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2511,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2513,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2516,
+      "held": [
+        "1",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2519,
+      "held": [
+        "1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2522,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2531,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2533,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2536,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2539,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2542,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2547,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2550,
+      "held": [
+        "5",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2556,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2558,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2561,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2564,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2567,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2570,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2573,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2575,
+      "held": [
+        "1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2578,
+      "held": [
+        "1",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2581,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2584,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2587,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2589,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2592,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2595,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2598,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2601,
+      "held": [
+        "4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2606,
+      "held": [
+        "4",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2609,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2612,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2615,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2618,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2621,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2623,
+      "held": [
+        "1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2629,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2631,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2634,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2637,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2640,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2643,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2646,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2648,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2651,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2654,
+      "held": [
+        "4",
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2657,
+      "held": [
+        "4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2660,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2662,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2674,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2676,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2679,
+      "held": [
+        "1"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2685,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2691,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2694,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2696,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2699,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2702,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2705,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2711,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2716,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2826,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2831,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2840,
+      "held": [
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2843,
+      "held": [
+        "f4",
+        "alt"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2845,
+      "held": [
+        "f4"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2848,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2859,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2868,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2885,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2887,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2913,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2918,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2941,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 2947,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2961,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2966,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2972,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2978,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 2981,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 2983,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3197,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 3203,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3208,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 3211,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3217,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 3220,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3225,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 3228,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3233,
+      "held": [],
+      "unknown": [
+        "down"
+      ]
+    },
+    {
+      "frame": 3239,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3399,
+      "held": [
+        "lmb"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3405,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3416,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3422,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3431,
+      "held": [
+        "action_row_1_slot_3"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3439,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3462,
+      "held": [
+        "action_row_2_slot_2"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3467,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3484,
+      "held": [
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3490,
+      "held": [
+        "enter",
+        "up"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3492,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3498,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3509,
+      "held": [
+        "esc"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3515,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3529,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3534,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3557,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3563,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3565,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3571,
+      "held": [],
+      "unknown": []
+    },
+    {
+      "frame": 3574,
+      "held": [
+        "enter"
+      ],
+      "unknown": []
+    },
+    {
+      "frame": 3579,
+      "held": [],
+      "unknown": []
+    }
+  ],
+  "unknown": [
+    "Overlay state may represent highlight/tap display rather than sustained physical input.",
+    "Frame index follows the official video only; run start, game start, and pauses/loading transitions are not globally aligned.",
+    "Game input polling, simulation frame boundary, and hold/release duration are unqualified.",
+    "Some visual cells are semantic/ambiguous and intentionally have no score token.",
+    "Mouse movement position is not extracted; only labeled LMB/RMB and arrow-like key cells are sampled."
+  ],
+  "binding_summary": {
+    "tokenized_cells_not_replay_qualified": [
+      "esc",
+      "f1",
+      "f2",
+      "f3",
+      "f4",
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+      "7",
+      "tab",
+      "q",
+      "w",
+      "e",
+      "enter",
+      "lmb",
+      "rmb",
+      "left",
+      "down",
+      "right",
+      "up"
+    ],
+    "unmapped_or_semantic_cells": [
+      "grave",
+      "tabadj_1",
+      "tabadj_2",
+      "solo",
+      "action_row_1_slot_1",
+      "action_row_1_slot_2",
+      "action_row_1_slot_3",
+      "action_row_1_slot_4",
+      "action_row_1_slot_5",
+      "action_row_2_slot_1",
+      "action_row_2_slot_2",
+      "action_row_2_slot_3",
+      "action_row_2_slot_4",
+      "action_row_2_slot_5",
+      "action_row_2_slot_6",
+      "ctrl",
+      "win",
+      "alt",
+      "space"
+    ],
+    "replay_disabled_reason": "visual highlight semantics, physical hold duration, game-frame alignment, and initial game state are not qualified"
+  }
+}

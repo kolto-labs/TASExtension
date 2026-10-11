@@ -1,5 +1,7 @@
 # Roadmap
 
+> **Historical snapshot, not the active execution plan.** This page still contains stale 2026-10-04 milestone and completion claims. The single current KPTAS queue, priority order, direct-user source crosswalk and live acceptance state are maintained in [`canonical-outstanding-execution-plan.md`](/home/brunner56/kptas-routine/planning-inputs/execution/canonical-outstanding-execution-plan.md). Do not use the status or estimates below to decide what is currently accepted or next. Preserve this document as historical context; do not duplicate the active queue here.
+
 KPTASInterface (InputInterfaceTelos) is a TAS toolkit for KotOR I and II. The goal: every tick of the game is a state you can save, load, rewind, branch and replay, and a score played twice gives the exact same game, on any machine.
 
 Status legend: **done** (built and checked), **next** (being built now), **planned** (designed, not started), **research** (still needs an answer).
@@ -19,6 +21,7 @@ Estimates are working days of focused work. They are guesses made from what the 
 | Python core: holorecord bundle, seek planner (all four modes), verify, tiers, backends, `telos` CLI | done | On PySim, seeks to ticks 20, 41 and 70 reach the recorded state root in every mode; `verify --fresh` compares every tick; two recordings of the same score give byte-identical journals |
 | Reference math | done | Within 1 ulp of correctly rounded; on one host, i386 under Wine and native x86_64 give byte-identical golden output |
 | Browser prototype | done | https://kptas-demo.bocloud.workers.dev |
+| Browser game presentation | next | The ordinary player UI describes the game and controls, not its implementation stack. Keep technical provenance and diagnostics available in their appropriate places, and describe WebGL only where it is the active graphics path. |
 
 ## Milestones
 

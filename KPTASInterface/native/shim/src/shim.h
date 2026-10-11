@@ -197,10 +197,12 @@ typedef struct {
     int rel_x, rel_y; /* per-tick delta */
     int wheel;        /* one-shot, first tick of the note */
 } input_t;
-void di_stage(const input_t *in, int first_tick, u32 time_ms, u8 hash_out[16]);
+void di_stage(const input_t *in, int first_tick, u32 time_ms, u8 hash_out[16], u8 sha256_out[32]);
 void di_set_cursor(int x, int y);
 void di_init_objects(void);
 extern u32 g_di_reads_kbd, g_di_reads_mouse;
+void di_observation_json(buf_t *b, u64 tick);
+void di_observation_reset(void);
 
 /* ---- msg.c ---- */
 void msg_install(void);
@@ -212,7 +214,7 @@ void msg_tick_reset(void);
 void msg_tick_digest(u8 out[16]);
 extern volatile int g_quit_seen;
 extern WNDPROC g_wndproc_orig[4];
-void msg_synth_push(UINT m, WPARAM w, LPARAM l);
+int msg_synth_push(UINT m, WPARAM w, LPARAM l);
 int msg_synth_peek(MSG *out);
 
 /* ---- gate.c ---- */
@@ -237,6 +239,7 @@ void srand_note(u32 site, u32 seed);
 void journal_tick_reset(void);
 extern char g_note[256];
 extern u8 g_input_hash[16];
+extern u8 g_input_sha256[32];
 
 /* ---- wire.c ---- */
 int wire_connect(void);
@@ -379,6 +382,7 @@ typedef struct shim_hg {
     u32 save_next_ms;     /* one-shot for the next save only */
     u32 save_next_set;
     u32 close_next;       /* WM_CLOSE staged for the next tick */
+    i32 mouse_pending_dx, mouse_pending_dy; /* bounded relative move retry */
 } shim_hg;
 
 extern shim_hg *SH;

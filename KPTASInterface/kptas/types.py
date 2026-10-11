@@ -1165,6 +1165,10 @@ class StepReport:
     reason: PointReason = PointReason.NOT_CAPTURED
     events: tuple[EngineEvent, ...] = ()
     outcome: ProcOutcome = ProcOutcome.ALIVE
+    # Exact native per-gate SHA-256 receipts. Kept separate from semantic/1
+    # journal bytes and keyed explicitly so multi-tick reports cannot smear
+    # the final tick's digest over earlier ticks.
+    input_sha256_by_tick: tuple[tuple[int, int, bytes], ...] = ()
 
     @classmethod
     def from_wire(cls, obj: Mapping[str, Any]) -> StepReport:

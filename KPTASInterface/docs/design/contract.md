@@ -285,16 +285,19 @@ As a result, CRT startup (the security cookie, then the static init that creates
 
 **DirectInput.** `DirectInput8Create` returns a virtual `IDirectInput8`, with keyboard and mouse `IDirectInputDevice8` objects driven by the score, so Wine's dinput is never acquired. `input.dinput = "passthrough"` (lab only) forwards the call to the system dinput8, which is loaded from the system directory on the first call.
 
+**Input observation receipt (wire-only v1).** For each subscribed `tick` push, the shim emits `input_observation` with the gate's tick number, staged buffered-record count and overflow count, then per-device `GetDeviceState` poll counts/nonzero-poll counts and `GetDeviceData` poll, exposed, dequeued and peeked counts. `records_dequeued` proves only that the virtual device queue removed those records during the game process's DirectInput call; it does not prove the game's input layer or gameplay acted on them. `state_nonzero_polls` proves the successful state call returned at least one nonzero byte. Empty polls remain distinguishable from calls that returned input. This telemetry is outside `semantic/1`, so it does not alter existing journal digests or replay compatibility; it is currently a live wire receipt and is not persisted into the holorecord. Durable per-tick evidence requires a versioned journal extension and corresponding reader/writer support before it can qualify engagement.
+
+**Engagement qualification.** No `engagement_qualified` producer exists in this tracked shim. DirectInput call counters alone cannot qualify engagement: the runtime must bind the intended score/input interval to each gate, observe the specific key/button state or buffered transition returned to the game's input API, and report the matching gate/tick/session with dropped, peeked and empty-poll cases kept distinct. The current receipt establishes API delivery/consumption boundaries, not successful game-level action; do not turn it into an engagement ACK.
+
 **Allocator.** `harness_core` is a private region reserved at boot. The shim never allocates from the process heap or the game heap.
 
 **Channel.** Winsock loopback TCP carrying NDJSON (§10). Bulk bytes travel through files in the session directory.
 
 **Staging ring.** The shim calls `CreateFileMapping` on a session-directory file (a `Z:` path under Wine) that the Python process also mmaps (§9, O11).
 
-**Coexistence.** KotorPhasor and KPM load through binkw32 proxies.
-- The shim never patches their slots. SwapBuffers (0x73d00c) belongs to KotorPhasor's overlay when it is present, and the M5 HUD chains through whatever pointer that slot holds.
-- Each gate checks the shim's patched bytes, and a changed slot halts the run with a report.
-- Restore refuses while any module outside `shim.module_allowlist` that allocates from game-visible heaps is loaded. tas requires the allowlist from tick 0 (C9).
+**Optional KotorPhasor integration.** KotorPhasor is a separate optional component, not a prerequisite. If a qualified run uses it, the shim never patches its slots; SwapBuffers (0x73d00c) remains KotorPhasor's overlay hook when present, and the M5 HUD chains through the pointer it owns. Each gate checks shim-patched bytes, and a changed slot halts the run with a report. Restore refuses while a module outside `shim.module_allowlist` that allocates from game-visible heaps is loaded; TAS tier requires the allowlist from tick 0 (C9).
+
+**KPM exclusion.** Kotor Patch Manager is not a supported loader or co-loader. Telos/Stasis must not load it, chain its hooks, advertise compatibility, or silently continue when a conflicting KPM installation is reliably identified. Refuse the Stasis session before activation, preserve all KPM files, and report unknown when detection is inconclusive. This current product constraint supersedes historical coexistence language; it does not change the optional KotorPhasor boundary above.
 
 **Builds.** K1 GOG 1.03 comes first. Steam needs the unpacked exe (sha256 `2719ed2c…`). The SteamStub exe (sha256 `34e6d971…`) has an encrypted `.text` and is refused. K2 comes later, and its addresses are unverified.
 
@@ -409,7 +412,7 @@ JSON bodies are canonical: UTF-8, sorted keys, no whitespace, no NaN.
 | 28 | 32 | state_root (zero unless CAPTURED) |
 | 60 | 32 | sim_root (zero unless SIM_ROOT) |
 | 92 | 32 | files_root (zero unless FILES) |
-| 124 | 32 | input_sha256: the staged input frame |
+| 124 | 32 | input_sha256: SHA-256 of the staged input frame, or all zeroes when the backend cannot provide that digest |
 | 156 | 32 | journal_sha256: sha256 of the semantic entry |
 | 188 | 2 | note length, u16 |
 | 190 | n | note, UTF-8, one line |
@@ -440,6 +443,8 @@ JSON bodies are canonical: UTF-8, sorted keys, no whitespace, no NaN.
 - budget-guard trips;
 - the internal WndProc message log;
 - the input hash.
+
+The native shim retains its original 16-byte BLAKE2s input hash as `in`; adding fields to `semantic/1` would change historical journal bytes and digests. The full SHA-256 is carried separately on each subscribed wire `tick` push as `input_sha256`, keyed by its `epoch` and `tick`, and copied only to the matching TICK v1 record. Multi-tick reports preserve each per-gate receipt independently. A missing receipt (including older shim versions) remains all zeroes; the shorter `in` digest and authored score note are not substitutes. Restore batches do not contribute input digests. The original journal bytes remain available for provenance and replay comparison.
 
 M2 and later add per-creature, event-queue and audio fields, under a new `journal_spec`.
 

@@ -2,7 +2,7 @@
 // truth: every roll edit is a rewrite of score lines, and the roll is rebuilt
 // from the compiled program and the recorded ticks.
 
-import { parseScore, noteText, inputOf, sameInput, EMPTY } from './score.js';
+import { parseScore, noteText, inputOf, sameInput, EMPTY, KEY_ORDER, BUTTONS, requireBrowserMouseInput } from './score.js';
 import { headOf } from './holo.js';
 
 // One row per tick. kind: boot (tick 0), note, wait (@sync), end (past the
@@ -69,6 +69,7 @@ function splitLine(raw) {
 function rle(vals) {
   const out = [];
   for (const v of vals) {
+    requireBrowserMouseInput(v);
     const last = out[out.length - 1];
     if (last && sameInput(last.v, v) && sameAl(last.v, v)) last.n++;
     else out.push({ n: 1, v });
@@ -77,7 +78,10 @@ function rle(vals) {
 }
 const sameAl = (a, b) => JSON.stringify(a.al || null) === JSON.stringify(b.al || null);
 
-const norm = (v) => ({ bits: v.bits | 0, xbits: v.xbits | 0, mouse: v.mouse ? [v.mouse[0] | 0, v.mouse[1] | 0] : null, al: v.al && Object.keys(v.al).length ? v.al : null });
+const norm = (v) => {
+  requireBrowserMouseInput(v);
+  return ({ bits: v.bits | 0, xbits: v.xbits | 0, mouse: v.mouse ? [v.mouse[0] | 0, v.mouse[1] | 0] : null, al: v.al && Object.keys(v.al).length ? v.al : null });
+};
 
 // Repeat blocks that hold any of these instructions.
 function repeatsFor(prog, srcs) {
@@ -131,6 +135,7 @@ function withNewline(lines) {
 // Append inputs after the end of the score. vals[k] is the input for tick
 // end + k (k from 0). Merges into the last note when it matches.
 function appendTail(lines, prog, vals) {
+  for (const v of vals) if (v) requireBrowserMouseInput(v);
   let k0 = vals.findIndex((v) => v && (v.bits || v.xbits || v.mouse));
   if (k0 < 0) return;
   const seq = vals.map((v) => (v ? norm(v) : norm(EMPTY)));
@@ -316,26 +321,89 @@ export function addMark(text, prog, model, t, name) {
   return { text: withNewline(lines) };
 }
 
-// Ticks t0..t1 as score lines (run-length notes; @sync rows as comments).
+// Input frames t0..t1 as portable literal score lines. Barrier rows are not
+// inputs and must never become a silently flattened clipboard range.
+// The native piano roll uses the same versioned score clipboard. Resolve
+// aliases so a copied selection does not depend on the source score's header.
+export const MAX_CLIPBOARD_FRAMES = 20000;
+export const MAX_CLIPBOARD_BYTES = 2 * 1024 * 1024;
 export function ticksAsScore(prog, model, t0, t1) {
-  const out = [];
+  if (!Number.isSafeInteger(t0) || !Number.isSafeInteger(t1) || t0 < 1 || t1 < t0 || t1 - t0 + 1 > MAX_CLIPBOARD_FRAMES)
+    throw new Error(`Select 1 to ${MAX_CLIPBOARD_FRAMES} input frames, starting after frame 0.`);
+  const out = ['#!score v1'];
   let run = null;
   const flush = () => { if (run) out.push(noteText(run.n, run.v)); run = null; };
-  for (let t = Math.max(1, t0); t <= t1; t++) {
+  for (let t = t0; t <= t1; t++) {
     const row = model.rows[t];
-    if (!row) break;
-    if (row.kind === 'wait') {
-      flush();
-      const it = prog.ins[row.src];
-      if (row.off === 0 || t === Math.max(1, t0)) out.push(`@sync ${it.ev} timeout=${it.timeout}`);
-      continue;
-    }
-    const v = rowInput(prog, row);
-    if (run && sameInput(run.v, v) && sameAl(run.v, v)) run.n++;
+    if (!row) throw new Error('The copied range extends past the visible input document.');
+    if (row.kind !== 'note') throw new Error('Copy input frames outside synchronization and end rows. No clipboard inputs were changed.');
+    const v = { ...rowInput(prog, row), al: null };
+    if (run && sameInput(run.v, v)) run.n++;
     else { flush(); run = { n: 1, v }; }
   }
   flush();
-  return out.join('\n') + '\n';
+  const result = out.join('\n') + '\n';
+  if (new TextEncoder().encode(result).length > MAX_CLIPBOARD_BYTES) throw new Error('The copied inputs exceed 2 MiB.');
+  return result;
+}
+
+const CLIPBOARD_KEYS = new Set([...KEY_ORDER, ...BUTTONS, 'escape']);
+export function clipboardInputs(text) {
+  if (typeof text !== 'string' || !text.trim() || new TextEncoder().encode(text).length > MAX_CLIPBOARD_BYTES)
+    throw new Error('Paste score input lines, up to 2 MiB.');
+  // Only literal notes are portable: do not silently discard metadata,
+  // timing changes, marks, aliases, or directives from an entire recording.
+  const body = text.trim().replace(/\r\n?/g, '\n');
+  for (const line of body.split('\n')) {
+    if (line.trim().startsWith('#!score') && line.trim() !== '#!score v1')
+      throw new Error('Copy plain input frames rather than a score with timing or recording metadata.');
+    const code = line.split('#')[0].trim();
+    if (code && !/^\d+\s/.test(code)) throw new Error('Paste plain input frames without score directives.');
+    for (const token of code.split(/\s+/).slice(1)) {
+      if (token !== '.' && !CLIPBOARD_KEYS.has(token) && !/^m@[0-9]{1,4},[0-9]{1,4}$/.test(token))
+        throw new Error(`The browser input editor cannot import '${token}'. No inputs were changed.`);
+    }
+  }
+  const parsed = parseScore(body);
+  if (parsed.errors.length) throw new Error(`Clipboard line ${parsed.errors[0].line}: ${parsed.errors[0].msg}`);
+  const count = parsed.prog.ins.reduce((sum, note) => sum + note.count, 0);
+  if (!Number.isSafeInteger(count) || count < 1 || count > MAX_CLIPBOARD_FRAMES)
+    throw new Error(`Paste 1 to ${MAX_CLIPBOARD_FRAMES} input frames at a time.`);
+  return parsed.prog.ins.flatMap((note) => Array.from({ length: note.count }, () => ({ ...inputOf(note), al: null })));
+}
+
+export function pasteTicks(text, prog, model, at, values, insert = false) {
+  if (!Number.isSafeInteger(at) || at < 1 || !values.length || values.length > MAX_CLIPBOARD_FRAMES)
+    throw new Error('Select an input frame after frame 0.');
+  const row = model.rows[at];
+  if (!row || !['note', 'end'].includes(row.kind)) throw new Error('Paste on an input frame, outside synchronization rows.');
+  const incoming = rle(values).map(({ n, v }) => noteText(n, v));
+  if (insert && row.kind === 'note') {
+    const it = prog.ins[row.src];
+    if (it.rep) return { needUnroll: repeatsFor(prog, [row.src]) };
+    const lines = text.split('\n');
+    const { indent, comment } = splitLine(lines[it.line - 1]);
+    const before = row.off ? [noteText(row.off, inputOf(it))] : [];
+    const after = [noteText(it.count - row.off, inputOf(it))];
+    const replacement = [...before, ...incoming, ...after];
+    lines.splice(it.line - 1, 1, ...replacement.map((line, i) => indent + line + (i === 0 && comment ? '  ' + comment : '')));
+    return { text: withNewline(lines) };
+  }
+  const changes = new Map();
+  const tail = [];
+  for (let i = 0; i < values.length; i++) {
+    const t = at + i;
+    if (t >= model.end) { tail.push(values[i]); continue; }
+    if (model.rows[t]?.kind !== 'note') throw new Error('The pasted range crosses a synchronization row. No inputs were changed.');
+    changes.set(t, () => values[i]);
+  }
+  const edited = changes.size ? editTicks(text, prog, model, changes) : { text, same: true };
+  if (edited.needUnroll || !tail.length) return edited;
+  const lines = edited.text.trimEnd().split('\n');
+  if (at > model.end) lines.push(noteText(at - model.end, EMPTY));
+  // Keep trailing releases and blank frames: their duration is part of a clip.
+  lines.push(...rle(tail).map(({ n, v }) => noteText(n, v)));
+  return { text: withNewline(lines) };
 }
 
 // Check that a text parses. Used before applying any rewrite.

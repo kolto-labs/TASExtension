@@ -1,0 +1,56 @@
+{
+  "schema": "stasis-ui-colors/v1",
+  "colors": {
+    "void": "#05070a",
+    "panel": "#0b1016",
+    "text": "#d7e3ea",
+    "muted": "#7f93a0",
+    "active": "#19e3c1",
+    "focus": "#5ad8ff",
+    "warning": "#ffb000",
+    "success": "#7dff9a",
+    "divergence": "#ff4fd8"
+  },
+  "tints": {
+    "line": {
+      "color": "muted",
+      "alpha": 0.22
+    },
+    "raise": {
+      "color": "muted",
+      "alpha": 0.08
+    },
+    "raise_2": {
+      "color": "muted",
+      "alpha": 0.14
+    },
+    "chrome": {
+      "color": "void",
+      "alpha": 0.56
+    },
+    "selected": {
+      "color": "active",
+      "alpha": 0.14
+    }
+  },
+  "metrics": {
+    "font_body": 13,
+    "font_small": 11,
+    "space_small": 4,
+    "space_medium": 8,
+    "panel_header": 28,
+    "control_content": 18
+  },
+  "fonts": {
+    "sans": [
+      "DejaVu Sans",
+      "Segoe UI",
+      "Arial"
+    ],
+    "mono": [
+      "DejaVu Sans Mono",
+      "Consolas",
+      "Liberation Mono"
+    ]
+  }
+}

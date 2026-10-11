@@ -235,6 +235,9 @@ class Store:
         self.xor_delta = xor_delta
         self.parent = parent
         self.writable = writable
+        # Store writes precede their TICK journal commit. A failed pack write or
+        # fsync leaves the writer's tail ambiguous until reopen rebuilds it.
+        self.write_failure: BaseException | None = None
         self.locs: dict[bytes, Loc] = {}
         self.valid: dict[tuple[int, int], int] = {}
         self.evictions = False
@@ -376,6 +379,11 @@ class Store:
 
     # -- writing
 
+    def _check_writable(self) -> None:
+        _need(self.writable, "page store is open read-only")
+        _need(self.write_failure is None,
+              "page store writer failed; close and reopen/recover before writing")
+
     def encode_page(self, key: bytes, data: bytes, bases: Iterable[bytes | None],
                     durable: Callable[[bytes], bool] | None = None) -> tuple[bytes, int, bool, int]:
         """Frame one page: PAGE_X against the first eligible base when smaller, else PAGE_I.
@@ -417,56 +425,73 @@ class Store:
     def roll(self, area: int, target_dir: str | os.PathLike[str] | None = None) -> int:
         """Start a new pack in `area`; with target_dir the pack lives there behind a symlink (spill)."""
         _need(area != AREA_KF, "keyframe packs are not rolled")
-        old = self._cur.pop(area, None)
-        if old is not None:
-            old[1].flush()
-            if area in self._dirty:
-                os.fsync(old[1].fileno())
-            old[1].close()
-        packs = [p for (a, p) in list_packs(self.root) if a == area]
-        n = max(packs) + 1 if packs else 0
-        path = pack_path(self.root, area, n)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if target_dir is not None:
-            real = Path(target_dir) / path.name
-            real.parent.mkdir(parents=True, exist_ok=True)
-            open(real, "xb").close()
-            os.symlink(os.path.abspath(real), path)
-        f = open(path, "x+b" if target_dir is None else "r+b")
-        self._cur[area] = (n, f)
-        self.valid[(area, n)] = 0
-        return n
+        self._check_writable()
+        try:
+            old = self._cur.get(area)
+            if old is not None:
+                old[1].flush()
+                if area in self._dirty:
+                    os.fsync(old[1].fileno())
+                old[1].close()
+                self._cur.pop(area, None)
+            packs = [p for (a, p) in list_packs(self.root) if a == area]
+            n = max(packs) + 1 if packs else 0
+            path = pack_path(self.root, area, n)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if target_dir is not None:
+                real = Path(target_dir) / path.name
+                real.parent.mkdir(parents=True, exist_ok=True)
+                open(real, "xb").close()
+                os.symlink(os.path.abspath(real), path)
+            f = open(path, "x+b" if target_dir is None else "r+b")
+            self._cur[area] = (n, f)
+            self.valid[(area, n)] = 0
+            return n
+        except BaseException as exc:
+            self.write_failure = exc
+            raise
 
     def append(self, area: int, items: Iterable[tuple[bytes, bytes, int, bool, int]]) -> int:
         """Append (key, frame, kind, anchored, depth) items, skipping keys already stored. Returns bytes written."""
-        written = 0
-        for key, frame, kind, anchored, depth in items:
-            if key in self.locs:
-                continue
-            n = self._current(area)
-            f = self._cur[area][1]
-            off = f.tell()
-            if off and off + len(frame) > PACK_LIMIT:
-                n = self.roll(area)
+        self._check_writable()
+        try:
+            written = 0
+            for key, frame, kind, anchored, depth in items:
+                if key in self.locs:
+                    continue
+                n = self._current(area)
                 f = self._cur[area][1]
-                off = 0
-            f.write(frame)
-            self.locs[key] = Loc(area, n, off, int(kind), anchored, depth)
-            self.valid[(area, n)] = off + len(frame)  # type: ignore[index]
-            written += len(frame)
-            self._dirty.add(area)
-        cur = self._cur.get(area)
-        if cur is not None:
-            cur[1].flush()
-        return written
-
-    def fsync(self) -> None:
-        for area in sorted(self._dirty):
+                off = f.tell()
+                if off and off + len(frame) > PACK_LIMIT:
+                    n = self.roll(area)
+                    f = self._cur[area][1]
+                    off = 0
+                if f.write(frame) != len(frame):
+                    raise OSError("short page-store write")
+                self.locs[key] = Loc(area, n, off, int(kind), anchored, depth)
+                self.valid[(area, n)] = off + len(frame)  # type: ignore[index]
+                written += len(frame)
+                self._dirty.add(area)
             cur = self._cur.get(area)
             if cur is not None:
                 cur[1].flush()
-                os.fsync(cur[1].fileno())
-        self._dirty.clear()
+            return written
+        except BaseException as exc:
+            self.write_failure = exc
+            raise
+
+    def fsync(self) -> None:
+        self._check_writable()
+        try:
+            for area in sorted(self._dirty):
+                cur = self._cur.get(area)
+                if cur is not None:
+                    cur[1].flush()
+                    os.fsync(cur[1].fileno())
+            self._dirty.clear()
+        except BaseException as exc:
+            self.write_failure = exc
+            raise
 
     def truncate_tails(self) -> list[tuple[int, int, int]]:
         """Writer only: cut each pack to its valid prefix. Returns (area, pack, bytes cut) per cut."""
@@ -493,28 +518,34 @@ class Store:
         return b"".join(parts)
 
     def write_kf(self, tick: int, blob: bytes, fsync: bool) -> None:
-        path = pack_path(self.root, AREA_KF, tick)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_name(path.name + ".tmp")
-        with open(tmp, "wb") as f:
-            f.write(blob)
+        self._check_writable()
+        try:
+            path = pack_path(self.root, AREA_KF, tick)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_name(path.name + ".tmp")
+            with open(tmp, "wb") as f:
+                if f.write(blob) != len(blob):
+                    raise OSError("short keyframe-pack write")
+                if fsync:
+                    f.flush()
+                    os.fsync(f.fileno())
+            os.replace(tmp, path)
             if fsync:
-                f.flush()
-                os.fsync(f.fileno())
-        os.replace(tmp, path)
-        if fsync:
-            fsync_dir(path.parent)
-        stale = self._read.pop((AREA_KF, tick), None)
-        if stale is not None:
-            stale.close()
-        with open(path, "rb") as f:
-            end = 0
-            for off, kind, key, _b, _raw, end in iter_frames(f, len(blob)):
-                old = self.locs.get(key)
-                if old is None or (kind == ObjKind.PAGE_I and old.area != AREA_KF):
-                    self.locs[key] = Loc(AREA_KF, tick, off, int(kind), kind == ObjKind.PAGE_I, 0)
-            _need(end == len(blob), "keyframe pack did not read back whole")
-        self.valid[(AREA_KF, tick)] = len(blob)
+                fsync_dir(path.parent)
+            stale = self._read.pop((AREA_KF, tick), None)
+            if stale is not None:
+                stale.close()
+            with open(path, "rb") as f:
+                end = 0
+                for off, kind, key, _b, _raw, end in iter_frames(f, len(blob)):
+                    old = self.locs.get(key)
+                    if old is None or (kind == ObjKind.PAGE_I and old.area != AREA_KF):
+                        self.locs[key] = Loc(AREA_KF, tick, off, int(kind), kind == ObjKind.PAGE_I, 0)
+                _need(end == len(blob), "keyframe pack did not read back whole")
+            self.valid[(AREA_KF, tick)] = len(blob)
+        except BaseException as exc:
+            self.write_failure = exc
+            raise
 
     def read_kf(self, tick: int) -> tuple[bytes, list[PageRef], dict[bytes, bytes]]:
         """Read a materialized pack sequentially: (state root, page refs, key -> page bytes)."""
@@ -612,16 +643,34 @@ class Store:
         return freed, dropped
 
     def close_handles(self) -> None:
+        failure: BaseException | None = None
         for f in self._read.values():
-            f.close()
+            try:
+                f.close()
+            except BaseException as exc:
+                failure = failure or exc
         self._read.clear()
         for area, (_n, f) in list(self._cur.items()):
-            f.flush()
-            if area in self._dirty:
-                os.fsync(f.fileno())
-            f.close()
+            try:
+                if self.write_failure is None:
+                    f.flush()
+                    if area in self._dirty:
+                        os.fsync(f.fileno())
+            except BaseException as exc:
+                if self.write_failure is None:
+                    self.write_failure = exc
+                failure = failure or exc
+            finally:
+                try:
+                    f.close()
+                except BaseException as exc:
+                    if self.write_failure is None:
+                        self.write_failure = exc
+                    failure = failure or exc
         self._cur.clear()
         self._dirty.clear()
+        if failure is not None:
+            raise failure
 
 
 def fsync_dir(path: str | os.PathLike[str]) -> None:

@@ -216,6 +216,10 @@ class Journal:
     def __init__(self, path: str | os.PathLike[str], writable: bool, create: bool = False) -> None:
         self.path = os.fspath(path)
         self.writable = writable
+        # A failed write or durability barrier may have published an unknown
+        # prefix. Refuse further appends until this writer is closed and the
+        # journal is explicitly reopened/recovered.
+        self.write_failure: BaseException | None = None
         mode = "x+b" if create else ("r+b" if writable else "rb")
         self.f = open(self.path, mode)
         if writable and fcntl is not None:
@@ -241,23 +245,49 @@ class Journal:
         return fourcc, payload
 
     def truncate(self, length: int) -> None:
-        self.f.truncate(length)
-        self.f.flush()
-        os.fsync(self.f.fileno())
+        _need(self.writable, "journal is open read-only")
+        _need(self.write_failure is None, "journal writer failed; close and recover before truncating")
+        try:
+            self.f.truncate(length)
+            self.f.flush()
+            os.fsync(self.f.fileno())
+        except BaseException as exc:
+            self.write_failure = exc
+            raise
 
     def append_raw(self, fourcc: bytes, payload: bytes) -> tuple[int, int]:
         """Append one framed chunk at the end; return (offset, end)."""
+        _need(self.writable, "journal is open read-only")
+        _need(self.write_failure is None, "journal writer failed; close and recover before appending")
         frame = frame_chunk(fourcc, payload)
-        self.f.seek(0, os.SEEK_END)
-        off = self.f.tell()
-        self.f.write(frame)
-        self.f.flush()
+        try:
+            self.f.seek(0, os.SEEK_END)
+            off = self.f.tell()
+            if self.f.write(frame) != len(frame):
+                raise OSError("short journal write")
+            self.f.flush()
+        except BaseException as exc:
+            # A failed write may have published a prefix. Never append beyond
+            # it or pretend retrying the same record is safe.
+            self.write_failure = exc
+            raise
         return off, off + len(frame)
 
     def fsync(self) -> None:
-        self.f.flush()
-        os.fsync(self.f.fileno())
+        _need(self.writable, "journal is open read-only")
+        _need(self.write_failure is None, "journal writer failed; close and recover before syncing")
+        try:
+            self.f.flush()
+            os.fsync(self.f.fileno())
+        except BaseException as exc:
+            self.write_failure = exc
+            raise
 
     def close(self) -> None:
         if not self.f.closed:
-            self.f.close()
+            try:
+                self.f.close()
+            except BaseException as exc:
+                if self.write_failure is None:
+                    self.write_failure = exc
+                raise

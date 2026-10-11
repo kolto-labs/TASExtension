@@ -1,0 +1,6 @@
+.runtime-inspector { border-top: 1px solid var(--line); padding: 6px 10px; background: var(--panel); }
+.runtime-inspector > summary { cursor: pointer; color: var(--dim); width: fit-content; min-height: 24px; line-height: 24px; }
+.runtime-inspector > summary:hover { color: var(--ink); }
+.runtime-inspector dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px 16px; margin: 8px 0 4px; }
+.runtime-inspector dt { color: var(--dim); font-size: 11px; }
+.runtime-inspector dd { margin: 2px 0 0; font-family: var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }

@@ -58,8 +58,11 @@ PYTHONPATH=KPTASInterface python3 -m kptas --help
 | `telos edit SCORE\|BUNDLE` | open a score (or a bundle's score) in `$EDITOR`, then check it |
 | `telos gym serve` | serve reset/step over loopback NDJSON |
 | `telos repl` | interactive authoring and inspection |
+| `telos core list` / `install` / `enable` / `disable` / `remove` | manage optional first-party package enrollment in a Core profile |
 
 Exit codes: 0 ok, 1 a check failed or a run halted, 2 usage, configuration or a missing module.
+
+Core package enrollment is documented in [native-core-package-cli.md](docs/design/native-core-package-cli.md). It records profile state; package activation remains the responsibility of the owning Core application.
 
 Every command in the table except `edit`, `gym serve` and `repl` has been run on PySim. The pages that go deeper: [score.md](docs/score.md), [holorecord.md](docs/holorecord.md), [tiers.md](docs/tiers.md).
 

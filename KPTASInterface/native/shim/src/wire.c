@@ -44,6 +44,7 @@ static u32 g_last_load_done;
 static u8 g_last_jdig[16];
 static int g_input_close;        /* the held note carries !close (first tick only) */
 static int g_os_close;           /* os_event close: the next tick */
+static int g_close_pending;       /* enqueue retry for score or OS close */
 static int g_exited;
 
 /* events of the running step or wait, reported in its reply */
@@ -316,36 +317,81 @@ static void do_hello(i64 id) {
 }
 
 /* ---- input args ---- */
-static void parse_input(jnode *args, input_t *in) {
+static int input_i16(jnode *node, int fallback, int *value) {
+    if (!node) { *value = fallback; return 1; }
+    if (node->type != J_NUM || node->num < -32768 || node->num > 32767) return 0;
+    *value = (int)node->num;
+    return 1;
+}
+
+static int input_i32(jnode *node, int fallback, int *value) {
+    if (!node) { *value = fallback; return 1; }
+    if (node->type != J_NUM || node->num < (-2147483647LL - 1) || node->num > 2147483647LL) return 0;
+    *value = (int)node->num;
+    return 1;
+}
+
+static int input_vec2(jnode *node, int *x, int *y) {
+    if (!node) return 1;
+    if (node->type != J_ARR || !node->child || !node->child->next || node->child->next->next)
+        return 0;
+    return input_i16(node->child, 0, x) && input_i16(node->child->next, 0, y);
+}
+
+static int input_vec2_i32(jnode *node, int *x, int *y) {
+    if (!node) return 1;
+    if (node->type != J_ARR || !node->child || !node->child->next || node->child->next->next)
+        return 0;
+    return input_i32(node->child, 0, x) && input_i32(node->child->next, 0, y);
+}
+
+static int parse_input(jnode *args, input_t *in, const char **bad) {
     memset(in, 0, sizeof *in);
     jnode *k = jget(args, "keys");
-    if (k && k->type == J_ARR)
+    if (k) {
+        if (k->type != J_ARR) { *bad = "keys must be an array of DIK codes"; return 0; }
         for (jnode *c = k->child; c; c = c->next) {
-            i64 d = jint(c, 0);
-            if (d > 0 && d < 256) in->keys[d >> 3] |= (u8)(1u << (d & 7));
+            if (c->type != J_NUM || c->num < 1 || c->num > 255) {
+                *bad = "each key must be an integer DIK code from 1 to 255";
+                return 0;
+            }
+            u32 d = (u32)c->num;
+            in->keys[d >> 3] |= (u8)(1u << (d & 7));
         }
+    }
     jnode *bt = jget(args, "buttons");
-    if (bt && bt->type == J_ARR)
+    if (bt) {
+        if (bt->type != J_ARR) { *bad = "buttons must be an array of lmb, rmb, or mmb"; return 0; }
         for (jnode *c = bt->child; c; c = c->next) {
-            const char *s = jstr(c, "");
+            if (c->type != J_STR) { *bad = "button names must be strings"; return 0; }
+            const char *s = c->str;
             if (k_streq(s, "lmb")) in->buttons |= 1;
             else if (k_streq(s, "rmb")) in->buttons |= 2;
             else if (k_streq(s, "mmb")) in->buttons |= 4;
-        }
-    jnode *m = jget(args, "mouse");
-    if (m) {
-        jnode *a = jget(m, "abs"), *r = jget(m, "rel");
-        if (a && a->type == J_ARR && a->child && a->child->next) {
-            in->has_abs = 1;
-            in->abs_x = (int)jint(a->child, 0);
-            in->abs_y = (int)jint(a->child->next, 0);
-        }
-        if (r && r->type == J_ARR && r->child && r->child->next) {
-            in->rel_x = (int)jint(r->child, 0);
-            in->rel_y = (int)jint(r->child->next, 0);
+            else { *bad = "button name must be lmb, rmb, or mmb"; return 0; }
         }
     }
-    in->wheel = (int)jint(jget(args, "wheel"), 0);
+    jnode *m = jget(args, "mouse");
+    if (m) {
+        if (m->type != J_OBJ) { *bad = "mouse must be an object"; return 0; }
+        jnode *a = jget(m, "abs"), *r = jget(m, "rel");
+        if (a) {
+            if (!input_vec2(a, &in->abs_x, &in->abs_y)) {
+                *bad = "mouse.abs must contain two signed 16-bit integers";
+                return 0;
+            }
+            in->has_abs = 1;
+        }
+        if (r && !input_vec2_i32(r, &in->rel_x, &in->rel_y)) {
+            *bad = "mouse.rel must contain two signed 32-bit integers";
+            return 0;
+        }
+    }
+    if (!input_i32(jget(args, "wheel"), 0, &in->wheel)) {
+        *bad = "wheel must be a signed 32-bit integer";
+        return 0;
+    }
+    return 1;
 }
 
 /* "msgs": OS events on the note's first tick. Returns 0 on an unsupported one. */
@@ -619,30 +665,51 @@ static void handle(char *line, u32 len, int phase) {
         const char *bad = "";
         int cl = 0;
         if (!parse_msgs(args, &cl, &bad)) { reply_err(id, "unsupported", bad); return; }
-        parse_input(args, &g_input);
-        g_input_close = cl;
-        set_note(args);
-        g_first_tick = jget(args, "first") ? (jget(args, "first")->type == J_BOOL ? (int)jget(args, "first")->num : 1) : 1;
-        g_sev_n = 0;
-        g_verbclass_acc = 0;
+        input_t next_input;
+        if (!parse_input(args, &next_input, &bad)) { reply_err(id, "bad_args", bad); return; }
+        int next_first = jget(args, "first")
+                         ? (jget(args, "first")->type == J_BOOL ? (int)jget(args, "first")->num : 1)
+                         : 1;
+        i64 step_count = 0;
+        i64 wait_timeout = 0;
+        const char *next_wait_event = "";
         if (k_streq(verb, "step")) {
-            i64 n = jint(jget(args, "n"), 1);
-            if (n < 0) { reply_err(id, "bad_args", "n < 0"); return; }
-            if (n == 0) {
+            step_count = jint(jget(args, "n"), 1);
+            if (step_count < 0) { reply_err(id, "bad_args", "n must be non-negative"); return; }
+            if (step_count == 0) {
+                /* A zero-step query must not replace held input or the current
+                 * note. Keep it observational and leave pending controls intact. */
+                g_sev_n = 0;
+                g_verbclass_acc = 0;
                 reply_begin(&b, id);
                 step_report(&b, -1, "alive");
                 reply_end(&b);
                 return;
             }
-            g_step_left = (u64)n;
+        } else {
+            next_wait_event = jstr(jget(args, "event"), "");
+            wait_timeout = jint(jget(args, "timeout"), 1800);
+            if (wait_timeout < 0) { reply_err(id, "bad_args", "timeout must be non-negative"); return; }
+        }
+
+        /* Commit the requested input only after all control arguments have
+         * passed validation. Rejected commands must not leak key presses into
+         * a later accepted step. */
+        g_input = next_input;
+        g_input_close = cl;
+        set_note(args);
+        g_first_tick = next_first;
+        g_sev_n = 0;
+        g_verbclass_acc = 0;
+        if (k_streq(verb, "step")) {
+            g_step_left = (u64)step_count;
             g_step_id = id;
         } else {
-            const char *ev = jstr(jget(args, "event"), "");
-            u32 l = (u32)strlen(ev);
+            u32 l = (u32)strlen(next_wait_event);
             if (l >= sizeof g_wait_event) l = sizeof g_wait_event - 1;
-            memcpy(g_wait_event, ev, l);
+            memcpy(g_wait_event, next_wait_event, l);
             g_wait_event[l] = 0;
-            g_wait_deadline = g_gate.tick + (u64)jint(jget(args, "timeout"), 1800);
+            g_wait_deadline = g_gate.tick + (u64)wait_timeout;
             int k = event_kind(g_wait_event);
             g_wait_kind = k < 0 ? EV_KINDS : (u32)k;
             g_wait_base = k < 0 ? 0 : g_ev_count[k];
@@ -655,7 +722,9 @@ static void handle(char *line, u32 len, int phase) {
         const char *bad = "";
         int cl = 0;
         if (!parse_msgs(args, &cl, &bad)) { reply_err(id, "unsupported", bad); return; }
-        parse_input(args, &g_input);
+        input_t next_input;
+        if (!parse_input(args, &next_input, &bad)) { reply_err(id, "bad_args", bad); return; }
+        g_input = next_input;
         g_input_close = cl;
         set_note(args);
         reply_begin(&b, id);
@@ -820,6 +889,9 @@ void wire_gate_hook(void) {
         b_init(&b, g_out, OBUF);
         b_str(&b, "{\"push\":\"tick\",\"tick\":");
         b_u64(&b, g_gate.tick);
+        b_str(&b, ",\"epoch\":1,\"input_sha256\":\"");
+        b_hex(&b, g_input_sha256, 32);
+        b_ch(&b, '\"');
         b_str(&b, ",\"ext\":");
         b_u64(&b, g_msg_ext_n);
         b_str(&b, ",\"run_us\":");
@@ -837,11 +909,14 @@ void wire_gate_hook(void) {
             b_str(&b, "\",\"cap\":");
             state_stats_json(&b);
         }
+        b_str(&b, ",\"input_observation\":");
+        di_observation_json(&b, g_gate.tick);
         b_str(&b, ",\"entry\":");
         b_raw(&b, j.p, j.n);
         b_ch(&b, '}');
         wire_send_line(&b);
     }
+    di_observation_reset();
     int hold = 1;
     if (g_start_id >= 0) {
         buf_t b;
@@ -873,12 +948,16 @@ void wire_gate_hook(void) {
 
     /* stage tick n+1 */
     u32 ms = (u32)((g_clk.uptime0_ms * 1000ull + g_clk.seg_v + (g_gate.tick + 1 - g_clk.seg_tick) * 1000000ull / g_clk.hz) / 1000ull);
-    di_stage(&g_input, g_first_tick, ms, g_input_hash);
+    di_stage(&g_input, g_first_tick, ms, g_input_hash, g_input_sha256);
     /* OS event close: WM_CLOSE to the game window at the start of tick n+1,
      * through the staged queue so it reaches the game's WndProc */
-    if ((g_first_tick && g_input_close) || g_os_close) {
-        msg_synth_push(WM_CLOSE, 0, 0);
+    if ((g_first_tick && g_input_close) || g_os_close) g_close_pending = 1;
+    if (g_close_pending && msg_synth_push(WM_CLOSE, 0, 0)) {
+        /* Publish the close event only after its matching window message has
+         * entered the bounded queue. A full queue leaves the request pending
+         * so the next gate can retry after the game drains messages. */
         SH->close_next = 1;
+        g_close_pending = 0;
         g_os_close = 0;
     }
     g_first_tick = 0;
