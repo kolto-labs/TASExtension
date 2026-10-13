@@ -13,3 +13,11 @@ The helper accepts bounded hexadecimal register strings and compares their exact
 Implemented in source on 2026-10-13 after actual recorded candidate214aa load diagnosis required manually copying thread11's saved EIP0x104fd1c4 into the mapping form. That earlier manual lookup returned /lib/libc.so.6 with file offset0x00000000000cd1c4. It does not qualify the new navigation action.
 
 No tests or test probes were run. The new source has not been adopted by the retained live game; no reload or hotpatch was performed. Live adoption and actual-use qualification remain pending. This adds navigation to the existing capability layer without granting uploaded files execution, memory access, module identity, replay or platform support.
+
+## Actual use on 2026-10-13
+
+The separate recordedf6aca guest32/sessionaa9f26db-8441-4e4b-91e0-3ba20bc46c94 adopted this UI source at launch. Normal Pause confirmed24/24workers and presentation0. Processes captured10rows with no presentation-owner association yet. Selected named PID10/wine, captured thread11/Kernel wait/nine registers. Its saved EIP was0x104fd197.
+
+Normal Prepare mapping for thread11 eip opened the form with exact0x104fd197 and the saved thread/register/time provenance message. It left the mapping table empty until normal Capture address backing file. That separate capture returned /lib/libc.so.6,start0x10452000,extent0x0000000000100000,file offset0x00000000000cd197. Normal register and mapping exports retained captured rows without navigation buttons. Screenshot /tmp/kptas-f6aca-register-mapping-20261013.jpg.
+
+This successful preparation/capture/export path is qualified only for this real startup pause. Source-only cases remain: zero/wider values, other backends, capability loss, selection replacement and disable/reactivation admission. Normal Resume confirmed23/24workers/presentation0; recording27b207b9 remains active, with no scored inputs. Existing214aa guest30 and its recording stay intact. No tests, test probes, reload or hotpatch were performed.
