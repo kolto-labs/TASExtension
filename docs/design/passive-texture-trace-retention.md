@@ -9,3 +9,7 @@ Original source and SDK shell were byte-identical with SHA2564ecf6ea325ee2d81480
 Actual retained class log SHA2566588c6f8d88964ac2571554a87883a4a98bf2ca2938711ea3d6959bc7664a2ed contains235upload/4draw/4texture-sample records. Portrait log SHA2566803acc1d23cac23f64404c7ee00911b1cba7aecbec0422923ab56cbbb8cd3de contains233upload/4draw/4texture-sample records. Each displayed snapshot had65628characters including its omission banner; neither is complete. Pixel sample hashes remain private local evidence.
 
 No tests, probes, synthetic requests, guest reload, deployment or vendor edit. Dirty source/index/data retained.
+
+## Actual retained title trace
+
+Candidate9a5c8/session6dd2a90d displayed200011characters and671KPTAS_GL records with no omission banner. Artifact6dd2a90d-displayed-title-renderer-trace-20261013.txt SHA2568087d0c9397f88a35ca395505e47105067158e388fdd2457310c21aeaa28d4a3 retained locally. This qualifies retention beyond the previous64KiB window for actual startup/title output. The1MiB boundary, omission behavior and other settings remain source-only. No rendering cause or complete-history guarantee inferred.
