@@ -23,9 +23,11 @@ offset zero is valid. Preserve64-bit file offsets without JavaScript integer
 rounding. Snapshot metadata only; no page fault, file read or target mutation.
 Keep legacy diagnostic exports unchanged.
 
-The backend-neutral operation should report process-scoped live-runtime
-evidence and use the existing session/revision/target broker and controller.
-Transport, backend, target and policy must all advertise support. A matching
+The backend-neutral operation reports process-scoped live-runtime evidence.
+Selected hosted backends use the existing session/revision/target broker and
+its transport, backend, target and policy support intersection. The original
+guest adapter uses the existing trusted runtime/controller and origin/session
+checked bridge; it does not establish four independent support reports. A matching
 ABI version and complete request/reply validation are required before showing
 availability. Static file inspection grants no process mapping capability.
 Other game adapters may implement the same operation with their own address
@@ -39,8 +41,12 @@ disassembly, symbol identity, replay or platform compatibility.
 
 ## Current disposition
 
-This is a design decision based on the actual source inspection. No lookup
-operation is exposed or advertised yet. Source implementation and actual
-debugger use remain outstanding; no synthetic requests, tests or probes were
-run. Current recorded candidate6889 continues in its established browser
-session while this capability is prepared for a later compatible batch.
+Source implementation now includes the nonblocking native metadata snapshot,
+versioned paused producer, bounded bridge transport, parent/runtime validation,
+operation vocabulary and a process-scoped debugger view with exact exports.
+The view validates the reply again and retains the complete bounded path;
+unavailable file offsets remain null and valid zero offsets remain exact hex.
+Availability requires ABI v1 and both native exports. Existing guests have not
+adopted these changes. Production compilation and actual debugger use remain
+outstanding; no synthetic requests, tests or probes were run. Recorded
+candidate6889 remains in its established browser session.
