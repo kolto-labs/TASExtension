@@ -5,6 +5,8 @@ const picker = byId('recording'), status = byId('status');
 const receiptStatus = byId('receipt-status'), receiptText = byId('receipt-text');
 const previewStatus = byId('preview-status'), video = byId('video');
 let revision = 0, listing = 0, receiptRequest = 0, previewRequest = 0, previewUrl = null;
+let finalizedRequest = 0, finalizedUrl = null;
+const finalizedStatus = byId('finalized-status');
 const parentOrigin = (() => {
   try {
     const value = new URL(new URLSearchParams(location.search).get('parentOrigin'));
@@ -22,12 +24,13 @@ function clearPreview() {
   if (oldUrl) URL.revokeObjectURL(oldUrl);
 }
 function selected() {
-  revision++; clearPreview(); receiptText.textContent = '';
+  revision++; clearPreview(); clearFinalized(); receiptText.textContent = '';
   if (parentOrigin) parent.postMessage({ schema:'telos.recording-preview/v1', action:'clear' }, parentOrigin);
   receiptStatus.textContent = 'View the selected receipt to inspect completion and provenance.';
   previewStatus.textContent = 'Open a saved footage snapshot. Playback is independent of the running game.';
   const enabled = validName(picker.value);
   byId('receipt').disabled = byId('preview').disabled = !enabled;
+  byId('finalized').disabled = !enabled;
 }
 async function directory(name) {
   if (!validName(name)) throw new Error('Choose a recording from the list.');
@@ -119,4 +122,62 @@ video.addEventListener('error', () => {
   const code = video.error?.code;
   previewStatus.textContent = `Footage could not open: ${reasons[code] || 'unknown media error'}${code ? ` (code ${code})` : ''}. Saved files remain unchanged. This does not establish whether the retained container is valid.`;
 });
-window.addEventListener('pagehide', clearPreview);
+function clearFinalized() {
+  if (finalizedUrl) URL.revokeObjectURL(finalizedUrl);
+  finalizedUrl = null;
+  finalizedStatus.textContent = 'Prepare a download after the writer reports finalization.';
+}
+async function readFinalizedReceipt(dir) {
+  const file = await (await dir.getFileHandle('receipt.json')).getFile();
+  if (!file.size || file.size > 65536) throw new Error('Receipt exceeds the supported inspection size.');
+  const bytes = await file.arrayBuffer();
+  if (bytes.byteLength !== file.size) throw new Error('Receipt changed while reading.');
+  const data = JSON.parse(new TextDecoder('utf-8', {fatal:true}).decode(bytes));
+  if (!data || Array.isArray(data) || data.schema !== 'telos.game-recording/v1'
+    || data.complete !== true || !Number.isSafeInteger(data.bytes) || data.bytes <= 0
+    || !Number.isSafeInteger(data.chunks) || data.chunks <= 0
+    || typeof data.endedAt !== 'string' || !Number.isFinite(Date.parse(data.endedAt))) {
+    throw new Error('The receipt does not report a finalized recording.');
+  }
+  return {bytes:new Uint8Array(bytes), data};
+}
+byId('finalized').addEventListener('click', async () => {
+  const name = picker.value, ticket = revision, request = ++finalizedRequest;
+  byId('finalized').disabled = true;
+  clearFinalized();
+  finalizedStatus.textContent = 'Reading finalized recording metadata…';
+  try {
+    const dir = await directory(name);
+    const first = await readFinalizedReceipt(dir);
+    const file = await (await dir.getFileHandle('game.webm')).getFile();
+    if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size !== first.data.bytes) {
+      throw new Error('Footage size does not match the finalized receipt.');
+    }
+    const second = await readFinalizedReceipt(dir);
+    if (first.bytes.byteLength !== second.bytes.byteLength
+      || first.bytes.some((byte, index) => byte !== second.bytes[index])) {
+      throw new Error('Receipt changed while preparing the download.');
+    }
+    if (!current(name, ticket) || request !== finalizedRequest) return;
+    // Preserve the file-backed Blob. Do not allocate a full-footage ArrayBuffer
+    // or relax the independent 64 MiB active-preview snapshot limit.
+    const snapshot = new File([file], 'game.webm', {type:'video/webm'});
+    const {schema, complete, bytes, chunks, endedAt} = first.data;
+    if (parentOrigin) {
+      parent.postMessage({schema:'telos.recording-finalized-download/v1', action:'open', name,
+        file:snapshot, receipt:{schema, complete, bytes, chunks, endedAt}}, parentOrigin);
+      finalizedStatus.textContent = `${name}: ${file.size.toLocaleString()} retained bytes prepared for the workspace download. The writer reported finalization; playback and run qualification remain separate.`;
+    } else {
+      finalizedUrl = URL.createObjectURL(snapshot);
+      const link = document.createElement('a');
+      link.href = finalizedUrl; link.download = `${name}.webm`;
+      document.body.append(link); link.click(); link.remove();
+      finalizedStatus.textContent = `${name}: download requested. Retained files remain unchanged; playback and run qualification remain separate.`;
+    }
+  } catch (error) {
+    if (current(name, ticket) && request === finalizedRequest) finalizedStatus.textContent = `Download unavailable; retained files remain unchanged: ${String(error.message).slice(0,240)}`;
+  } finally {
+    if (current(name, ticket) && request === finalizedRequest) byId('finalized').disabled = !validName(name);
+  }
+});
+window.addEventListener('pagehide', () => { clearPreview(); clearFinalized(); });

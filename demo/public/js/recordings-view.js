@@ -25,10 +25,18 @@ export function mountRecordingLibrary(root) {
   downloadReceipt.textContent = 'Download receipt snapshot'; downloadReceipt.disabled = true;
   receiptExport.append(receiptStatus, downloadReceipt);
   preview.append(heading, status, video, downloadFootage);
-  root.replaceChildren(note, frame, receiptExport, preview);
+  const finalizedExport = document.createElement('section');
+  finalizedExport.setAttribute('aria-label', 'Finalized recording download');
+  const finalizedStatus = document.createElement('p'); finalizedStatus.setAttribute('role', 'status');
+  finalizedStatus.textContent = 'Prepare finalized footage in the library to download it.';
+  const downloadFinalized = document.createElement('button');
+  downloadFinalized.textContent = 'Download finalized footage'; downloadFinalized.disabled = true;
+  finalizedExport.append(finalizedStatus, downloadFinalized);
+  root.replaceChildren(note, frame, receiptExport, finalizedExport, preview);
   let selected = null, previewUrl = null;
   let receiptName = null, receiptUrl = null;
   let reportedSecond = -1;
+  let finalizedName = null, finalizedUrl = null;
   function clearPreview() {
     const old = previewUrl; previewUrl = null;
     video.pause(); video.removeAttribute('src'); video.load();
@@ -41,7 +49,12 @@ export function mountRecordingLibrary(root) {
     receiptUrl = receiptName = null; downloadReceipt.disabled = true;
     receiptStatus.textContent = 'Read a receipt in the library to prepare its download.';
   }
-  function clear() { clearPreview(); clearReceipt(); }
+  function clearFinalized() {
+    if (finalizedUrl) URL.revokeObjectURL(finalizedUrl);
+    finalizedName = finalizedUrl = null; downloadFinalized.disabled = true;
+    finalizedStatus.textContent = 'Prepare finalized footage in the library to download it.';
+  }
+  function clear() { clearPreview(); clearReceipt(); clearFinalized(); }
   function download(url, name) {
     if (!url || !name) return;
     const link = document.createElement('a');
@@ -50,13 +63,29 @@ export function mountRecordingLibrary(root) {
   }
   downloadFootage.addEventListener('click', () => download(previewUrl, `${selected}-snapshot.webm`));
   downloadReceipt.addEventListener('click', () => download(receiptUrl, `${receiptName}-receipt-snapshot.json`));
+  downloadFinalized.addEventListener('click', () => download(finalizedUrl, `${finalizedName}.webm`));
   const receive = event => {
     if (event.source !== frame.contentWindow || event.origin !== url.origin
-      || !['telos.recording-preview/v1','telos.recording-receipt/v1'].includes(event.data?.schema)) return;
+      || !['telos.recording-preview/v1','telos.recording-receipt/v1','telos.recording-finalized-download/v1'].includes(event.data?.schema)) return;
     if (event.data.action === 'clear') { clear(); return; }
     const { action, name, file } = event.data;
     if (action !== 'open' || !/^recording-[0-9a-f-]{36}$/.test(name)
       || !(file instanceof File) || !file.size || !Number.isSafeInteger(file.size)) return;
+    if (event.data.schema === 'telos.recording-finalized-download/v1') {
+      const receipt = event.data.receipt;
+      if (file.type !== 'video/webm' || file.name !== 'game.webm'
+        || receipt?.schema !== 'telos.game-recording/v1' || receipt.complete !== true
+        || !Number.isSafeInteger(receipt.bytes) || receipt.bytes !== file.size
+        || !Number.isSafeInteger(receipt.chunks) || receipt.chunks <= 0
+        || typeof receipt.endedAt !== 'string' || !Number.isFinite(Date.parse(receipt.endedAt))) return;
+      if (selected && selected !== name) clearPreview();
+      if (receiptName && receiptName !== name) clearReceipt();
+      clearFinalized(); finalizedName = name; finalizedUrl = URL.createObjectURL(file);
+      downloadFinalized.disabled = false;
+      finalizedStatus.textContent = `${name}: ${file.size.toLocaleString()} retained bytes ready to download. The receipt reports finalization; playback, audio and complete-run qualification remain separate.`;
+      return;
+    }
+    if (finalizedName && finalizedName !== name) clearFinalized();
     if (event.data.schema === 'telos.recording-receipt/v1') {
       if (file.size > 65536 || file.type !== 'application/json') return;
       if (selected && selected !== name) clearPreview();

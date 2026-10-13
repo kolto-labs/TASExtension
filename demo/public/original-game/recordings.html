@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Saved game recordings</title>
+  <link rel="stylesheet" href="recordings.css">
+  <script type="module" src="recordings-library.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Inspect saved recordings</h1>
+    <p>These files stay in this browser origin. Directory presence and receipt completion do not prove a complete run or replay qualification.</p>
+    <div class="controls">
+      <button id="refresh" type="button">Find saved recordings</button>
+      <label>Recording <select id="recording" disabled></select></label>
+      <button id="receipt" type="button" disabled>View receipt</button>
+      <button id="preview" type="button" disabled>Open footage snapshot</button>
+      <button id="finalized" type="button" disabled>Prepare finalized download</button>
+    </div>
+    <p id="status" role="status">Find recordings to inspect their retained files.</p>
+    <section aria-label="Recording receipt">
+      <h2>Read receipt</h2>
+      <p id="receipt-status">No receipt selected.</p>
+      <pre id="receipt-text"></pre>
+    </section>
+    <p id="finalized-status" role="status">Prepare a download after the writer reports finalization.</p>
+    <section aria-label="Footage preview">
+      <h2>View footage</h2>
+      <p id="preview-status">A snapshot reads the saved footage at the time you open it. It does not stop a recording. Preview starts muted; use the video controls to play or unmute it.</p>
+      <video id="video" controls muted preload="metadata"></video>
+    </section>
+  </main>
+</body>
+</html>
