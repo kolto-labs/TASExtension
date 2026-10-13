@@ -51,7 +51,7 @@ body[data-tas-presentation="overlay"] .game-running .original-game-view {
 }
 body[data-tas-presentation="overlay"] .game-running .original-game-controls {
   position: absolute; z-index: 10; top: var(--tas-overlay-controls-top); right: var(--tas-overlay-gap);
-  width: min(620px, calc(100% - 2 * var(--tas-overlay-gap)));
+  width: min(440px, calc(100% - 2 * var(--tas-overlay-gap)));
   max-height: max(48px, min(28dvh, calc(100dvh - var(--tas-overlay-controls-top) - var(--tas-overlay-editor-height) - 3 * var(--tas-overlay-gap))));
   overflow: auto; background: var(--tas-overlay-surface);
 }
@@ -81,6 +81,10 @@ body.tas-ui-hidden #live-tas-workspace { display: none; }
 @media (max-width: 640px) {
   body[data-tas-presentation="overlay"] { --tas-overlay-controls-top: 96px; }
   body[data-tas-presentation="overlay"] .target-scope { top: 40px; right: var(--tas-overlay-gap); }
-  body[data-tas-presentation="overlay"] .game-running .original-game-controls { grid-template-columns: minmax(0, 1fr); }
+  body[data-tas-presentation="overlay"] .game-running .original-game-controls { grid-template-columns: auto minmax(0, 1fr); }
   body[data-tas-presentation="overlay"] .game-running .original-game-controls > * { grid-column: 1; grid-row: auto; }
+  body[data-tas-presentation="overlay"] .game-running .original-game-controls > .original-game-actions { grid-column:1; grid-row:1; }
+  body[data-tas-presentation="overlay"] .game-running .original-game-controls .game-vm-controls { grid-column:2; grid-row:1; }
+  body[data-tas-presentation="overlay"] .game-running .original-game-controls > :is(.status, .game-setup),
+  body[data-tas-presentation="overlay"] .game-running .original-game-controls > [data-extension-owner] > .game-native-note { grid-column:1 / -1; }
 }

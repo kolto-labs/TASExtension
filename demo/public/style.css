@@ -501,12 +501,16 @@ dialog::backdrop { background: rgba(5, 7, 10, 0.7); }
 .game-running .original-game-actions > .connect, .game-running .original-game-actions > .launch { display:none; }
 .game-running .game-native-note { margin:0; }
 .game-running .original-game-controls { grid-template-columns:auto minmax(0,1fr) auto; align-items:center; }
+/* Package owners keep visibility/lifecycle boundaries, while their existing
+   controls participate in the same compact grid as before the wrappers. */
+.game-running .original-game-controls > [data-extension-owner]:not([hidden]) { display:contents; }
 .game-running .original-game-actions { grid-column:1; grid-row:1; }
 .game-running .game-vm-controls { grid-column:2; grid-row:1; display:flex; flex-wrap:wrap; gap:4px; }
 .game-running .game-setup { grid-column:3; grid-row:1; }
 .game-running .game-setup[open] { grid-column:1 / -1; grid-row:auto; }
 .game-running .original-game-controls > .status { grid-column:1 / -1; padding:2px 0; border:0; background:none; font-size:11px; }
 .game-running .original-game-controls > .game-native-note { grid-column:1 / -1; font-size:10px; }
+.game-running .original-game-controls > [data-extension-owner] > .game-native-note { grid-column:1 / -1; font-size:10px; }
 .game-running .game-action { min-height:26px; padding:4px 8px; }
 
 .runtime-inspector { flex:0 0 auto; padding:4px 6px; border:1px solid var(--line); background:var(--panel); }
