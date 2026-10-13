@@ -9,3 +9,7 @@ Actual adoption2026-10-13: fresh tab4/session632bc210-2d56-49b8-a94a-5d19b49c2a2
 Reference: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Permissions-Policy/autoplay
 
 No tests or probes. No runtime rebuild, default selection or deployment was required for this parent source change. The coupled parent source remains dirty and preserved.
+
+Actual bounded continuity: recordingee701f86 acknowledged18409bytes/2chunks flushed while still active during present0/workers47of49. No suspension observed through this interval. Game content, audible PCM, full capture and causality remain unqualified.
+
+Continuing actual adoption: title reached, then four released inputs through no-saved-games dialog, paused39/full50. Capture active with422956bytes/37chunks. No suspension observed over this interval. Audible PCM and longer capture remain unqualified. Actual screenshot /tmp/kptas-audio-delegated-menu-capture-20261013.jpg.
