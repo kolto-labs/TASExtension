@@ -4,6 +4,8 @@ The register table offers a preparation action beside values that fit the active
 
 The action retains the capture's process, thread, register and displayed capture time. Session, selection epoch and process checks refuse navigation after a target change. The mapping view also requires its own advertised reader and capture boundary. A saved register value is not evidence that the value is a pointer. It is not the current instruction or a wait cause.
 
+Each displayed preparation button retains its capture epoch, process and session. Its disabled state checks those values too, so a retained table cannot present an enabled navigation action after disable/reactivation invalidates its capture epoch. The click handler repeats the checks.
+
 The helper accepts bounded hexadecimal register strings and compares their exact integer value against the 32-bit operation limit before conversion. Zero remains valid. Wider nonzero values and other pointer widths are unavailable in this form; they are never truncated. Register row exports retain the captured data without navigation buttons. Preparing a lookup leaves the previous mapping table and export intact and labels them accordingly.
 
 ## Evidence
