@@ -46,7 +46,13 @@ versioned paused producer, bounded bridge transport, parent/runtime validation,
 operation vocabulary and a process-scoped debugger view with exact exports.
 The view validates the reply again and retains the complete bounded path;
 unavailable file offsets remain null and valid zero offsets remain exact hex.
-Availability requires ABI v1 and both native exports. Existing guests have not
-adopted these changes. Production compilation and actual debugger use remain
-outstanding; no synthetic requests, tests or probes were run. Recorded
-candidate6889 remains in its established browser session.
+Availability requires ABI v1 and both native exports. The one-job production
+build completed successfully and staged candidate214aa1fc with SDK WASM
+SHA2566b8321c7243c2653dc8e274ca090b979bdf9bff3c9c1eaec07252eb0bf0f022b.
+Separate guest30/session25751740-3189-41fc-9310-551286814c9e adopted the view
+and capability handshake. Its normal toolbar opens the view, which requires a
+process selection before capture. Actual mapping capture remains outstanding.
+The guest is still starting, recorded before its first presentation. These
+observations do not qualify a mapping reply or original-game acceptance. No
+synthetic requests, tests or probes were run. Candidate6889 remains in its
+established browser session; the default runtime is unchanged.
