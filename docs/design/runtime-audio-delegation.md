@@ -13,3 +13,5 @@ No tests or probes. No runtime rebuild, default selection or deployment was requ
 Actual bounded continuity: recordingee701f86 acknowledged18409bytes/2chunks flushed while still active during present0/workers47of49. No suspension observed through this interval. Game content, audible PCM, full capture and causality remain unqualified.
 
 Continuing actual adoption: title reached, then four released inputs through no-saved-games dialog, paused39/full50. Capture active with422956bytes/37chunks. No suspension observed over this interval. Audible PCM and longer capture remain unqualified. Actual screenshot /tmp/kptas-audio-delegated-menu-capture-20261013.jpg.
+
+Continuing capture: same session reached New Game, class selection and Quick Character setup; paused68/full50/all12inputsreleased. Recording remainsactive,999984bytes/66chunksflushed. Portrait corruption persists. No game/audio/replay/full-run acceptance. Actual score example (44).score and execution debug-execution-2026-10-13T21-53-31-677Z.json retained in user home.
