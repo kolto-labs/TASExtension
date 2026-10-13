@@ -13,33 +13,41 @@
   box-shadow: inset 0 0 0 1px var(--kolto);
 }
 
-body[data-tas-presentation="overlay"] { height: 100dvh; min-height: 0; overflow: hidden; }
+body[data-tas-presentation="overlay"],
+body.wide[data-tas-presentation="overlay"],
+body.compact[data-tas-presentation="overlay"] { height: 100dvh; min-height: 0; overflow: hidden; }
 body[data-tas-presentation="overlay"] > .top,
 body[data-tas-presentation="overlay"] > .foot,
+body[data-tas-presentation="overlay"] > nav[aria-label="Workspace layout"],
 body[data-tas-presentation="overlay"] .cockpit > .p-score,
 body[data-tas-presentation="overlay"] .cockpit > .p-right,
 body[data-tas-presentation="overlay"] .cockpit > .p-console { display: none; }
-body[data-tas-presentation="overlay"] .cockpit {
+body[data-tas-presentation="overlay"] .cockpit > .dock-panel:not(#p-center):not(#live-tas-workspace) { display: none; }
+body[data-tas-presentation="overlay"] #cockpit {
   height: 100dvh; padding: 0; gap: 0;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   grid-template-areas: "center";
 }
-body[data-tas-presentation="overlay"] .p-center {
-  position: relative; height: 100%; overflow: hidden; gap: 0;
+body[data-tas-presentation="overlay"] #p-center {
+  grid-area: center; position: relative; height: 100%; min-height: 0; max-height: none; resize: none; overflow: hidden; gap: 0;
+  display: flex; flex-direction: column;
 }
-/* The mode switch and target boundary remain visible above the game. */
+body[data-tas-presentation="overlay"] #cockpit > .dock-splitter { display: none; }
+body[data-tas-presentation="overlay"] .p-center > .dock-titlebar { display: none; }
+/* Reserve parent chrome above the iframe. Child recording controls start at
+   its top edge and must not sit beneath the parent's presentation toggle. */
 body[data-tas-presentation="overlay"] .center-head {
-  position: absolute; z-index: 12; top: var(--tas-overlay-gap); right: var(--tas-overlay-gap);
-  border: 0; background: var(--tas-overlay-surface);
+  position: relative; z-index: 12; flex: 0 0 auto; align-self: flex-end;
+  border: 0; margin: var(--tas-overlay-gap); background: var(--tas-overlay-surface);
 }
 body[data-tas-presentation="overlay"] .center-head > .tabs { display: none; }
 body[data-tas-presentation="overlay"] .target-scope {
-  position: absolute; z-index: 11; top: var(--tas-overlay-gap); left: var(--tas-overlay-gap);
-  right: 144px; max-height: 3.8em; overflow: auto; background: var(--tas-overlay-surface);
+  position: relative; z-index: 11; flex: 0 0 auto;
+  margin: 0 var(--tas-overlay-gap); max-height: 3.8em; overflow: auto; background: var(--tas-overlay-surface);
 }
 body[data-tas-presentation="overlay"] .p-center > .original-pane {
-  position: absolute; inset: 0; min-height: 0;
+  position: relative; flex: 1 1 0; min-height: 0; overflow: hidden;
 }
 body[data-tas-presentation="overlay"] #original-game { padding-top: var(--tas-overlay-controls-top); }
 body[data-tas-presentation="overlay"] #original-game:not(.game-running) {
@@ -47,12 +55,11 @@ body[data-tas-presentation="overlay"] #original-game:not(.game-running) {
 }
 body[data-tas-presentation="overlay"] #original-game.game-running { padding-top: 0; }
 body[data-tas-presentation="overlay"] .game-running .original-game-view {
-  position: absolute; inset: 0; min-height: 0; height: 100%;
+  position: relative; order: 1; flex: 1 1 0; min-height: 0; height: auto;
 }
 body[data-tas-presentation="overlay"] .game-running .original-game-controls {
-  position: absolute; z-index: 10; top: var(--tas-overlay-controls-top); right: var(--tas-overlay-gap);
-  width: min(440px, calc(100% - 2 * var(--tas-overlay-gap)));
-  max-height: max(48px, min(28dvh, calc(100dvh - var(--tas-overlay-controls-top) - var(--tas-overlay-editor-height) - 3 * var(--tas-overlay-gap))));
+  position: relative; z-index: 10; order: 0; flex: 0 0 auto;
+  width: auto; max-height: 28dvh;
   overflow: auto; background: var(--tas-overlay-surface);
 }
 /* Runtime commands and their busy/error text above remain available; detailed
@@ -61,10 +68,11 @@ body[data-tas-presentation="overlay"] #original-game > .runtime-inspector,
 body[data-tas-presentation="overlay"] #original-game > .debugger-workbench { display: none; }
 /* The ID also beats the base :has(> #p-roll[hidden]) overflow rule when Score
    is selected, so either editor stays bounded and scrollable. */
-body[data-tas-presentation="overlay"] .p-center > #live-tas-workspace {
+body[data-tas-presentation="overlay"] .p-center > #live-tas-workspace,
+body[data-tas-presentation="overlay"] .cockpit > #live-tas-workspace {
   position: absolute; z-index: 13;
   left: var(--tas-overlay-gap); right: var(--tas-overlay-gap); bottom: var(--tas-overlay-gap);
-  flex: none; max-height: var(--tas-overlay-editor-height); overflow: auto;
+  flex: none; max-height: var(--tas-overlay-editor-height) !important; overflow: auto;
   padding: 6px; gap: 4px; border: 1px solid var(--line); background: var(--tas-overlay-surface);
 }
 body[data-tas-presentation="overlay"] .live-tas-workspace > .p-roll {
@@ -80,7 +88,6 @@ body.tas-ui-hidden #live-tas-workspace { display: none; }
 
 @media (max-width: 640px) {
   body[data-tas-presentation="overlay"] { --tas-overlay-controls-top: 96px; }
-  body[data-tas-presentation="overlay"] .target-scope { top: 40px; right: var(--tas-overlay-gap); }
   body[data-tas-presentation="overlay"] .game-running .original-game-controls { grid-template-columns: auto minmax(0, 1fr); }
   body[data-tas-presentation="overlay"] .game-running .original-game-controls > * { grid-column: 1; grid-row: auto; }
   body[data-tas-presentation="overlay"] .game-running .original-game-controls > .original-game-actions { grid-column:1; grid-row:1; }
