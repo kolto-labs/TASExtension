@@ -51,8 +51,18 @@ build completed successfully and staged candidate214aa1fc with SDK WASM
 SHA2566b8321c7243c2653dc8e274ca090b979bdf9bff3c9c1eaec07252eb0bf0f022b.
 Separate guest30/session25751740-3189-41fc-9310-551286814c9e adopted the view
 and capability handshake. Its normal toolbar opens the view, which requires a
-process selection before capture. Actual mapping capture remains outstanding.
-The guest is still starting, recorded before its first presentation. These
-observations do not qualify a mapping reply or original-game acceptance. No
+process selection before capture. During actual startup diagnosis, normal Pause
+confirmed all38workers at present0. Processes captured14rows; selected PID10
+wine had one saved thread11 in kernel wait, with EIP0x104fd197. The actual
+lookup returned /lib/libc.so.6, start0x10452000, extent0x0000000000100000,
+file offset0x00000000000cd197. Normal export retained exact request/metadata
+in debug-address-mapping-2026-10-13T16-52-12-433Z.json,
+SHA256f937a376a8491b6e4879a81a81f948478308df20e2bf502cb0f564fd66cfd7f0.
+This qualifies the producer/transport/validation/view/export path for this
+one successful pause capture. Zero/unknown offsets, busy metadata, oversized
+paths, no mapping, interruption and other backends remain unqualified. This
+does not identify the Windows game executable or establish a wait cause.
+The guest resumed after capture; its startup recording remains active. These
+observations do not establish original-game acceptance. No
 synthetic requests, tests or probes were run. Candidate6889 remains in its
 established browser session; the default runtime is unchanged.
