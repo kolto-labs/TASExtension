@@ -27,10 +27,10 @@ body[data-tas-presentation="overlay"] #cockpit {
   height: 100dvh; padding: 0; gap: 0;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
-  grid-template-areas: "center";
+  grid-template-areas: "game";
 }
 body[data-tas-presentation="overlay"] #p-center {
-  grid-area: center !important; position: relative; height: 100%; min-height: 0; max-height: none; resize: none; overflow: hidden; gap: 0;
+  grid-area: game !important; position: relative; height: 100%; min-height: 0; max-height: none; resize: none; overflow: hidden; gap: 0;
   display: flex; flex-direction: column;
 }
 body[data-tas-presentation="overlay"] #cockpit > .dock-splitter { display: none; }
