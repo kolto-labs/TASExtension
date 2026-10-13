@@ -42,3 +42,11 @@ completed compatible production batch. Existing candidate30 and every retained g
 remain intact. No synthetic GL queries, tests or test probes were run. This is
 a P1 diagnostic implementation decision, not a new direct user requirement or
 a graphics repair. Other runtime/platform support remains unqualified.
+
+## Actual startup adoption on 2026-10-13
+
+Opened stagedf6aca separately in tab32/sessionaa9f26db-8441-4e4b-91e0-3ba20bc46c94 with glDispatchTiming=1. This supersedes the earlier unlaunched status. Existing214aa tab30 stayed fully paused at presentation393, black after first-area Loading, with its recording active. No existing guest was reloaded or hotpatched.
+
+Started recording27b207b9-9869-413c-b660-154883671843 before the new guest's first presentation. Normal Pause confirmed4/4workers and presentation0. Execution displayed the zero-query message and normal export retained all nine normalized zero-count buckets with queries0. Export /home/brunner56/debug-execution-2026-10-13T18-29-31-278Z.json SHA9833526b83a949c8eb2348fec8bbeef7398fb396de5ff7e5ef3f3d2155f22017. Screenshot /tmp/kptas-f6aca-zero-replies-startup-20261013.jpg.
+
+Producer/bridge/parent/UI/export zero-query path is qualified for this actual startup pause only. Nonzero replies, rendering, process/context attribution, performance and causality remain unqualified. No guest GL query was added or triggered for this capture. Normal Resume confirmed3/4workers/presentation0; startup and recording remain active, with no scored inputs. Default selection and Workers gate are unchanged. No build, tests, test probes or private-asset publication occurred during adoption.
