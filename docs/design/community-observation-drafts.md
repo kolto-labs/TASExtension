@@ -24,6 +24,20 @@ the independent reference view only. The local import/export limit is64MiB;
 oversize export is refused without truncation. Download URLs are retained until
 replacement or disposal; no polling or scheduled work is introduced.
 
-This implements a portable draft handoff in source. It does not complete
-community replay, K2 corpus acquisition or editor/runtime acceptance. Actual
-export and re-import remain unqualified. No tests or test probes were run.
+Actual no-game workspace31 imported the full existing R4NG3 artifact through
+the normal file picker:86,876observations/42lanes. Source observation31673
+showed W/LMB/RMB and source part9. A chosen draft start240 displayed draft
+tick31913 with the uncertainty note. Normal export saved741643bytes,
+SHA256bfddf46262df930153e0fd85b4aff3d0bf87363ea3f5196320079bc3f63d4fde,
+containing6614state changes,294with unknown states, and execution/replay false.
+Normal local re-import retained start240 and the uncertainty note; selecting
+31673 again displayed the same source inputs and draft position. This qualifies
+the observed export/import/display path only. Other packets, invalid placement,
+oversize paths, source replacement and disposal remain unqualified.
+
+The observed export filename used the older catalog label; its embedded
+artifact identity correctly names the20261011full observation assembly. Source
+now derives future filenames from the imported artifact ID. That filename
+refinement has not been adopted in the already loaded31workspace. This handoff
+does not complete community replay, K2 corpus acquisition or executable editor
+integration. No tests or test probes were run.
