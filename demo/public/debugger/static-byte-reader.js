@@ -26,6 +26,6 @@ export async function captureStaticBytes(file, payload, assertActive) {
       Array.from(line, byte => byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.').join(''),
     ]));
   }
-  return Object.freeze({ scope:'target', captured:true, offset, length,
+  return Object.freeze({ scope:'target', captured:true, offset, length, fileSize:file.size,
     semantics:'selected-file-bytes', rows:Object.freeze(rows) });
 }
