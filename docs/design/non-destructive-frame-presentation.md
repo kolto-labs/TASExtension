@@ -63,3 +63,20 @@ They are producer diagnostics, not an independently authenticated input
 journal. Continuous capture3a56bc76 remains active; old2ad owner28 remains
 paused107 with its data and capture preserved. No new build or staging was
 needed for these actual gameplay actions.
+
+First-area Loading subsequently transitioned to black while the counter
+advanced156. Normal Pause167/full43 retained an actual v2 capture with3142
+slots/85nonzero entries/truncatedfalse. The guest console reports Module
+Loaded/Module Running. Browser warning/error capture is empty; displayed
+console retains rectangular-matrix resolution gaps, but none of those names
+appears among the captured nonzero proxy counters. Direct-owner calls are
+outside that counter scope, so absence is not proof the APIs were never used.
+File-range failure count is0 and cumulative short-read/retry counts26/26.
+
+The presenter change is not accepted as a black-screen repair. The active
+VM/capture is preserved; no restart follows from this negative result.
+Execution export debug-execution-2026-10-13T16-07-04-042Z.json has SHA-256
+1db018adb5e15926469427c008279f3b0e3cd1c9242faad85bdeba4abb7b6ab7.
+Displayed console artifact6889-black-transition-displayed-console-20261013.txt
+has SHA-2563d1f77f61993a567f0a18a7d8dd622dfb9b0ee03b35846889d1f5fab98f592b3.
+Those observations do not establish the underlying rendering cause.
