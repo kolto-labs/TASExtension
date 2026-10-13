@@ -75,9 +75,29 @@ export class Footage {
     this.t = 0;
   }
 
-  async open() {
-    if (this.loaded) return;
+  open() {
+    if (this.loaded) return this.loadPromise || Promise.resolve();
     this.loaded = true;
+    const promise = this.loadView();
+    this.loadPromise = promise;
+    const clear = () => { if (this.loadPromise === promise) this.loadPromise = null; };
+    promise.then(clear, clear);
+    return promise;
+  }
+
+  async openObservationDraft(file, isCurrent = () => true) {
+    if (!isCurrent()) return false;
+    const request = this.referenceImportRevision = (this.referenceImportRevision || 0) + 1;
+    if (this.current !== 2 || !this.playground) { this.current = 2; this.loaded = false; }
+    const opening = this.open(), generation = this.loadGeneration;
+    const admitted = () => request === this.referenceImportRevision
+      && generation === this.loadGeneration && this.current === 2 && isCurrent();
+    await opening;
+    if (!admitted() || !this.playground) return false;
+    return this.playground.openObservationEvidence(file, admitted);
+  }
+
+  async loadView() {
     this.current ??= 0;
     const generation = this.loadGeneration = (this.loadGeneration || 0) + 1;
     this.video?.pause();
