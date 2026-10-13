@@ -24,9 +24,21 @@ aggregates; no PID/context attribution or causal timing is supplied. Zero
 queries do not establish a clean renderer; error-free observed replies do not
 prove correct pixels or the absence of errors between requests.
 
-Producer source is implemented and backed up, but unbuilt and unadopted.
-Bridge/parent/view/export wiring remains outstanding and should join one
-compatible production build. Existing candidate30 and every retained guest
+Producer source is implemented and backed up. The compatible one-job production
+build completed with active/exited/MainPID0/Resultsuccess/ExecMainStatus0. SDK
+WASM SHA2561a1f9630b50ab44e15171acdd852ff33d9b89d865ea4084aba90e7d19feb9226
+staged candidatef6aca22d9e8838dc203bde0a7ee77d14bdd431b6d37e9c3c926c0a417a3644a4,
+qualifiedfalse/unlaunched. The existing/default selection is unchanged and no
+installation assets were copied or uploaded. Actual reply capture remains
+unadopted and unqualified.
+Bridge/parent/view/export wiring is now implemented in source: the bridge
+requires ABI v1/nine slots/exact code layout and complete pause before/after
+capture; U64 counts and their sum must fit exactly in JavaScript or the optional
+field stays unavailable. Parent and UI normalize the fixed record again under
+their pause admission. Execution shows an explicit runtime-wide summary and
+exports the normalized snapshot without another request. Cached observations
+are invalidated with existing control/run boundaries. This consumer should join
+the completed compatible production batch. Existing candidate30 and every retained guest
 remain intact. No synthetic GL queries, tests or test probes were run. This is
 a P1 diagnostic implementation decision, not a new direct user requirement or
 a graphics repair. Other runtime/platform support remains unqualified.
