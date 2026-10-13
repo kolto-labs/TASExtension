@@ -19,8 +19,18 @@ not rewritten. Transport remains bounded above the game, whether its existing
 owner mounted it under the game panel or under the cockpit. Splitters hide
 while the overlay grid is active.
 
-This is source progress. The retained game pages still have their earlier
-stylesheet; they were not reloaded to load this change. Recording disclosure
-access, expanded recorder geometry, transport scrolling, floating layouts and
-return to surround require actual application qualification. No tests, test
-probes, syntax checks, stylesheet injection or guest restart were used.
+The separate 861ca780 candidate loaded the earlier correction and exposed a
+placement failure during normal Overlay activation. At a 1280 by 720 viewport,
+the retained game panel occupied x608/y659 with height61, and its game image
+was outside the visible area. Returning to Surround restored the same guest.
+The dock assigns an inline `grid-area: game` to that panel. It overrode the
+overlay's `center` rule and created an implicit placement outside the intended
+single area. The source now overrides that assignment only in Overlay and
+resets the absolute transport's grid area to auto. Stored inline placement is
+retained for Surround.
+
+This latest correction is source-only. Existing game pages were not reloaded
+or injected to adopt it. Recording disclosure access, expanded recorder
+geometry, transport scrolling, floating layouts and the corrected full-image
+overlay still require application qualification. No tests, test probes,
+syntax checks, stylesheet injection or guest restart were used.
