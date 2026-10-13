@@ -1,0 +1,11 @@
+# Observe existing host shader query outputs
+
+The recordedf6aca guest reached a black first-area view while its guest-requested glGetError counter stayed0. This does not establish a clean driver. BoxedWine's GL4ES initializer already supplies a backend procedure loader; a downstream forwarding layer can observe existing query outputs without adding GL queries or changing vendor code.
+
+The source observer forwards glGetShaderiv and glGetProgramiv exactly once through their original resolved functions. It records buffer values only for COMPILE_STATUS and LINK_STATUS after the original query. Native heap bounds guard the additional read, and memcpy handles alignment. Seven saturating atomicU64buckets cover0/1/other for each kind and unreadable native output buffers. There is no per-query allocation, mutex, timer, extra GL operation, object lookup or copied shader source.
+
+These are observed buffer values, not verified successful replies. An invalid object or failed driver query can leave a prior buffer value unchanged. Output writes and object validity remain explicitly unverified. Other is an aggregate bucket, not a literal output value. No process/context attribution, shader identity or error causality is established.
+
+The optional native ABI has version1, seven slots, exact kind/value layout and atomic counts. The bridge requires a complete pause before/after, safe exact counts and total, and uses existing command/run cache invalidation. Parent and UI normalize the fixed record again. Execution displays and exports the normalized snapshot without another backend request. Missing or invalid telemetry stays unavailable and grants no capability.
+
+Source implemented on2026-10-13. Preserved sdlgl.cpp before edits at artifacts/sdlgl-before-host-query-observer-20261013.cpp,77847bytes/SHA8d91d4e2f9825e97ccf2d7969e58d9e3f030904fec5b2b15c00c872377d6c401. GL4ES vendor code untouched. Existing SDK code/configuration preserved at artifacts/sdk-before-host-query-outputs-20261013,4files/5821645bytes. One finite production build started as kptas-wasm-build-host-query-outputs-20261013.service with one worker and existing compatibility flags. Build/stage/live acceptance remain pending until authoritative receipts confirm them. No tests, test probes, synthetic shader/query requests or private-asset publication.
