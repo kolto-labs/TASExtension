@@ -37,8 +37,8 @@ capture; U64 counts and their sum must fit exactly in JavaScript or the optional
 field stays unavailable. Parent and UI normalize the fixed record again under
 their pause admission. Execution shows an explicit runtime-wide summary and
 exports the normalized snapshot without another request. Cached observations
-are invalidated with existing control/run boundaries. This consumer should join
-the completed compatible production batch. Existing candidate30 and every retained guest
+are invalidated with existing control/run boundaries. The consumer joined the
+completed compatible production batch. Existing candidate30 and every retained guest
 remain intact. No synthetic GL queries, tests or test probes were run. This is
 a P1 diagnostic implementation decision, not a new direct user requirement or
 a graphics repair. Other runtime/platform support remains unqualified.
