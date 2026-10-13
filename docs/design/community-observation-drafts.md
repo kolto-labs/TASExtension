@@ -37,7 +37,24 @@ oversize paths, source replacement and disposal remain unqualified.
 
 The observed export filename used the older catalog label; its embedded
 artifact identity correctly names the20261011full observation assembly. Source
-now derives future filenames from the imported artifact ID. That filename
-refinement has not been adopted in the already loaded31workspace. This handoff
+now derives filenames from the imported artifact ID. The no-game31viewer was
+reloaded, the saved draft restored through its local picker, and normal export
+used the actual20261011official artifact name. Saved corrected draft SHA256
+7240569bad4529024ec7173a878150aab208a0716728312077e5a3896edf35b1.
+
+Further actual use exposed a provenance mismatch: imported R4NG3 observations
+retained the selected Otterito heading and catalog player. The importer now
+sets its heading from the reported packet identity, replaces the source notes,
+and enables the selected catalog player only when both reported video and
+submission URLs match. Matching declarations are not source authentication or
+player alignment. A request guard also refuses an unmatched catalog player.
+No-player metrics do not borrow catalog resolution/rate. After reloading only
+the no-game31viewer and restoring the saved draft, actual UI showed R4NG3,
+start240, no source player and a disabled Open catalog player for the mismatched
+Otterito entry. The matching-player/archived-source paths remain unqualified.
+Source now invalidates late catalog-read success/error when a local observation
+import changes the observation revision, retaining the existing video controller.
+That race/cancellation path and later placeholder/tooltip refinements are
+source-only. This handoff
 does not complete community replay, K2 corpus acquisition or executable editor
 integration. No tests or test probes were run.
