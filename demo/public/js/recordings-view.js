@@ -31,12 +31,14 @@ export function mountRecordingLibrary(root) {
   finalizedStatus.textContent = 'Prepare finalized footage in the library to download it.';
   const downloadFinalized = document.createElement('button');
   downloadFinalized.textContent = 'Download finalized footage'; downloadFinalized.disabled = true;
-  finalizedExport.append(finalizedStatus, downloadFinalized);
+  const viewFinalized = document.createElement('button');
+  viewFinalized.textContent = 'View finalized footage'; viewFinalized.disabled = true;
+  finalizedExport.append(finalizedStatus, viewFinalized, downloadFinalized);
   root.replaceChildren(note, frame, receiptExport, finalizedExport, preview);
   let selected = null, previewUrl = null;
   let receiptName = null, receiptUrl = null;
   let reportedSecond = -1;
-  let finalizedName = null, finalizedUrl = null;
+  let finalizedName = null, finalizedUrl = null, finalizedFile = null;
   function clearPreview() {
     const old = previewUrl; previewUrl = null;
     video.pause(); video.removeAttribute('src'); video.load();
@@ -51,7 +53,7 @@ export function mountRecordingLibrary(root) {
   }
   function clearFinalized() {
     if (finalizedUrl) URL.revokeObjectURL(finalizedUrl);
-    finalizedName = finalizedUrl = null; downloadFinalized.disabled = true;
+    finalizedName = finalizedUrl = finalizedFile = null; downloadFinalized.disabled = viewFinalized.disabled = true;
     finalizedStatus.textContent = 'Prepare finalized footage in the library to download it.';
   }
   function clear() { clearPreview(); clearReceipt(); clearFinalized(); }
@@ -64,6 +66,14 @@ export function mountRecordingLibrary(root) {
   downloadFootage.addEventListener('click', () => download(previewUrl, `${selected}-snapshot.webm`));
   downloadReceipt.addEventListener('click', () => download(receiptUrl, `${receiptName}-receipt-snapshot.json`));
   downloadFinalized.addEventListener('click', () => download(finalizedUrl, `${finalizedName}.webm`));
+  viewFinalized.addEventListener('click', () => {
+    if (!finalizedFile || !finalizedName) return;
+    clearPreview(); selected = finalizedName;
+    previewUrl = URL.createObjectURL(finalizedFile);
+    video.muted = true; video.src = previewUrl; preview.hidden = false;
+    downloadFootage.disabled = false;
+    status.textContent = `${selected}: ${finalizedFile.size.toLocaleString()} retained bytes opened from the finalized file. Use Play to inspect footage; audio, frame alignment and complete-run qualification remain separate.`;
+  });
   const receive = event => {
     if (event.source !== frame.contentWindow || event.origin !== url.origin
       || !['telos.recording-preview/v1','telos.recording-receipt/v1','telos.recording-finalized-download/v1'].includes(event.data?.schema)) return;
@@ -80,8 +90,8 @@ export function mountRecordingLibrary(root) {
         || typeof receipt.endedAt !== 'string' || !Number.isFinite(Date.parse(receipt.endedAt))) return;
       if (selected && selected !== name) clearPreview();
       if (receiptName && receiptName !== name) clearReceipt();
-      clearFinalized(); finalizedName = name; finalizedUrl = URL.createObjectURL(file);
-      downloadFinalized.disabled = false;
+      clearFinalized(); finalizedName = name; finalizedFile = file; finalizedUrl = URL.createObjectURL(file);
+      downloadFinalized.disabled = viewFinalized.disabled = false;
       finalizedStatus.textContent = `${name}: ${file.size.toLocaleString()} retained bytes ready to download. The receipt reports finalization; playback, audio and complete-run qualification remain separate.`;
       return;
     }
@@ -109,13 +119,15 @@ export function mountRecordingLibrary(root) {
   video.addEventListener('error', () => {
     if (previewUrl) status.textContent = `Snapshot could not open (media code ${video.error?.code || 'unknown'}). Retained files remain unchanged; container validity is unqualified.`;
   });
-  video.addEventListener('timeupdate', () => {
+  function renderPlaybackPosition(force = false) {
     if (!previewUrl || !Number.isFinite(video.currentTime)) return;
     const second = Math.floor(video.currentTime);
-    if (second === reportedSecond) return;
+    if (!force && second === reportedSecond) return;
     reportedSecond = second;
     status.textContent = `${selected}: ${video.paused ? 'Paused' : 'Playing'} at ${second} seconds, ${video.videoWidth}×${video.videoHeight}; ${video.muted ? 'muted' : 'unmuted'}. This playback position does not qualify complete footage, audible content or frame alignment.`;
-  });
+  }
+  video.addEventListener('timeupdate', () => renderPlaybackPosition());
+  for (const event of ['play','pause','volumechange','seeked']) video.addEventListener(event, () => renderPlaybackPosition(true));
   addEventListener('message', receive);
   const dispose = () => { removeEventListener('message', receive); clear(); };
   addEventListener('pagehide', dispose, { once:true });
