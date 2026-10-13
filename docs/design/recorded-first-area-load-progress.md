@@ -29,3 +29,11 @@ Per-operation elapsed samples already exist behind BOXEDWINE_GL_DISPATCH_TIMING=
 The owned-install adapter retains bounded64KiB cached chunks and exact range validation. Its existing comments record larger synchronous range failures. These reads should not be enlarged based only on cumulative read counts. No transport rewrite, build, tests or test probes were performed.
 
 Normal Resume after the second capture confirmed40/43workers at presentation373. Continuous recording remains active. The next observation stays on this same session.
+
+## Inspect the staged backing file
+
+Reassembled only the existing Wine root chunks in memory and checked SHA256a14446b27adbaccd4fac25dfb4e951da2dd4978fecfbf6e16aa718871fe4b0c5. Extracted its lib/libc.so.6 for passive local disassembly:1655568bytes, SHA256141319771edb3c2ffbd91d7617dc133bc70eafa3bf718defa60d11ba5a729d7d. This is the staged runtime asset, not a new live memory capture or verified live-file digest.
+
+ELF executable LOAD file offset and virtual address both begin at0x22000. File offset0xcd1c4 therefore corresponds to ELF address0xcd1c4 in that segment. Objdump labels the function beginning0xcd16b as __read@@GLIBC_2.0. Address0xcd1c2 contains int0x80;0xcd1c4 contains cmp eax,0xfffff000. Earlier offset0xcd197 also contains int0x80. The actual saved thread11 snapshot had EIP0x104fd1c4/EAX0x1000 and state Paused. Other captured threads reported Kernel wait at0x104fd1c2/EAX3. Those values are consistent with the staged read wrapper, but no live byte comparison, syscall attribution or wait cause is established.
+
+Evidence paths: artifacts/a14446-libc-saved-address-analysis.elf and artifacts/a14446-libc-read-disassembly-20261013.txt in the WASM workspace. Disassembly SHA2568337288abf07a7c236d9470a1e9083c383620566bfa42591002081204d14daa3. No asset publication, guest mutation, execution or test was performed. Actual game subsequently advanced to presentation383 with loading artwork and nearly full bar; acceptance remains pending.
