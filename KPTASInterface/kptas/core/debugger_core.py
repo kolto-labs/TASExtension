@@ -18,19 +18,63 @@ DEBUG_CAPABILITIES_SCHEMA = "telos.debug-capabilities/v1"
 DEBUGGER_LAYERS = ("transport", "backend", "target", "policy")
 CAPABILITY_STATES = frozenset({"available", "unsupported", "not-qualified", "unavailable"})
 
-STANDARD_OPERATIONS = (
+# Keep canonical operation IDs aligned with the static host's DEBUG_OPERATIONS
+# in demo/public/debugger/debugger-contract.js. This is reporting vocabulary,
+# not a command dispatcher or evidence that either host implements an operation.
+CANONICAL_OPERATIONS = (
+    "input.apply",
     "execution.pause",
     "execution.resume",
     "execution.step",
+    "execution.seek",
+    "execution.rewind",
+    "processes.list",
+    "threads.count",
     "threads.list",
+    "modules.list",
+    "memory.map",
+    "memory.mapping",
     "memory.read",
+    "memory.search",
     "memory.write",
+    "memory.watch.list",
+    "memory.watch.add",
+    "memory.watch.remove",
     "registers.read",
+    "stack.read",
+    "code.disassemble",
+    "code.decompile",
+    "code.references",
+    "code.functions",
+    "symbols.list",
+    "symbols.resolve",
+    "source.resolve",
+    "breakpoints.list",
+    "breakpoints.add",
+    "breakpoints.remove",
+    "breakpoints.manage",
+    "expressions.evaluate",
+    "trace.read",
+    "events.read",
+    "input.timeline",
+    "binary.identity",
+    "binary.sections",
+    "binary.dependencies",
+    "binary.bytes",
+    "state.snapshot",
+    "state.restore",
+)
+
+# Retain the original native reporting IDs as separate entries. An owner must
+# explicitly report a canonical ID; a legacy assertion must never grant an
+# operation under a different name or pretend that semantics are equivalent.
+LEGACY_OPERATIONS = (
     "disassembly.read",
     "breakpoints.software",
     "snapshots.capture",
     "snapshots.restore",
 )
+STANDARD_OPERATIONS = CANONICAL_OPERATIONS + LEGACY_OPERATIONS
 
 _IDENTIFIER = re.compile(r"^[a-z][a-z0-9.-]{0,79}$")
 _OPERATION = re.compile(r"^[a-z][a-z0-9_-]*(?:\.[a-z][a-z0-9_-]*)+$")
