@@ -9,6 +9,19 @@ execution: code
 ---
 # Stasis complete product - Plan
 
+## Continuation receipt — cloud source/runtime transport and suspended connector (2026-10-14 UTC)
+
+Direct user resource/browser steering: "close all the unrelated tabs to use less resources." Disposition: unrelated restored Chromium tabs closed; only KPTAS in-app session and related cloud setup/auth tabs retained. Direct user browser selection: "doesn't work in this browser session, please use patchright cli and the default chromium browser instead." Disposition: Patchright controls installed system Chromium; no unrelated in-app login tab remains.
+
+Latest direct cloud ASAP steering remains active without reducing P1–P7/parity/modular debugger/full-run/Routine scope or granting gameplay acceptance. Previous browser cleanup terminated restored system Chromium; KPTAS in-app tab was not touched. Interrupted SSD browser controller and browser were confirmed missing before relaunch. Current Patchright/system Chromium uses one dedicated ext4 SSD profile and related GitHub access-settings popup; no unrelated restored tabs. ChatGPT identity verification completed, and actual environment picker reports Connected to GitHub as bodencrouch.
+
+Private KPHarness migration branch14ba477b300cb96ce06e2573fdc1da37d0ca3bd2 includes exact257-file handoff manifest,236 native source/docs files, dirty KPHarness/BoxedWine source and complete directive plans. Root AGENTS preserves no tests/probes/syntax checks/automations even during setup. A dedicated PRIVATE bodencrouch/kptas-cloud-execution repository now holds exact same source tree as default main0029dd8f84e2a622259bb5f5b056215107a1aba0, with Actions disabled before push and confirmed false afterward. Original worktree/index/history/data remain preserved; bootstrap does not rewrite them.
+
+Staged redistributable runtime4eff1068 actual bytes matched all descriptor-declared payload hashes and Wine roota14446b27adbaccd4fac25dfb4e951da2dd4978fecfbf6e16aa718871fe4b0c5 before packing. Archive106680320bytes SHA2563cf9fd3162e68aabe7d754c4a512db0d80f599f751bc593ee9bfb7fd61342727 uploaded to original PRIVATE KPHarness draft release kptas-cloud-migration-runtime-20261014; API asset639178461 confirms uploaded/digest/isDrafttrue. No game installation/assets/K1 JIT modules/saves/recordings/credentials/live VM memory included; qualifiedfalse, no deployment/renderer/audio/clock/restore/replay/full-run acceptance. The dedicated PRIVATE migration repo copy is now confirmed: draft release untagged-325adaa6be4db4ac915c, asset639205442 uploaded106680320bytes with same SHA256; Actions remains disabled.
+
+Actual GitHub settings installation160533943 states the bodencrouch Codex connector was manually suspended2026-10-10, with All repositories selected and read/write actions/code/issues/PR/workflows permissions. This explains why new private repo is absent despite CLI admin access. No Unsuspend/Save access change performed. Browser access-safety instruction requires current approval to restore security-sensitive write access. Specific approval requested: enable only dedicated migration repository, restore existing all-repo access, or leave suspended. Pending choice is not approval. Cloud conversation6acefa83 still lacks confirmed executor/checkout/output; no spawned execution claim. Source/runtime transport is progress, not whole-session migration or finished goal. No tests/probes/syntax checks, new automations, private game publication or local guest command. All priority gates remain incomplete.
+
+
 ## Direct user steering and cloud migration receipt (2026-10-14 UTC)
 
 Direct user: "Goal is to put everything on the cloud as soon as possible as fast as possible to resume where we left off as optimally as possible. Do anything required. No more localhost shit lol. Start by using codex cli to spawn a cloud agent and start feeding it"

@@ -15,3 +15,5 @@ These instructions preserve direct user restrictions for cloud setup and continu
 - Name core loading/session host Telos Core, workspace Stasis, and TAS optional extension.
 - Source/build/staging is not gameplay or native/WASM/platform parity acceptance. Current/latest runtime identities and evidence are in the handoff. Never claim deterministic replay, whole-VM restore, arbitrary uploaded-game execution, full-run/audio acceptance or supported platforms without authoritative evidence.
 - Native source is in migration-handoff/native-product-source; assets, compiled outputs, tests, golden fixtures and user scores were excluded. BoxedWine base and patches are in handoff. Never execute preserved native/probes sources as tests.
+
+- Direct user resource requirement: close unrelated browser tabs and reuse related tabs where possible. Keep the established local KPTAS session intact during cloud transition. No invented fixed tab cap.

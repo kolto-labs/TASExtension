@@ -1,11 +1,11 @@
 {
   "schema": "kptas.cloud-source-handoff/v2",
-  "captured_utc": "2026-10-14T04:16:40.210799+00:00",
-  "source_parent_commit": "e72dd28985f918af75310986658e1ae49736ba6b",
+  "captured_utc": "2026-10-14T04:26:36.644091+00:00",
+  "source_parent_commit": "14ba477b300cb96ce06e2573fdc1da37d0ca3bd2",
   "files": {
     "CLOUD-RUNTIME.md": {
-      "bytes": 2065,
-      "sha256": "e41cf92f46da6355ed4bbdfdb1b49559ce6da5e000f2d1a92219bcf83ccf316f"
+      "bytes": 2720,
+      "sha256": "00cea657e7f458b8d2c0d2249228c2717ab50db753615b321fb3e53b7a338060"
     },
     "KPHarness-working-tree.patch": {
       "bytes": 523013,
@@ -52,8 +52,8 @@
       "sha256": "4e12463bd15d9991b873f6e254bddf1be09deb83410e5f85b623b0a41b8d7571"
     },
     "canonical-outstanding-execution-plan.md": {
-      "bytes": 1081464,
-      "sha256": "bce5b085cadae81d34fa307cfab3f0c85f0942a68cf8e037e5f7d8442fb10595"
+      "bytes": 1084934,
+      "sha256": "9739abf87dd5b35878fee370fce102aa5b292ce545eed9a040114b695cefb7c3"
     },
     "harness-index-before.patch": {
       "bytes": 0,
@@ -1024,13 +1024,13 @@
       "sha256": "c799614dfde148be26d6f8a1b7c17cb74ab65c0849567b4ebc04c5cf67ddd923"
     },
     "original-product-plan.md": {
-      "bytes": 459721,
-      "sha256": "f9f31f7071849066705ee40c5bc6fb4422dad5ce9720d663cdf11bd89242c64e"
+      "bytes": 463191,
+      "sha256": "560a5b44bd04d041fed7415800fe490ee031609c12d49659ffbf208f1d3d8d54"
     },
     "runtime-transfer-inventory.json": {
       "bytes": 4780,
       "sha256": "7a3eee4c0941fdb64b76b8e939d8f161c7806a7b6687ad1bd35feff9ac640b61"
     }
   },
-  "scope": "Exact branch migration-handoff blobs; manifest excludes itself. Root KPHarness source is the branch tree. Native authored source exclusions and private runtime transfer boundary are documented separately. No private game assets or credentials included."
+  "scope": "Exact migration-handoff blobs, excluding manifest itself. Native/runtime exclusions documented separately. No private game assets or credentials."
 }
