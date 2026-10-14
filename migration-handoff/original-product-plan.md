@@ -9,6 +9,19 @@ execution: code
 ---
 # Stasis complete product - Plan
 
+## Direct user steering and cloud migration receipt (2026-10-14 UTC)
+
+Direct user: "Goal is to put everything on the cloud as soon as possible as fast as possible to resume where we left off as optimally as possible. Do anything required. No more localhost shit lol. Start by using codex cli to spawn a cloud agent and start feeding it"
+
+Direct user: "th3w1zard1 is an old GitHub account. Authenticate using bodencrouch. Kotor.js also is irrelevant? Give me a device code and the website I can put it in and then capture the auth details."
+
+Disposition: cloud migration and correct-account authentication are active requirements. Future execution should move off localhost, preserving the current local guest and data during transition. All P1–P7, native/static bidirectional parity, modular debugger, full-run/Routine, no-tests/no-probes/no-automations/private-assets and accurate acceptance requirements remain in scope. The change of execution location does not itself qualify a runtime or remove gameplay acceptance gates.
+
+Execution evidence, not new requirements: Codex CLI authenticated but cloud exec returned403 GitHub connector disabled/unavailable; old KotOR.js environment is irrelevant and must not be used. GitHub device authorization completed for bodencrouch; gh credential installation exit0 and user API confirmed bodencrouch with ADMIN access to PRIVATE kolto-labs/KPHarness. Source snapshot branch cloud-migration-20261014 pushed with original worktree/index unchanged; latest native authored source snapshot538526f8f8fc06585c4ade77a669c03b0c040b20 includes236 native source/docs files plus earlier dirty KPHarness/BoxedWine patches and full plans. No game assets, recordings, credentials, runtime binaries or live browser memory uploaded. Full data/runtime migration remains incomplete.
+
+Cloud conversation6acefa83-ba90-83e9-af4a-6fc207e8e113 created and fed exact private source branch; current readback contains user prompts only, idle/cwdnull. No actual cloud executor, source checkout, agent output or gameplay progress confirmed. Browser cloud setup is signed out of ChatGPT; user explicitly requested Patchright CLI/default Chromium because in-app session fails. System Chromium launched through Patchright with existing profile; startup observation pending. No cloud acceptance or completed migration claim. Existing local9625a guest not touched; current VM state unverified.
+
+
 ## Continuation receipt — declared section navigation and local startup report export (2026-10-14 UTC)
 
 Previous goal turn answered roadmap, without runtime progress. Re-poll of retainedtab failed and reset CUA; browser selection and later inventory reported unavailable/apps[]/browsers[]. No process/register read or Resume dispatched and no restart/reload/new tab. Last actual paused0renders32/32 remains historical latest observation; current state unverified. Server44787 freshly observed Ssl. Observation failure is not terminal game evidence.
