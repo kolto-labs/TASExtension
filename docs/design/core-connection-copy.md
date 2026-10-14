@@ -11,3 +11,9 @@ Source served by the existing localhost application. The retained live browser o
 Source review found connection status inside the telos.tas presentation wrapper. The parent game owner now maintains a separate coreConnectionStatus outside both Debug and TAS wrappers. Initial/connecting, validated input handshake, bridge failure and runtime stop update it independently of package visibility. The successful message says Game input connected to Telos Core; it does not claim full VM/debugger/replay readiness. Optional TAS retains score-input waiting and boundary details. No new capability, dispatch, package dependency, runtime timer or controller was introduced.
 
 Live adoption remains unconfirmed because current browser discovery returned no accessible browsers. No duplicate tab, reload or runtime restart. Backup: WASM artifacts/original-game-before-core-status-ownership-20261014.js.
+
+## Report independent readiness
+
+Validated input and VM-control handshakes now both update core status. The display distinguishes input only, execution only, both, and a validated runtime reporting unavailable execution controls. This uses existing admitted capability replies; no timeout guesses, extra requests or capability grants. It does not claim simulation/replay or graphics/audio acceptance.
+
+Actual server PID44787 remains Ssl and loopback listeners47655/47656 remain present. Service-manager property lookup ended with Transport endpoint is not connected; service health is not inferred from process evidence. Browser inventory rediscovered only retainedtab1/9625a. Rebinding and handoff were attempted before bounded actual-log observation timed out/reset; no log contents or current game state received, no restart/reload.
