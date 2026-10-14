@@ -128,8 +128,8 @@ def main() -> None:
 
         def log_message(self, format: str, *args) -> None:
             # A stale runtime can flood stdout with one access log per byte.
-            # Keep ordinary lazy-range traffic quiet and report at most a few
-            # malformed tiny-range attempts while preserving other server logs.
+            # Keep ordinary lazy-range traffic quiet and report a bounded
+            # number of HTTP failures while preserving other server logs.
             request_path = self.path.split("?", 1)[0]
             if request_path == "/__dev/ui-revisions":
                 return
@@ -140,11 +140,11 @@ def main() -> None:
             if "__telosGuestTrace=" in self.path:
                 return
             if request_path.startswith("/private/install/"):
-                is_rejection = format.startswith("code %d, message %s") and args and int(args[0]) == 416
-                if is_rejection and request_path not in range_rejections_logged:
+                is_rejection = format.startswith("code %d, message %s") and args and int(args[0]) >= 400
+                if (is_rejection and request_path not in range_rejections_logged
+                        and len(range_rejections_logged) < 8):
                     range_rejections_logged.add(request_path)
-                    if len(range_rejections_logged) <= 8:
-                        super().log_message(format, *args)
+                    super().log_message(format, *args)
                 return
             super().log_message(format, *args)
 

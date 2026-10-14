@@ -34,6 +34,13 @@ export class GameStartup {
       style.dataset.gameStartupStyle = ''; document.head.append(style);
     }
     this.frame = frame; this.phase = 'starting'; this.presented = false;
+    this.declaredSession = null; this.declaredRelease = null;
+    try {
+      const frameUrl = new URL(frame.src, location.href);
+      const declaredSession = frameUrl.searchParams.get('ownedSession');
+      if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(declaredSession || '')) this.declaredSession = declaredSession;
+      this.declaredRelease = frameUrl.pathname.match(/\/runtime-releases\/([0-9a-f]{64})\//)?.[1] || null;
+    } catch { /* Unknown declarations remain unknown. */ }
     this.startedAt = new Date().toISOString(); this.entries = [];
     this.startedClock = performance.now(); this.lastStatusClock = null;
     this.phaseClock = this.startedClock; this.finishedClock = null;
@@ -75,7 +82,7 @@ export class GameStartup {
     this.runtimeMetrics.setAttribute('aria-label', 'Runtime measurements');
     this.runtimeMetrics.setAttribute('aria-live', 'off');
     this.metricValues = new Map();
-    for (const label of ['Control state', 'Render presents', 'SDL dispatch calls', 'SDL caller time', 'SDL callback time', 'Workers at safe point']) {
+    for (const label of ['Control state', 'Render presents', 'SDL proxy calls', 'SDL caller elapsed', 'SDL callback elapsed', 'Workers at safe point', 'Worker lifecycle snapshot']) {
       const term = document.createElement('dt'); term.textContent = label;
       const value = document.createElement('dd'); value.textContent = 'Not reported';
       this.metricValues.set(label, value); this.runtimeMetrics.append(term, value);
@@ -101,9 +108,26 @@ export class GameStartup {
         this.copyStatus.textContent = 'Clipboard unavailable. Copy the selected report below.';
       }
     });
+    const saveReport = document.createElement('button'); saveReport.type = 'button'; saveReport.textContent = 'Save diagnostic report';
+    saveReport.addEventListener('click', () => {
+      try {
+        const blob = new Blob([this.report()], {type:'text/plain;charset=utf-8'});
+        if (blob.size > 256 * 1024) throw new Error('Diagnostic report exceeds the 256 KiB download limit.');
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `kptas-startup-${this.declaredSession?.slice(0,8) || 'session'}-${new Date().toISOString().replace(/[:.]/g,'-')}.txt`;
+        try { document.body.append(link); link.click(); this.copyStatus.textContent = 'Report download requested.'; }
+        finally { link.remove(); setTimeout(() => URL.revokeObjectURL(url),30000); }
+      } catch (error) { this.copyStatus.textContent = error.message || 'Report download could not be prepared.'; }
+    });
     this.manualReport = document.createElement('textarea'); this.manualReport.hidden = true; this.manualReport.readOnly = true;
     this.manualReport.setAttribute('aria-label', 'Diagnostic report to copy');
-    const actions = document.createElement('div'); actions.className = 'game-startup-diagnostic-actions'; actions.append(copy, this.copyStatus);
+    this.showGuestButton = document.createElement('button'); this.showGuestButton.type = 'button';
+    this.showGuestButton.textContent = 'Show guest window'; this.showGuestButton.disabled = true;
+    this.showGuestButton.title = 'View the guest window while startup continues.';
+    this.showGuestButton.addEventListener('click', () => this.showGuestWindow());
+    const actions = document.createElement('div'); actions.className = 'game-startup-diagnostic-actions'; actions.append(copy, saveReport, this.copyStatus, this.showGuestButton);
     details.append(summary, this.failure, this.runtimeStatus, this.runtimeMetrics, this.evidenceList, actions, this.manualReport, this.log);
     content.append(eyebrow, emblem, this.live, this.timing, this.progressSummary, this.diagnosis, this.steps, details);
     this.element.append(content); host.append(this.element);
@@ -158,7 +182,7 @@ export class GameStartup {
         const dispatchAge = this.dispatchProgressClock === null ? null : now - this.dispatchProgressClock;
         if (status.sdlDispatch && dispatchAge !== null && dispatchAge >= 30000) {
           kind = 'dispatch-stalled';
-          diagnosis = 'The session responds, but its event dispatch has not advanced for at least 30 seconds and no image has arrived. Copy the diagnostic report before restarting.';
+          diagnosis = 'The session responds. Dispatch counters have been unchanged for at least 30 seconds, and no image has arrived. Keep the session open and copy its diagnostic report.';
         } else {
           kind = 'no-image';
           diagnosis = 'The session responds; the first image is still pending. Keep this session open and inspect the render and event counters in diagnostics.';
@@ -181,10 +205,33 @@ export class GameStartup {
     this.finishTiming();
     const ownedFocus = this.element.contains(document.activeElement);
     this.element.hidden = true;
+    this.restoreFrameInteraction(focusGame || ownedFocus);
+  }
+  restoreFrameInteraction(focusGame) {
     this.frame.inert = this.frameWasInert;
     if (this.frameAriaHidden === null) this.frame.removeAttribute('aria-hidden');
     else this.frame.setAttribute('aria-hidden', this.frameAriaHidden);
-    if (focusGame || ownedFocus) this.frame.focus();
+    if (focusGame) this.frame.focus();
+  }
+  showGuestWindow() {
+    if (!this.filesReady) return;
+    if (['error', 'stopped'].includes(this.phase)) {
+      // Recording controls belong to the retained frame. Showing them must
+      // not issue a native window/control command to a failed guest.
+      this.record('view', 'Stopped guest window shown for recording controls and diagnostics; execution remains stopped.');
+      this.element.hidden = true;
+      this.restoreFrameInteraction(true);
+      return;
+    }
+    this.record('view', 'Guest window shown while startup continues; first image remains unconfirmed.');
+    this.element.hidden = true;
+    this.restoreFrameInteraction(true);
+    const runtimeUrl = new URL(this.frame.src);
+    const session = runtimeUrl.searchParams.get('ownedSession');
+    if (/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(session || '')) {
+      this.frame.contentWindow?.postMessage({type:'telos-wasm-guest-view',
+        schema:'telos-wasm-guest-view/v1',session,action:'show-window'}, runtimeUrl.origin);
+    }
   }
   markEvidence(label) {
     if (this.evidence.has(label)) return;
@@ -204,7 +251,10 @@ export class GameStartup {
     }
   }
   report() {
-    return ['Startup report v1', `Session started: ${this.startedAt}`, `Current phase: ${this.phase}`,
+    return ['Startup report v2', `Frame-declared session: ${this.declaredSession || 'unavailable'}`,
+      `Frame-declared runtime release: ${this.declaredRelease || 'unavailable'}`,
+      'Identity scope: frame URL declarations; loaded game binary identity is not established.',
+      `Session started: ${this.startedAt}`, `Current phase: ${this.phase}`,
       `Last milestone: ${[...this.evidence.keys()].at(-1) || 'none'}`,
       `Observation: ${this.diagnosis.dataset.kind || 'waiting'}`,
       `Elapsed seconds: ${(((this.finishedClock ?? performance.now()) - this.startedClock) / 1000).toFixed(1)}`,
@@ -214,6 +264,12 @@ export class GameStartup {
       ...[...this.evidence].map(([label, evidence]) => `${label}: ${evidence.at} (+${(evidence.elapsed / 1000).toFixed(1)} s)`),
       this.runtimeStatus.textContent,
       ...[...this.metricValues].map(([label, value]) => `${label}: ${value.textContent}`),
+      'SDL metric scope: cumulative completed proxy calls; direct graphics-owner calls excluded; caller/callback elapsed can include pause-barrier waits; elapsed times can overlap and are not CPU or frame-rate measurements.',
+      `File range I/O: ${JSON.stringify(this.lastObservedStatus?.assetIo ?? null)}`,
+      'File metric scope: cumulative owned-install range exchanges and chunk cache; excludes Wine-root/archive preload.',
+      `Paused GL call counts: ${JSON.stringify(this.lastObservedStatus?.glCounts ?? null)}`,
+      'GL metric scope: bounded cumulative callback/host call counts from a confirmed pause; not timings or simulation cadence.',
+      `Last control failure: ${this.lastObservedStatus?.lastControlError || 'none reported'}`,
       this.diagnosis.hidden ? '' : this.diagnosis.textContent, this.failureSummary || '', '', ...this.entries].join('\n');
   }
   record(state, message) {
@@ -250,6 +306,10 @@ export class GameStartup {
       this.filesReady = true;
       this.markEvidence('Files connected');
     }
+    this.showGuestButton.disabled = !this.filesReady;
+    this.showGuestButton.title = ['error', 'stopped'].includes(phase)
+      ? 'View retained recording controls and diagnostics. This does not resume the game.'
+      : 'View the guest window while startup continues.';
     if (!PHASES[phase] || (this.presented && !['error', 'stopped'].includes(phase))) return;
     if (phase === 'error') this.showFailure(message);
     if (['error', 'stopped'].includes(phase)) {
@@ -294,11 +354,15 @@ export class GameStartup {
     const setMetric = (label, value) => { this.metricValues.get(label).textContent = value; };
     setMetric('Control state', status.state);
     setMetric('Render presents', status.presents === null ? 'Not reported' : String(status.presents));
-    setMetric('SDL dispatch calls', dispatch ? String(dispatch.calls) : 'Not reported');
-    setMetric('SDL caller time', dispatch ? `${(dispatch.callerMicros / 1000).toFixed(1)} ms` : 'Not reported');
-    setMetric('SDL callback time', dispatch ? `${(dispatch.callbackMicros / 1000).toFixed(1)} ms` : 'Not reported');
+    setMetric('SDL proxy calls', dispatch ? String(dispatch.calls) : 'Not reported');
+    setMetric('SDL caller elapsed', dispatch ? `${(dispatch.callerMicros / 1000).toFixed(1)} ms` : 'Not reported');
+    setMetric('SDL callback elapsed', dispatch ? `${(dispatch.callbackMicros / 1000).toFixed(1)} ms` : 'Not reported');
     setMetric('Workers at safe point', status.parkedThreads !== null && status.activeThreads !== null
       ? `${status.parkedThreads} / ${status.activeThreads}` : 'Not reported');
+    const lifecycle = status.threadStateCounts;
+    setMetric('Worker lifecycle snapshot', lifecycle
+      ? `Starting ${lifecycle.starting} · Running ${lifecycle.running} · Kernel wait ${lifecycle.kernelWait} · Paused ${lifecycle.paused} · Exiting ${lifecycle.exiting} · Total ${lifecycle.total}`
+      : 'Not reported');
     const description = `Control state: ${status.state}. Dispatch and render observations are listed separately below.${status.error ? ` Error: ${status.error}` : ''}`;
     if (this.runtimeStatus.textContent !== description) this.runtimeStatus.textContent = description;
     this.refreshDiagnosis();

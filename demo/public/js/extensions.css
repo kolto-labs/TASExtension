@@ -79,7 +79,9 @@
   .extension-manager .extension-metadata { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .extension-manager .extension-metadata dd { margin-bottom: 6px; }
 }
-body[data-tas-extension="disabled"] :is(#p-console, #p-score, #p-roll, #p-branches, #p-right, #live-tas-workspace, #scene-pane, #tab-scene, #rs-tabs, #tab-score, #tab-roll, #hstat, #key-settings, #b-show-workspace, header.top .files, #b-tas-presentation, [data-dock-id="score"], [data-dock-id="piano-roll"], [data-dock-id="transport"], [data-dock-id="branches"], [data-dock-id="score-history"], [data-dock-id="sample-state"], [data-dock-id="sample-hex"]) { display: none !important; }
+/* Only a ready TAS package may reveal its UI, including detached dock shells.
+   Missing/loading state fails closed without altering saved layout choices. */
+body:not([data-tas-extension="enabled"]) :is([data-tas-owner="telos.tas"], #p-console, #p-score, #p-roll, #p-branches, #p-right, #live-tas-workspace, #scene-pane, #tab-scene, #rs-tabs, #tab-score, #tab-roll, #hstat, #key-settings, #b-show-workspace, header.top .files, #b-tas-presentation, [data-dock-id="score"], [data-dock-id="piano-roll"], [data-dock-id="transport"], [data-dock-id="timeline"], [data-dock-id="right"], [data-dock-id="branches"], [data-dock-id="console"], [data-dock-id="score-history"], [data-dock-id="sample-state"], [data-dock-id="sample-hex"], [data-dock-id="sample-scene"]) { display: none !important; }
 
 .extension-manager .extension-filters {
   display: flex;

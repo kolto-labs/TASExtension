@@ -40,6 +40,20 @@ Replace `START_FRAME` and `END_FRAME` with the chosen zero-based ordinal bounds.
 
 The output is `kptas.speedrun-segment-evidence/v1` JSON, not `.score` syntax. It preserves the source frame/decoder metadata but does not convert visible highlights into physical inputs or nominal frames into TAS ticks. Use it as a review packet for manual route authoring; source alignment, complete physical input, initial game state, and route replay still need independent qualification.
 
+The static Speedrun playground can open either this packet or a full `kptas.browser-visible-inputs/v1` selected-observations track with **Open read-only observation packet**. It validates read-only/replay-disabled declarations, hash-field formats, ordered event states, lane references, selected-frame span, and source-part coverage, then previews the file on its own selected-observation timeline. Source-reported hashes and submission/video relationships are shown as claims because the browser does not authenticate their producers or recompute the source-artifact hashes. The file is read locally, not uploaded; it does not alter the selected video, create score syntax, or dispatch game input. Player/video alignment and replay remain unqualified.
+
+The archived selected-controls wrapper uses the same browser-visible schema
+with per-event source origins and lineage digests under `provenance`, rather
+than a root `source` record and `parts` array. Catalog loading and local import
+admit this wrapper through a separate bounded validator. It requires the
+read-only and replay-disabled flags, false video/timeline qualifications,
+manifest/span/adapter/input digest formats, ordered event states, valid lane
+references, and source-origin metadata. The view displays the lineage claims
+without borrowing the selected video's run identity. An event's decoder PTS
+identifies its state change; the viewer does not extrapolate that PTS or origin
+to intervening observation frames. Tracks with qualified structural part
+coverage can show the mapped decoded frame separately from state-change PTS.
+
 ## Executable-score qualification: official R4NG3 full VOD
 
 The complete official linked VOD observation artifact is

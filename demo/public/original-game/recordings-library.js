@@ -127,13 +127,14 @@ function clearFinalized() {
   finalizedUrl = null;
   finalizedStatus.textContent = 'Prepare a download after the writer reports finalization.';
 }
-async function readFinalizedReceipt(dir) {
+async function readFinalizedReceipt(dir, name) {
   const file = await (await dir.getFileHandle('receipt.json')).getFile();
   if (!file.size || file.size > 65536) throw new Error('Receipt exceeds the supported inspection size.');
   const bytes = await file.arrayBuffer();
   if (bytes.byteLength !== file.size) throw new Error('Receipt changed while reading.');
   const data = JSON.parse(new TextDecoder('utf-8', {fatal:true}).decode(bytes));
   if (!data || Array.isArray(data) || data.schema !== 'telos.game-recording/v1'
+    || (data.recording !== undefined && data.recording !== name)
     || data.complete !== true || !Number.isSafeInteger(data.bytes) || data.bytes <= 0
     || !Number.isSafeInteger(data.chunks) || data.chunks <= 0
     || typeof data.endedAt !== 'string' || !Number.isFinite(Date.parse(data.endedAt))) {
@@ -148,12 +149,12 @@ byId('finalized').addEventListener('click', async () => {
   finalizedStatus.textContent = 'Reading finalized recording metadata…';
   try {
     const dir = await directory(name);
-    const first = await readFinalizedReceipt(dir);
+    const first = await readFinalizedReceipt(dir, name);
     const file = await (await dir.getFileHandle('game.webm')).getFile();
     if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size !== first.data.bytes) {
       throw new Error('Footage size does not match the finalized receipt.');
     }
-    const second = await readFinalizedReceipt(dir);
+    const second = await readFinalizedReceipt(dir, name);
     if (first.bytes.byteLength !== second.bytes.byteLength
       || first.bytes.some((byte, index) => byte !== second.bytes[index])) {
       throw new Error('Receipt changed while preparing the download.');

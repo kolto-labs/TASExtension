@@ -1,0 +1,164 @@
+{
+  "created_utc": "2026-10-14T03:43:58.571533+00:00",
+  "harness_base": "131b6f3e18cc8d000d7a13c389ebfe1f41554af5",
+  "boxedwine_base": "509f6a7545e0827a27ed1b4ebab66ac1da4b1ea7",
+  "files": {
+    "KPHarness-working-tree.patch": {
+      "bytes": 523013,
+      "sha256": "4870fd21e8914a65e753cd913da0307e88ce37e9885ca2c23e9877f5f99e8b1f"
+    },
+    "boxedwine-working-tree.patch": {
+      "bytes": 418295,
+      "sha256": "4e12463bd15d9991b873f6e254bddf1be09deb83410e5f85b623b0a41b8d7571"
+    },
+    "canonical-outstanding-execution-plan.md": {
+      "bytes": 1079056,
+      "sha256": "9359133bbdb3093f3c2e8eaad108862006207b33ccfdf10dc4cb51f034c3f975"
+    },
+    "original-product-plan.md": {
+      "bytes": 457313,
+      "sha256": "729d418fc576e2268f603a644ffcb943cdfbde07a94975a99bdf8cb12dffa45b"
+    },
+    "native-telos/memory_scan_capture.py": {
+      "bytes": 9382,
+      "sha256": "9766e9c6a9c78ab221cf64dd13200990c2033ee07db7e4a125c541e3cf28e9c7"
+    },
+    "native-telos/debugger_widget.py": {
+      "bytes": 35343,
+      "sha256": "5d0076789b21ed573e2cff73b8339d70ba98b35cfff2456d4ea86c0d9661accc"
+    },
+    "native-telos/shared_presentation.py": {
+      "bytes": 6911,
+      "sha256": "c799614dfde148be26d6f8a1b7c17cb74ab65c0849567b4ebc04c5cf67ddd923"
+    },
+    "boxedwine-new-source/source/kernel/timerschedulerlock.h": {
+      "bytes": 356,
+      "sha256": "619f41777b82defa7e509bbb6c75c8ce7b2a9c30818f2cbdecc95979a8a61369"
+    },
+    "boxedwine-new-source/source/opengl/gl4esBridge.h": {
+      "bytes": 1327,
+      "sha256": "537858ca9cf18bc30ee85ba1e8f3e6ab81bbb718ca0b6efd53bd0dd0bc22491b"
+    },
+    "boxedwine-new-source/source/util/teloscontrol.cpp": {
+      "bytes": 41382,
+      "sha256": "5fdf2bfa36b30e68dd4af59430c18bc4df66f5bcdbfe6a24c891408fee5701d5"
+    },
+    "boxedwine-new-source/source/util/teloscontrol.h": {
+      "bytes": 8507,
+      "sha256": "bb1b78da350fd68241d61197e5bdecfa8deb605bc7868410e47d6d1fbcddb328"
+    },
+    "boxedwine-new-source/project/emscripten/boxedwine-proxying-lifetime.c": {
+      "bytes": 20958,
+      "sha256": "6b0c590bc641e021fc9507d00d285ca237d02a011dbfe9cb64033707c459052a"
+    },
+    "boxedwine-new-source/project/emscripten/boxedwine-proxying-lifetime.json": {
+      "bytes": 555,
+      "sha256": "e26f2d9b3e2f7fef8acd9134e6a121840a7d34a58818a30eee033159c10a735e"
+    },
+    "boxedwine-new-source/project/emscripten/emscripten-proxying-LICENSE.txt": {
+      "bytes": 5093,
+      "sha256": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86"
+    },
+    "harness-new-source/docs/design/community-observation-correspondence.md": {
+      "bytes": 1761,
+      "sha256": "585df915dc07a5a96822a5ca389ec385754a60ba8dd24aed0141f770f162dcd3"
+    },
+    "harness-new-source/docs/design/compiled-input-key-negotiation.md": {
+      "bytes": 2118,
+      "sha256": "419146425908771e6152ca57cc89dd3883bd19e686a73108c03589b0a2905580"
+    },
+    "harness-new-source/docs/design/debugger-reader-navigation.md": {
+      "bytes": 1753,
+      "sha256": "f028e3acc01d31230b01cbadae5500acc9c6b9ea46fb42913de5f34d64ef43c1"
+    },
+    "harness-new-source/docs/design/full-paused-gl-count-capture.md": {
+      "bytes": 3453,
+      "sha256": "6b85c7873e7c68b3a5dc736a32607a584ceeaff7f35b7196da76f41aefd31630"
+    },
+    "harness-new-source/docs/design/input-consumption-present-boundary.md": {
+      "bytes": 3840,
+      "sha256": "194edaedd3fdcc35c0cba2383b0381006e473fe0389273fe852c46da8c22d1d3"
+    },
+    "harness-new-source/docs/design/published-dispatch-progress.md": {
+      "bytes": 2358,
+      "sha256": "5d82abd17b27fc8f16d4d11f0cf262eac5d9414b170d538bde946f8dd010d75b"
+    },
+    "harness-new-source/docs/design/quiescent-score-input-admission.md": {
+      "bytes": 1942,
+      "sha256": "7cc2bcbf721caeb25b2196ebf366d96d189298c357545a087f9d3b6ce207eb27"
+    },
+    "harness-new-source/docs/design/requested-input-provenance.md": {
+      "bytes": 1650,
+      "sha256": "a1333cff861b90ab324cf1e65c156a97061516327b01a615d8055c415aebb237"
+    },
+    "harness-new-source/docs/design/runtime-fault-symbol-provenance.md": {
+      "bytes": 3719,
+      "sha256": "2d8c16063d69c45d7cc1153348d594ceff71557156c69219e565370cd24639be"
+    },
+    "harness-new-source/docs/design/score-transport-draft-commit.md": {
+      "bytes": 1259,
+      "sha256": "08abb6ae7cda9e6a3ff841ecbfc381266b95c182f8d4ff7af62232c9b25b41c1"
+    },
+    "harness-new-source/docs/design/scored-input-workspace-focus.md": {
+      "bytes": 1417,
+      "sha256": "9a90bbbe09f757130f98000c20f0ca0ea6ebb399a096f4b59af86f3ea4597c84"
+    },
+    "harness-new-source/demo/tools/runtime-attempt-report.mjs": {
+      "bytes": 3382,
+      "sha256": "3fbb1e28807bf02a8291270ba91a791514044c3ee163a52f1f014fbd72d7c0a7"
+    },
+    "harness-new-source/demo/tools/stage-runtime-range-optimization.mjs": {
+      "bytes": 6509,
+      "sha256": "43421b367ba5eedc56c337b4a59166808ef8a4cff98094fd278eca5c50c24e06"
+    },
+    "harness-new-source/demo/public/debugger/debugger-backend-registry.js": {
+      "bytes": 5041,
+      "sha256": "cf2eb38b90e3d5b46faf81407393f4a153b9dbb642edd14fd1f47bc02db46939"
+    },
+    "harness-new-source/demo/public/debugger/debugger-operation-broker.js": {
+      "bytes": 14939,
+      "sha256": "eb8680db5bb02bad4d80b1c42b298b1edd581809195054088f1aeed7bdc431ee"
+    },
+    "harness-new-source/demo/public/debugger/static-binary-backend.js": {
+      "bytes": 8691,
+      "sha256": "a681af72bbb5274368acac4c96cd4d3a55d96d7de1bfc544d14ab49618f2cec6"
+    },
+    "harness-new-source/demo/public/debugger/static-file-owner.js": {
+      "bytes": 6552,
+      "sha256": "6f3aad9ca2be413746bb992894a5dfeb8ced7ad01697dbd9d500f1dc26b5b320"
+    },
+    "harness-new-source/demo/public/js/debugger-capability-directory.js": {
+      "bytes": 9972,
+      "sha256": "0e0470c0813358a9e04b9ec5f6fab2e60db1fde7f6523d2e424f5a6807f11d59"
+    },
+    "harness-new-source/demo/public/original-game/game-recording-writer.js": {
+      "bytes": 4067,
+      "sha256": "abd625123c5beda4dbb7941acf9ddf309120ed1cd588707082bbcd0c5c5e0e31"
+    },
+    "harness-new-source/demo/public/original-game/game-recording.js": {
+      "bytes": 24680,
+      "sha256": "0276ef7f1a5b8e9992f6408c713f55903323d913f6e7ba8aaba885173f1e5636"
+    },
+    "harness-new-source/demo/public/original-game/recordings-host.html": {
+      "bytes": 770,
+      "sha256": "130a4430c08e5d132f831ac536b5e51af8668d05a9b854fa91b46e625286db21"
+    },
+    "harness-new-source/demo/public/original-game/recordings.css": {
+      "bytes": 1024,
+      "sha256": "1d6511a6e9304302ae7610c241e55442cbe77b48de3331aebfc4b18dbef62c06"
+    },
+    "harness-new-source/demo/public/packages/debug-runtime/broker-adapter.js": {
+      "bytes": 5682,
+      "sha256": "c5ea7d948eef597a9a911ccfc3d8b41260d4c8758797d99f9552d5b33e81500f"
+    },
+    "harness-new-source/demo/public/packages/debug-runtime/execution-completion.js": {
+      "bytes": 2522,
+      "sha256": "73bfa78042c612604e1ecf6475a8082e378cf33aef684a8e955b1fa75f31a630"
+    },
+    "harness-new-source/demo/public/packages/debug-runtime/selected-runtime.js": {
+      "bytes": 3824,
+      "sha256": "8ae4f0ee8058753e8bc7c9d241284ff946eff663e8a289425c4a6e92ef889fdc"
+    }
+  },
+  "scope": "Source/plan handoff; excludes game installation, game assets, browser memory, recordings, credentials. Native source contains selected parity files, not complete native product."
+}

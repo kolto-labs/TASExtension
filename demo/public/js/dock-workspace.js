@@ -1,4 +1,5 @@
-import { SHARED_PRESENTATION_FORMAT, PREVIOUS_SHARED_PRESENTATION_FORMAT, LEGACY_SHARED_PRESENTATION_FORMAT, SHARED_PROFILE_STORAGE, validateSharedProfile, retainedHostProfiles } from './shared-presentation-profile.js';
+import { SHARED_PRESENTATION_FORMAT, PREVIOUS_SHARED_PRESENTATION_FORMAT, GAME_ONLY_SHARED_PRESENTATION_FORMAT, LEGACY_SHARED_PRESENTATION_FORMAT, SHARED_PROFILE_STORAGE, validateSharedProfile, retainedHostProfiles } from './shared-presentation-profile.js';
+import { TIMELINE_DENSITY_KEY, preferredTimelineDensity, requestTimelineDensity } from './timeline-density.js';
 
 const STORAGE_KEY = 'telos.dock-workspace.v1';
 const PRESETS_KEY = 'telos.dock-layout-presets.v1';
@@ -738,7 +739,7 @@ export function mountDockWorkspace() {
     try {
       const profile = validateSharedProfile({ format:SHARED_PRESENTATION_FORMAT,
         presentation:presentationRequest('read') ? 'overlay' : 'surround',
-        panels:{game:{visible:state.panels.game.visible, opacity:state.panels.game.opacity, collapsed:state.panels.game.collapsed},...(state.panels.transport ? {timeline:{opacity:state.panels.transport.opacity}} : {})},
+        panels:{game:{visible:state.panels.game.visible, opacity:state.panels.game.opacity, collapsed:state.panels.game.collapsed},timeline:{opacity:state.panels.transport?.opacity ?? 1,density:preferredTimelineDensity()}},
         hostProfiles:{...retainedHostProfiles(),browser:clone(state)},
       });
       url = URL.createObjectURL(new Blob([JSON.stringify(profile,null,2)], {type:'application/json'}));
@@ -756,17 +757,23 @@ export function mountDockWorkspace() {
     announce('Layout profile exported.');
   });
   importLayout.addEventListener('click', () => importFile.click());
+  let sharedImportRevision = 0;
   importFile.addEventListener('change', async () => {
+    const ticket = ++sharedImportRevision;
     const file = importFile.files?.[0]; importFile.value = '';
     if (!file) return;
     if (file.size > 65536) { announce('Layout profile exceeds the 64 KiB limit.'); return; }
     try {
-      const document = JSON.parse(await file.text());
-      if ([SHARED_PRESENTATION_FORMAT, PREVIOUS_SHARED_PRESENTATION_FORMAT, LEGACY_SHARED_PRESENTATION_FORMAT].includes(document?.format)) {
+      const source = await file.text();
+      if (ticket !== sharedImportRevision) return;
+      const document = JSON.parse(source);
+      if ([SHARED_PRESENTATION_FORMAT, PREVIOUS_SHARED_PRESENTATION_FORMAT, GAME_ONLY_SHARED_PRESENTATION_FORMAT, LEGACY_SHARED_PRESENTATION_FORMAT].includes(document?.format)) {
         const profile = validateSharedProfile(document);
         const previousState = clone(state);
         const previousOverlay = presentationRequest('read');
         const previousStored = localStorage.getItem(SHARED_PROFILE_STORAGE);
+        const previousDensity = preferredTimelineDensity();
+        const previousDensityStored = localStorage.getItem(TIMELINE_DENSITY_KEY);
         const candidate = clone(state);
         Object.assign(candidate.panels.game,profile.panels.game);
         if (profile.panels.timeline && candidate.panels.transport) candidate.panels.transport.opacity = profile.panels.timeline.opacity;
@@ -774,12 +781,25 @@ export function mountDockWorkspace() {
         try {
           presentationRequest('apply',profile.presentation==='overlay');
           if (!loadLayout(candidate,'current')) throw new Error('Layout owner refused the profile.');
+          if (profile.format === SHARED_PRESENTATION_FORMAT) requestTimelineDensity(profile.panels.timeline.density);
           localStorage.setItem(SHARED_PROFILE_STORAGE,JSON.stringify(profile));
         } catch (error) {
-          loadLayout(previousState,'current');
-          presentationRequest('apply',previousOverlay);
-          if (previousStored === null) localStorage.removeItem(SHARED_PROFILE_STORAGE);
-          else localStorage.setItem(SHARED_PROFILE_STORAGE,previousStored);
+          const failures = [];
+          const rollback = fn => { try { fn(); } catch (cause) { failures.push(cause.message); } };
+          rollback(() => requestTimelineDensity(previousDensity,{persist:false}));
+          // Restore dock visibility last: density may reveal/hide its editor,
+          // while the original dock state is the final geometry authority.
+          rollback(() => { if (!loadLayout(previousState,'current')) throw new Error('Dock rollback was refused.'); });
+          rollback(() => presentationRequest('apply',previousOverlay));
+          rollback(() => {
+            if (previousDensityStored === null) localStorage.removeItem(TIMELINE_DENSITY_KEY);
+            else localStorage.setItem(TIMELINE_DENSITY_KEY,previousDensityStored);
+          });
+          rollback(() => {
+            if (previousStored === null) localStorage.removeItem(SHARED_PROFILE_STORAGE);
+            else localStorage.setItem(SHARED_PROFILE_STORAGE,previousStored);
+          });
+          if (failures.length) throw new Error(`${error.message} Rollback could not restore every preference: ${failures.join('; ')}`);
           throw error;
         }
         announce('Shared presentation imported; panel geometry retained.');
@@ -927,6 +947,11 @@ export function mountDockWorkspace() {
       // Do not persist: enabling an extension restores its prior layout.
     },
     show(id) { setVisible(id, true); },
+    reveal(id) {
+      if (!panels.has(id) || unavailablePanels.has(id)) return;
+      state.panels[id].collapsed = false;
+      setVisible(id, true);
+    },
     hide(id) { setVisible(id, false); },
     snapshot() { return { state:clone(state), presets:clone(presets), activeLayout }; },
     restore(snapshot) {

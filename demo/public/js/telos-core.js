@@ -101,7 +101,7 @@ export class ExtensionHost extends EventTarget {
     return () => { if (this.services.get(id) === service) this.services.delete(id); };
   }
 
-  register(manifestValue, lifecycle) {
+  register(manifestValue, lifecycle, { restore = true } = {}) {
     const manifest = checkedManifest(manifestValue);
     if (this.catalog.has(manifest.id) || typeof lifecycle?.activate !== 'function'
       || typeof lifecycle?.deactivate !== 'function') fail('CORE_PACKAGE_DUPLICATE_OR_INVALID', manifest.id);
@@ -113,8 +113,10 @@ export class ExtensionHost extends EventTarget {
       };
       this.#persist();
     }
-    if (this.saved[manifest.id]?.installed && this.saved[manifest.id]?.enabled) {
-      try { this.#activate(manifest.id); }
+    if (restore && this.saved[manifest.id]?.installed && this.saved[manifest.id]?.enabled) {
+      // Restore through the same dependency transaction as an explicit enable.
+      // A saved dependent must never activate with missing or disabled services.
+      try { this.change(manifest.id, 'enable'); }
       catch (error) {
         this.saved[manifest.id] = { installed: true, enabled: false };
         this.#persist();
@@ -181,6 +183,10 @@ export class ExtensionHost extends EventTarget {
 
   #activate(id) {
     const item = this.catalog.get(id);
+    if (this.cleanupPending.has(id)) fail('CORE_CLEANUP_RETRY_REQUIRED', `Disable ${item.manifest.name} to finish cleanup, then enable it again.`);
+    for (const dependency of item.manifest.requires) {
+      if (!this.enabled(dependency)) fail('CORE_DEPENDENCY_DISABLED', `Enable ${this.catalog.get(dependency)?.manifest.name || dependency} before ${item.manifest.name}.`);
+    }
     try {
       const dispose = item.lifecycle.activate(this.#context(id));
       if (dispose != null && typeof dispose !== 'function') fail('CORE_DISPOSER_INVALID', id);
@@ -258,7 +264,7 @@ export class ExtensionHost extends EventTarget {
         const activated = [];
         try {
           for (const packageId of affected) {
-            if (!this.saved[packageId]?.installed) fail('CORE_DEPENDENCY_NOT_INSTALLED', packageId);
+            if (!this.saved[packageId]?.installed) fail('CORE_DEPENDENCY_NOT_INSTALLED', `Install ${this.catalog.get(packageId).manifest.name} in Extensions, then enable ${entry.manifest.name} again.`);
             if (!this.enabled(packageId)) { this.#activate(packageId); activated.push(packageId); }
             this.saved[packageId] = { installed: true, enabled: true };
           }

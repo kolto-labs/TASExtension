@@ -37,12 +37,14 @@ export function requireBrowserMouseInput(inp) {
 
 // Keys the roll shows but the stand-in scene does not read. They reach the
 // score and the roll, never the sim: only `bits` is passed to step().
-export const XKEYS = ['q', 'e', 'space', 'tab', 'esc', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'enter', 'up', 'down', 'left', 'right'];
+export const XKEYS = ['q', 'e', 'space', 'tab', 'esc', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'enter', 'up', 'down', 'left', 'right', 'i'];
 export const BUTTONS = ['lmb', 'rmb'];
 // `xbits` stores score lanes that are not part of the sample sim's four-key
 // movement mask. Mouse buttons share this compact, serializable lane mask;
 // they are still emitted separately as mouse buttons by the live-game bridge.
-export const XBIT = Object.fromEntries([...XKEYS, ...BUTTONS].map((k, i) => [k, 1 << i]));
+// Retain every existing serialized lane bit, including both mouse buttons.
+// Newly added keys follow the original lanes rather than moving the buttons.
+export const XBIT = Object.fromEntries([...XKEYS.filter(k => k !== 'i'), ...BUTTONS, 'i'].map((k, i) => [k, 1 << i]));
 export const KEY_ORDER = ['w', 'a', 's', 'd', ...XKEYS];
 const SYN = { escape: 'esc' };
 

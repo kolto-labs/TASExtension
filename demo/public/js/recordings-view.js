@@ -85,6 +85,7 @@ export function mountRecordingLibrary(root) {
       const receipt = event.data.receipt;
       if (file.type !== 'video/webm' || file.name !== 'game.webm'
         || receipt?.schema !== 'telos.game-recording/v1' || receipt.complete !== true
+        || (receipt.recording !== undefined && receipt.recording !== name)
         || !Number.isSafeInteger(receipt.bytes) || receipt.bytes !== file.size
         || !Number.isSafeInteger(receipt.chunks) || receipt.chunks <= 0
         || typeof receipt.endedAt !== 'string' || !Number.isFinite(Date.parse(receipt.endedAt))) return;
@@ -92,7 +93,7 @@ export function mountRecordingLibrary(root) {
       if (receiptName && receiptName !== name) clearReceipt();
       clearFinalized(); finalizedName = name; finalizedFile = file; finalizedUrl = URL.createObjectURL(file);
       downloadFinalized.disabled = viewFinalized.disabled = false;
-      finalizedStatus.textContent = `${name}: ${file.size.toLocaleString()} retained bytes ready to download. The receipt reports finalization; playback, audio and complete-run qualification remain separate.`;
+      finalizedStatus.textContent = `${name}: ${file.size.toLocaleString()} retained bytes ready to download. ${receipt.recording === name ? 'The receipt declares this recording directory.' : 'This legacy receipt does not declare its recording directory.'} The receipt reports finalization; playback, audio and complete-run qualification remain separate.`;
       return;
     }
     if (finalizedName && finalizedName !== name) clearFinalized();

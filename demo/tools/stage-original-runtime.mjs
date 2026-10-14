@@ -165,7 +165,25 @@ if (hasEnableHook) {
   runtimeJs = replaceOnce(runtimeJs, hookEnable, 'hook_enable:cap=>{if(cap!==GL_TEXTURE_1D&&cap!==GL_TEXTURE_2D&&cap!==GL_TEXTURE_3D&&cap!==GL_TEXTURE_CUBE_MAP)return;var cur=getCurTexUnit();switch(cap){case GL_TEXTURE_1D:', 'GL enable texture-capability guard');
   runtimeJs = replaceOnce(runtimeJs, hookDisable, 'hook_disable:cap=>{if(cap!==GL_TEXTURE_1D&&cap!==GL_TEXTURE_2D&&cap!==GL_TEXTURE_3D&&cap!==GL_TEXTURE_CUBE_MAP)return;var cur=getCurTexUnit();switch(cap){case GL_TEXTURE_1D:', 'GL disable texture-capability guard');
 }
+// Emscripten's window keyboard callbacks also see the embedded recorder and
+// diagnostics controls. Keep their key presses and unowned releases in the
+// browser UI; deliver releases for keys pressed in the guest across focus changes.
+// Do not stop DOM propagation or prevent the control's normal activation.
+runtimeJs = replaceOnce(runtimeJs,
+  'var keyEventHandlerFunc=e=>{var keyEventData=',
+  `var keyEventHandlerFunc=e=>{
+    var guestKey=e.code||e.keyCode;
+    var guestKeys=JSEvents.telosGuestPressedKeys||(JSEvents.telosGuestPressedKeys=new Set);
+    var uiKeyTarget=e.target instanceof Element&&e.target.closest("button,summary,input,textarea,select,a[href],[contenteditable]:not([contenteditable=false]),[role=button]");
+    if(uiKeyTarget&&(eventTypeString!=="keyup"||!guestKeys.has(guestKey)))return;
+    if(eventTypeString==="keydown")guestKeys.add(guestKey);
+    else if(eventTypeString==="keyup")guestKeys.delete(guestKey);
+    var keyEventData=`,
+  'embedded browser control keyboard ownership');
 payloads.set('boxedwine.js', Buffer.from(runtimeJs));
+// Optional redistributable runtime function-index metadata; no guest assets.
+try { payloads.set('boxedwine.symbols', await readFile(resolve(runtime, 'boxedwine.html.symbols'))); }
+catch (error) { if (error.code !== 'ENOENT') throw error; }
 let html = await readFile(resolve(runtime, 'boxedwine.html'), 'utf8');
 if (!html.includes('<script src=boxedwine-shell.js>')) throw new Error('Unsupported BoxedWine HTML bootstrap.');
 html = html.replace('<script src=boxedwine-shell.js>', '<script src=owned-install.js></script><script src=boxedwine-shell.js>');
@@ -176,6 +194,7 @@ html = html.replace('content="emulator,wine,windows,x86,PC,emscripten,web assemb
 html = replaceOnce(html, '<div id=console><textarea', '<details id=console><summary>Diagnostics</summary><textarea', 'console opening');
 html = replaceOnce(html, '</textarea></div><div id=openModal', '</textarea></details><div id=openModal', 'console closing');
 html = html.replace('<script src=owned-install.js>', '<link rel=stylesheet href=embedded.css><script src=owned-install.js>');
+html = replaceOnce(html, '</body>', '<script src=game-recording.js></script></body>', 'local game recording controls');
 payloads.set('game-runtime.html', Buffer.from(html));
 let shell = await readFile(resolve(runtime, 'boxedwine-shell.js'), 'utf8');
 shell = replaceOnce(shell, 'params.push("/bin/wine");', 'params.push("-title", "KOTOR");\n            params.push("/bin/wine");', 'game window title');
@@ -212,17 +231,32 @@ shell = replaceOnce(shell, '}).then(function(buffer) {\n                callback
                 callback(new Uint8Array(buffer));`, 'root archive integrity hook');
 payloads.set('boxedwine-shell.js', Buffer.from(shell));
 let mount = await readFile(resolve(workspace, 'public/owned-install.js'), 'utf8');
+mount = replaceOnce(mount,
+  "new URL('/original-game/telos-tas-bridge.js?v=13-parent-origin', location.origin).href",
+  "new URL('telos-tas-bridge.js', location.href).href",
+  'immutable candidate input bridge');
 mount = mount.replace("const response = await fetchOwnedManifest('/private/install.json');", "const localInstall = new URLSearchParams(location.search).get('localInstall') === '1';\n  const session = new URLSearchParams(location.search).get('ownedSession');\n  if (!localInstall && !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(session)) throw new Error('Connect your KOTOR installation in the prototype.');\n  const assetPrefix = '/original-game/owned-game-assets/' + session + '/';\n  const response = await fetchOwnedManifest(localInstall ? '/private/install.json' : assetPrefix + 'manifest');");
 mount = mount.replace('const localSnapshots = await receiveOwnedFileSnapshots(manifest);', 'const localSnapshots = localInstall ? null : await receiveOwnedFileSnapshots(manifest);');
 mount = mount.replace("!/^\\/private\\/install\\/\\d+$/.test(file.url)", "(localInstall ? !/^\\/private\\/install\\/\\d+$/.test(file.url) : (!file.url.startsWith(assetPrefix) || !/^\\d+$/.test(file.url.slice(assetPrefix.length))))");
 if (!mount.includes("const localInstall = new URLSearchParams(location.search).get('localInstall') === '1';")) throw new Error('Local installation transport was not staged.');
 payloads.set('owned-install.js', Buffer.from(mount));
 payloads.set('embedded.css', await readFile(resolve(demo, 'public/original-game/embedded.css')));
+for (const name of ['game-recording.js', 'game-recording-writer.js', 'telos-tas-bridge.js']) {
+  payloads.set(name, await readFile(resolve(demo, 'public/original-game', name)));
+}
 const gl4esDependency = resolve(workspace, 'dependencies/gl4es');
 const gl4esMetadata = JSON.parse(await readFile(resolve(gl4esDependency, 'source.json'), 'utf8'));
 payloads.set('GL4ES-LICENSE.txt', await readFile(resolve(gl4esDependency, gl4esMetadata.source_directory, 'LICENSE')));
 const notice = 'BoxedWine: GPL-2.0-or-later, https://github.com/danoon2/Boxedwine, source revision 509f6a7545e0827a27ed1b4ebab66ac1da4b1ea7. gl4es: MIT, https://github.com/ptitSeb/gl4es, source revision ' + gl4esMetadata.commit + '; license retained in GL4ES-LICENSE.txt. Local downstream patches and provenance: kptas-browser-game-wasm/dependencies/gl4es/source.json and artifacts/. Wine root: official TinyCore15 Wine11.0 web package; retain upstream component notices. Local staging is not a published distribution. Original KOTOR files are supplied only by the user and are not included.\n';
-payloads.set('NOTICE.txt', Buffer.from(notice));
+const linkConfiguration = JSON.parse(await readFile(resolve(runtime, '.link-config.json'), 'utf8'));
+const proxyLifetimeLinked = String(linkConfiguration.settings?.OBJECTS || '').split(/\s+/)
+  .some(object => object.endsWith('/boxedwine-proxying-lifetime.o'));
+if (proxyLifetimeLinked) {
+  const project = resolve(workspace, 'upstream/project/emscripten');
+  payloads.set('EMSCRIPTEN-PROXYING-LICENSE.txt', await readFile(resolve(project, 'emscripten-proxying-LICENSE.txt')));
+  payloads.set('emscripten-proxying-backport.json', await readFile(resolve(project, 'boxedwine-proxying-lifetime.json')));
+}
+payloads.set('NOTICE.txt', Buffer.from(notice + (proxyLifetimeLinked ? 'Emscripten4.0.14 proxying lifetime backport: upstream PR26582. License retained in EMSCRIPTEN-PROXYING-LICENSE.txt; source hashes in emscripten-proxying-backport.json. Runtime acceptance remains pending.\n' : '')));
 // Hash the entire generated bootstrap, not merely the JS/WASM pair. Every
 // companion asset uses this immutable directory throughout a guest's lifetime.
 const digest = createHash('sha256');
@@ -405,10 +439,25 @@ if (sourceSnapshot) {
 // Staging only creates an immutable candidate. Local selection is a separate,
 // explicit action after live acceptance; public qualification stays separate.
 const descriptor = { schema:'telos.original-runtime/v1', release, entry:`/original-game/runtime-releases/${release}/game-runtime.html`, qualified:false, assets, sourceBundle, root };
+const descriptorBytes = JSON.stringify(descriptor, null, 2) + '\n';
+const candidateDirectory = resolve(demo, 'public/original-game/runtime-candidates');
+await mkdir(candidateDirectory, { recursive:true });
+const candidatePath = resolve(candidateDirectory, `${release}.json`);
+const candidateTemporary = resolve(candidateDirectory, `.candidate-${process.pid}.tmp`);
+let candidateTemporaryCreated = false;
+try {
+  await writeFile(candidateTemporary, descriptorBytes, { flag:'wx', mode:0o644 });
+  candidateTemporaryCreated = true;
+  try { await link(candidateTemporary, candidatePath); }
+  catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    if (await readFile(candidatePath, 'utf8') !== descriptorBytes) throw new Error('Existing runtime candidate descriptor differs; preserving it.');
+  }
+} finally { if (candidateTemporaryCreated) await rm(candidateTemporary, { force:true }); }
 if (selectLocal) {
   const descriptorTemporary = resolve(demo, 'public/original-game/.runtime-local-' + process.pid + '.json');
   try {
-    await writeFile(descriptorTemporary, JSON.stringify(descriptor, null, 2) + '\n', { mode:0o644 });
+    await writeFile(descriptorTemporary, descriptorBytes, { mode:0o644 });
     await rename(descriptorTemporary, resolve(demo, 'public/original-game/runtime-local.json'));
   } finally { await rm(descriptorTemporary, { force:true }); }
 }

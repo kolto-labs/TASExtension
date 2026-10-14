@@ -12,6 +12,8 @@ import {
   tierReport, exportHolo, importHolo, flagsOf, verbsOf, verbsText, flagsText, F, LEGEND, REACHED, HOLO_FORMAT,
 } from '../../js/telos.js';
 import { buildRows, rowMarks, rowSegments, rowInput, editTicks, unrollRepeats, insertTicks, deleteTicks, splitAt, addMark, ticksAsScore, clipboardInputs, pasteTicks } from '../../js/edit.js';
+import { applyLanePattern } from '../../js/input-lane-pattern.js';
+import { preferredTimelineDensity, rememberTimelineDensity } from '../../js/timeline-density.js';
 import { Roll, COLS, FIRST_INPUT, stateText } from '../../js/roll.js';
 import { drawScene, drawTimeline, fmtVt, thumbnail, TIER_COLOR } from '../../js/render.js';
 import { compileWatch, readWatch, fmtWatch, sparkline, hexView } from '../../js/memory.js';
@@ -19,10 +21,12 @@ import { KeyboardControls, loadKeyboardSettings } from '../../js/keyboard-contro
 import { compileBreakpoint, loadBreakpoints, saveBreakpointEnabled, saveBreakpointExpression } from '../../js/breakpoints.js';
 
 import { ListenerScope } from './listener-scope.js';
+import { OBSERVATION_DRAFT_SCHEMA } from '../../js/observation-draft.js';
 
 export function createTasEditor(host) {
 const events = new ListenerScope();
 let initialized = false;
+let importRevision = 0;
 let dismissDialog = null;
 let cancelTimelineDrag = () => {};
 const $ = (id) => document.getElementById(id);
@@ -284,7 +288,7 @@ function applyText(text, { fromEditor = false, quiet = false } = {}) {
   } else if (res.fork <= app.t) {
     app.g = extend(b, app.t, simCtx);
     app.t = headOf(b);
-    if (!quiet) say(el.scoreStatus, `Changed from tick ${res.fork}. Replayed ${app.t - res.fork + 1} ticks to the playhead.`, 'ok');
+    if (!quiet) say(el.scoreStatus, `Changed from tick ${res.fork}. Recomputed ${app.t - res.fork + 1} sample authoring records to the playhead.`, 'ok');
   } else if (!quiet) say(el.scoreStatus, `Changed from tick ${res.fork}. Later ticks were dropped. Play on to record them.`, 'ok');
   rebuild();
   dirty('editor', 'view', 'memory', 'branches');
@@ -395,6 +399,48 @@ function clearSelection(all = false) {
   return rollEdit(`Clear ${all ? 'all inputs' : col.label} on ${range(a, b)}`, (text, prog, model) => editTicks(text, prog, model, changes));
 }
 
+async function patternSelection(low, high, lane, mode) {
+  if (!events.active || !extensions.enabled(TAS_ID) || !app.b
+    || !prepareScoreNavigation('edit input lanes')) return;
+  if (app.dirty.rows) rebuild();
+  const branch = app.b, before = branch.score, model = app.model;
+  const generation = tasLifecycleGeneration;
+  let period = 2, phase = 0;
+  if (mode === 'autofire') {
+    const answer = await ask(
+      `Set autofire for ${lane} on ${range(low, high)}. Enter period and phase in score ticks. The lane is held for floor(period/2) ticks, then released. Phase starts at the first included score tick. This edits the score; it does not run or rewind the game.`,
+      '2 0', [], 'Set autofire');
+    if (answer === null) return;
+    const match = /^([0-9]{1,5})\s+([0-9]{1,5})$/.exec(answer);
+    if (!match) {
+      say(el.scoreStatus, 'Enter two whole numbers: period and phase, such as 2 0.', 'warn');
+      return;
+    }
+    period = Number(match[1]); phase = Number(match[2]);
+  }
+  if (!events.active || !extensions.enabled(TAS_ID) || generation !== tasLifecycleGeneration) return;
+  if (app.b !== branch || branch.score !== before || app.model !== model) {
+    say(el.scoreStatus, 'The score changed while configuring the lane edit. Choose the range again.', 'warn');
+    return;
+  }
+  const label = mode === 'hold'
+    ? `Hold ${lane} on ${range(low, high)}`
+    : `Autofire ${lane} on ${range(low, high)} · period ${period}, phase ${phase} score ticks`;
+  try {
+    await rollEdit(label, (text, prog, rows) => {
+      if (!events.active || !extensions.enabled(TAS_ID) || generation !== tasLifecycleGeneration
+        || app.b !== branch || branch.score !== before) {
+        // Throw before the authoring owner can interpret `same` as approval
+        // to commit a repeat block that was just unrolled in its dialog.
+        throw new Error('The input lane edit was cancelled because its owner changed.');
+      }
+      return applyLanePattern(text, prog, rows, { low, high, lanes:[lane], mode, period, phase });
+    });
+  } catch (error) {
+    say(el.scoreStatus, error.message || 'The lane pattern could not be applied.', 'warn');
+  }
+}
+
 async function editMouse(t) {
   const row = app.model.rows[t];
   if (!row || row.kind === 'wait') { say(el.scoreStatus, '@sync rows are not editable. Change the event or timeout in the score text.', 'warn'); return; }
@@ -501,6 +547,7 @@ function stepForward() {
     say(el.stageStatus, `Waiting for the runtime to acknowledge score tick ${app.wasmPendingTick}.`, 'warn');
     return;
   }
+  if (!prepareScoreNavigation('step forward')) return;
   const b = app.b;
   if (app.t >= MAX_TICKS) { pause(); return; }
   const watchedFrom = app.playing && app.pauseWatchChange && app.watchBreak && !app.watchBreak.w.error && app.watchBreak.w.steps[0] !== 'input' ? b.recs[app.t] : null;
@@ -585,6 +632,7 @@ function toggleRecord(on = !app.rec.on) {
 function play() {
   if (!extensions.enabled(TAS_ID)) return;
   if (app.playing) return;
+  if (!prepareScoreNavigation('play')) return;
   if (centerTarget === 'original') dispatchEvent(new CustomEvent('telos:wasm-vm-control', { detail:{ action:'resume' } }));
   app.playing = true;
   app.last = performance.now();
@@ -754,6 +802,9 @@ function runScoreLine(line) {
   const to = e1 > 0 ? e1 : headOf(b);
   const firstNew = from + 1;
   if (to >= firstNew) {
+    if (centerTarget === 'original') {
+      print('Appended to the score. The rows below describe the sample authoring model; live KOTOR input was not sent. Use Transport to deliver the authored inputs and inspect runtime acknowledgements.', 'warn');
+    }
     printRun(b, firstNew, to);
     app.g = restore(b.recs[to]);
     app.t = to;
@@ -1018,18 +1069,29 @@ function exportHoloFile() {
 }
 async function importFile(file) {
   if (!file || !extensions.enabled(TAS_ID)) return;
-  if (file.size > 20 * 1024 * 1024) { print('That file is over 20 MB. Import a score or a holorecord from this page.', 'warn'); return; }
+  if (file.size > 64 * 1024 * 1024) { print('The file exceeds the 64 MiB local import limit.', 'warn'); return; }
   const generation = tasLifecycleGeneration;
+  const revision = ++importRevision;
+  const isCurrent = () => generation === tasLifecycleGeneration && revision === importRevision && extensions.enabled(TAS_ID);
   let text;
   try { text = await file.text(); }
   catch (error) {
-    if (generation === tasLifecycleGeneration && extensions.enabled(TAS_ID)) print(`Import failed: ${error.message || error}`, 'warn');
+    if (isCurrent()) print(`Import failed: ${error.message || error}`, 'warn');
     return;
   }
   // A disable/re-enable cycle also invalidates work started by the old lifecycle.
-  if (generation !== tasLifecycleGeneration || !extensions.enabled(TAS_ID)) return;
+  if (!isCurrent()) return;
   let obj = null;
   if (/^\s*\{/.test(text)) { try { obj = JSON.parse(text); } catch { obj = null; } }
+  if (obj?.schema === OBSERVATION_DRAFT_SCHEMA) {
+    if (typeof host.openReferenceDraft !== 'function') { print('Reference draft viewing is unavailable in this host.', 'warn'); return; }
+    try {
+      const opened = await host.openReferenceDraft(file, isCurrent);
+      if (isCurrent()) print(opened ? `Opened ${file.name} as reference observations. Timing and replay remain unqualified.` : 'Reference draft could not be opened.', opened ? 'ok' : 'warn');
+    } catch (error) { if (isCurrent()) print(`Reference import failed: ${error.message || error}`, 'warn'); }
+    return;
+  }
+  if (file.size > 20 * 1024 * 1024) { print('Scores and holorecords are limited to 20 MiB.', 'warn'); return; }
   if (obj && obj.format === HOLO_FORMAT) {
     pause();
     print(`import ${file.name}: rebuilding every branch by replay and checking each hash`, 'in');
@@ -1110,6 +1172,11 @@ function openMenu(x, y) {
   add(`Insert ${n === 1 ? '1 empty tick' : n + ' empty ticks'} here`, () => rollEdit(`Insert ${n} ticks at ${a}`, (t, p, m) => insertTicks(t, p, m, a, n)));
   add(`Delete ${range(a, b)}`, () => rollEdit(`Delete ${range(a, b)}`, (t, p, m) => deleteTicks(t, p, m, a, b)));
   add(`Split the note at tick ${a}`, () => rollEdit(`Split at tick ${a}`, (t, p, m) => splitAt(t, p, m, a)));
+  if (col.kind === 'key') {
+    const unavailable = events.active && extensions.enabled(TAS_ID) ? '' : 'Enable the TAS package to edit inputs';
+    add(`Hold ${col.label} on ${range(a, b)}`, () => patternSelection(a, b, col.id, 'hold'), unavailable);
+    add(`Set autofire for ${col.label} on ${range(a, b)}…`, () => patternSelection(a, b, col.id, 'autofire'), unavailable);
+  }
   add(`Clear ${col.label} on ${range(a, b)}`, () => clearSelection(false));
   add(`Clear all inputs on ${range(a, b)}`, () => clearSelection(true));
   add(`Add a mark at tick ${a}`, () => markAt(a));
@@ -1518,6 +1585,7 @@ function drawView() {
   el.tl.setAttribute('aria-valuemax', String(head));
   el.tl.setAttribute('aria-valuenow', String(app.t));
   $('timeline-position').textContent = `tick ${app.t} / ${head}`;
+  $('minimal-score-position').textContent = `score tick ${app.t} / ${head}`;
   const input = inputAt(app.t);
   const previousInput = app.t > 0 ? inputAt(app.t - 1) : null;
   const held = [...KEY_ORDER, ...BUTTONS].filter((key) => input[key]);
@@ -1551,9 +1619,10 @@ function drawView() {
   const tickJump = $('tick-jump');
   if (document.activeElement !== tickJump) tickJump.value = String(app.t);
   tickJump.max = String(head);
-  el.hTick.textContent = `tick ${app.t}`;
-  el.hEp.textContent = `ep ${app.g.epoch}`;
-  el.hHz.textContent = `${app.g.hz} Hz`;
+  el.hTick.textContent = `score tick ${app.t}`;
+  el.hEp.textContent = `model ep ${app.g.epoch}`;
+  el.hHz.textContent = `score ${app.g.hz} Hz`;
+  el.hHz.title = 'Score authoring rate. The runtime reports render presentation cadence separately.';
 }
 
 let tasFrameRequest = null;
@@ -1617,8 +1686,17 @@ function setFollowPlayhead(on) {
   }
 }
 
-function setTimelineExpanded(expanded, { persist = false } = {}) {
-  app.timelineExpanded = Boolean(expanded);
+function setTimelineExpanded(expanded, { persist = false, density = null, reveal = false } = {}) {
+  const nextDensity = density ?? (expanded ? 'editor' : 'timeline');
+  if (!['editor', 'timeline', 'minimal'].includes(nextDensity)) throw new Error('Unsupported timeline density.');
+  const previousFocus = document.activeElement;
+  const workspace = $('live-tas-workspace');
+  const ownedFocus = workspace?.contains(previousFocus);
+  rememberTimelineDensity(nextDensity);
+  document.body.dataset.tasTimelineDensity = nextDensity;
+  $('timeline-density').value = nextDensity;
+  $('timeline-minimal-hud').hidden = nextDensity !== 'minimal';
+  app.timelineExpanded = nextDensity === 'editor';
   const panel = $('timeline-panel');
   panel.classList.toggle('expanded', app.timelineExpanded);
   applyTimelineDetailVisibility();
@@ -1627,9 +1705,13 @@ function setTimelineExpanded(expanded, { persist = false } = {}) {
   button.setAttribute('aria-expanded', String(app.timelineExpanded));
   if (!app.timelineExpanded && isDockPanel($('p-roll'))) window.TelosDock?.hide('piano-roll');
   // Revealing a focused editor during layout changes is temporary, not a saved choice.
+  if ((persist || reveal) && app.timelineExpanded && isDockPanel($('p-roll'))) window.TelosDock?.show('piano-roll');
   if (persist) {
-    if (expanded && isDockPanel($('p-roll'))) window.TelosDock?.show('piano-roll');
     try { localStorage.setItem(TIMELINE_EXPANDED_KEY, String(app.timelineExpanded)); } catch { /* Layout remains usable for this visit. */ }
+    try { rememberTimelineDensity(nextDensity,{persist:true}); } catch { /* Keep this visit's intended density. */ }
+  }
+  if (ownedFocus && !previousFocus.getClientRects().length) {
+    (nextDensity === 'minimal' ? $('b-density-timeline') : $('timeline-density')).focus({preventScroll:true});
   }
   dirty('view', 'roll', 'editor');
 }
@@ -1999,7 +2081,7 @@ function bind() {
     event.preventDefault(); event.stopPropagation();
     pasteInputText(event.clipboardData.getData('text/plain'), roll.selRange()[0]);
   });
-  setTimelineExpanded(app.timelineExpanded);
+  setTimelineExpanded(app.timelineExpanded,{density:preferredTimelineDensity()});
   const followButton = $('b-follow-playhead');
   setFollowPlayhead(app.followPlayhead);
   events.listen(followButton, 'click', () => setFollowPlayhead(!app.followPlayhead));
@@ -2063,6 +2145,19 @@ function bind() {
   events.listen($('b-prev-mark'), 'click', () => navigateMark(-1));
   events.listen($('b-next-mark'), 'click', () => navigateMark(1));
   events.listen($('b-toggle-timeline'), 'click', () => setTimelineExpanded(!app.timelineExpanded, { persist: true }));
+  events.listen($('timeline-density'), 'change', () => {
+    const density = $('timeline-density').value;
+    setTimelineExpanded(density === 'editor',{persist:true,density});
+  });
+  events.listen($('b-density-timeline'), 'click', () => setTimelineExpanded(false,{persist:true,density:'timeline'}));
+  events.listen(window, 'telos:timeline-density', event => {
+    const request = event.detail;
+    if (!events.active || !extensions.enabled(TAS_ID) || !request) return;
+    try {
+      setTimelineExpanded(request.density === 'editor',{density:request.density,reveal:true});
+      request.applied = true;
+    } catch (error) { request.error = error.message; }
+  });
   events.listen(document.querySelector('.skip[href="#roll"]'), 'click', () => {
     if (isDockPanel($('p-roll'))) window.TelosDock?.show('piano-roll');
     else { showTab('rs', 'roll'); setTimelineExpanded(true); }
@@ -2255,7 +2350,7 @@ function init() {
   centerTarget = host.getTarget();
   roll.select(1, 1, FIRST_INPUT, false);
   say(el.scoreStatus, `Parsed. Recorded ${headOf(main)} ticks.`, 'ok');
-  say(el.stageStatus, 'Each sample tick has a deterministic state snapshot. Click the strip or a tick number to seek there.');
+  say(el.stageStatus, 'Click the strip or a tick number to move the sample authoring playhead.');
   print('telos console. Type help for the commands. Score lines such as 4 w lmb run at the end of the score.', 'in');
   initialized = true;
 }

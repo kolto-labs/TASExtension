@@ -1,0 +1,16 @@
+:root { color-scheme:dark; font:14px system-ui,sans-serif; background:#0b1013; color:#d5e1e7; }
+body { margin:0; }
+main { max-width:1100px; margin:0 auto; padding:24px; }
+h1 { font-size:24px; }
+h2 { font-size:18px; }
+p { line-height:1.5; }
+.controls { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+button, select { font:inherit; background:#172329; color:inherit; border:1px solid #52636c; border-radius:3px; padding:7px 10px; }
+button:disabled, select:disabled { opacity:.55; }
+button:focus-visible, select:focus-visible, video:focus-visible { outline:2px solid #49d4ca; outline-offset:3px; }
+label { display:flex; align-items:center; gap:8px; }
+select { max-width:100%; }
+section { margin-top:24px; padding:16px; border:1px solid #34464f; }
+pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:420px; overflow:auto; }
+video { display:block; width:100%; max-height:620px; background:#000; }
+@media (max-width:600px) { main { padding:12px; } label { width:100%; } select { min-width:0; flex:1; } }

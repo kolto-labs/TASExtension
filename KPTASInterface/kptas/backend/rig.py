@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -184,7 +185,10 @@ class StageFiles:
                     base = Path(root)
                     for d in dirs:
                         q = base / d
-                        yield str(q.relative_to(self.stage)).replace(os.sep, "/") + "/", q, q.lstat()
+                        st = q.lstat()
+                        if not stat.S_ISDIR(st.st_mode):
+                            raise BackendError(f"refusing to track non-directory or symlinked {q}")
+                        yield str(q.relative_to(self.stage)).replace(os.sep, "/") + "/", q, st
                     for f in sorted(files):
                         q = base / f
                         yield str(q.relative_to(self.stage)).replace(os.sep, "/"), q, q.lstat()
@@ -232,8 +236,66 @@ class StageFiles:
     def write(self, rows: Sequence[Sequence[Any]], blob: Callable[[str], bytes]) -> None:
         """Make the stage hold exactly `rows`. Files are rewritten in place, so open handles see the new
         bytes; an unchanged file is left alone."""
-        want = {str(r[0]): str(r[1]) for r in rows}
+        roots = []
+        for configured in self.paths:
+            if not isinstance(configured, str) or not configured or "\\" in configured or "\x00" in configured:
+                raise BackendError("configured stage path is invalid")
+            parts = configured.split("/")
+            if any(part in ("", ".", "..") or ":" in part for part in parts):
+                raise BackendError("configured stage path must be relative and normalized")
+            roots.append(configured)
+        want: dict[str, str] = {}
+        sizes: dict[str, int] = {}
+        directories: dict[str, bool] = {}
+        folded_paths: dict[str, str] = {}
+        for row in rows:
+            if not isinstance(row, (list, tuple)) or len(row) != 4:
+                raise BackendError("file tree rows must contain path, SHA-256, size, and virtual time")
+            raw_path, digest, size, vtime = row
+            if not isinstance(raw_path, str) or not raw_path or "\\" in raw_path or "\x00" in raw_path:
+                raise BackendError("file tree contains an invalid path")
+            is_dir = raw_path.endswith("/")
+            rel = raw_path[:-1] if is_dir else raw_path
+            parts = rel.split("/")
+            if (not rel or rel.startswith("/") or any(part in ("", ".", "..") or ":" in part for part in parts)
+                or not any(rel == root or rel.startswith(root + "/") for root in roots)):
+                raise BackendError(f"file tree path is outside configured stage roots: {raw_path!r}")
+            if type(size) is not int or size < 0 or type(vtime) is not int:
+                raise BackendError(f"file tree metadata is invalid for {raw_path!r}")
+            if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+                raise BackendError(f"file tree SHA-256 is invalid for {raw_path!r}")
+            if is_dir and (digest != EMPTY_SHA or size != 0):
+                raise BackendError(f"file tree directory metadata is invalid for {raw_path!r}")
+            if rel in directories:
+                raise BackendError(f"file tree contains duplicate or conflicting path {rel!r}")
+            folded = rel.casefold()
+            if folded in folded_paths:
+                raise BackendError(f"file tree paths collide on case-insensitive filesystems: {folded_paths[folded]!r}, {rel!r}")
+            folded_paths[folded] = rel
+            directories[rel] = is_dir
+            want[raw_path] = digest
+            sizes[raw_path] = size
+        for rel in directories:
+            parent = rel.rpartition("/")[0]
+            while parent:
+                if parent in directories and not directories[parent]:
+                    raise BackendError(f"file tree places a child below file {parent!r}")
+                parent = parent.rpartition("/")[0]
         cur, _ = self.read()
+        have = {r[0]: r[1] for r in cur}
+        have_sizes = {r[0]: r[2] for r in cur}
+        staged_blobs: dict[str, bytes] = {}
+        for rel, digest in want.items():
+            if rel.endswith("/"):
+                continue
+            if have.get(rel) == digest:
+                if have_sizes.get(rel) != sizes[rel]:
+                    raise BackendError(f"file tree size disagrees with the existing blob: {rel!r}")
+                continue
+            data = blob(digest)
+            if not isinstance(data, bytes) or len(data) != sizes[rel] or hashlib.sha256(data).hexdigest() != digest:
+                raise BackendError(f"file tree blob does not match its recorded size and SHA-256: {rel!r}")
+            staged_blobs[rel] = data
         for rel, _h, _s, _v in sorted(cur, key=lambda r: r[0], reverse=True):
             if rel not in want:
                 p = self.stage / rel.rstrip("/")
@@ -243,7 +305,6 @@ class StageFiles:
                     shutil.rmtree(p, ignore_errors=True)
                 else:
                     p.unlink(missing_ok=True)
-        have = {r[0]: r[1] for r in cur}
         for rel in sorted(want):
             p = self.stage / rel.rstrip("/")
             if rel.endswith("/"):
@@ -254,7 +315,7 @@ class StageFiles:
                 if p.is_dir():
                     shutil.rmtree(p)
                 p.parent.mkdir(parents=True, exist_ok=True)
-                data = blob(want[rel])
+                data = staged_blobs[rel]
                 with open(p, "r+b" if p.exists() else "wb") as f:
                     f.write(data)
                     f.truncate()

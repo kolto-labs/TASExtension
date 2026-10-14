@@ -4,33 +4,41 @@ import { extensions, TAS_ID, mountExtensionManager, registerOptionalTas } from '
 import { OriginalGame } from './original-game.js?v=9-compiled-input-batch';
 import { mountDebuggerWorkbench } from './debugger-workbench.js';
 import { DEBUG_MANIFEST, createDebugUiLifecycle } from '../packages/debug-ui/index.js';
+import { createDebugRuntime, createGuestMemoryAdapter, createGuestExecutionAdapter, createGuestThreadAdapter, createGuestRegisterAdapter, createGuestMappingAdapter } from '../packages/debug-runtime/runtime.js';
+import { mountRecordingLibrary } from './recordings-view.js';
+import { createSelectedDebugRuntime } from '../packages/debug-runtime/selected-runtime.js';
+import { createStaticFileInspectionOwner } from '../debugger/static-file-owner.js';
 
 const $ = id => document.getElementById(id);
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+const recordingLibraryView = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)
+  && new URLSearchParams(location.search).get('view') === 'saved-recordings';
 let target = 'original', session = null, footage = null, footageLoading = null;
 const game = new OriginalGame($('original-game'));
+const debugRuntime = createDebugRuntime({ getSession:() => game.session, adapters:[createGuestMemoryAdapter(game), createGuestExecutionAdapter(game), createGuestThreadAdapter(game), createGuestRegisterAdapter(game), createGuestMappingAdapter(game)] });
 
 function updateTargetScope() {
   const value = session?.session === game.session ? session : null;
   const capabilities = value?.capabilities || {};
   let text = target === 'scene' ? 'Target: Sample scene · Score playback and sample state'
-    : target === 'real' ? 'Target: Recorded footage · Video playback' : '';
+    : target === 'real' ? 'Target: Recorded footage · Video playback'
+    : recordingLibraryView ? 'Target: Saved recordings · Local receipt and footage inspection' : '';
   if (!text) {
     const actions = [];
     if (extensions.enabled(TAS_ID) && capabilities.input === true) actions.push('Score → live game input');
-    if (capabilities.pause === true && capabilities.resume === true) actions.push('Pause / resume');
-    if (capabilities.renderStep === true && value.executionBoundary === 'render-present') actions.push('Render step');
+    if (extensions.enabled('telos.debug') && capabilities.pause === true && capabilities.resume === true) actions.push('Pause / resume');
+    if (extensions.enabled('telos.debug') && capabilities.renderStep === true && value.executionBoundary === 'render-present') actions.push('Render step');
     text = `Target: ${value?.guestId || 'KOTOR'} · ${actions.join(' · ') || value?.status || 'Connecting'}`;
   }
   if ($('target-scope').textContent !== text) $('target-scope').textContent = text;
 }
 
 async function openFootage() {
-  if (footage) { footage.open(); return; }
+  if (footage) return footage.open();
   if (footageLoading) return footageLoading;
   footageLoading = import('./footage.js').then(({ Footage }) => {
     footage = new Footage($('footage'), { reduced: () => reduced.matches });
-    footage.open();
+    return footage.open();
   }).catch(error => {
     console.error('Recorded footage could not load:', error);
     $('footage').textContent = 'Recorded footage could not load. Open Proof of Concept again to retry.';
@@ -105,12 +113,38 @@ addEventListener('telos:runtime-session', event => {
 addEventListener('telos:dock-ready', registerCoreViews);
 registerCoreViews();
 
-extensions.provide('debug.runtime', {
+const selectedDebugger = createSelectedDebugRuntime({
+  getSession() { return debugRuntime.getSession(); },
+  getTarget() { return game.session ? game.getRuntimeTarget() : null; },
   getGame() { return game; },
-  mountWorkbench(options) { return mountDebuggerWorkbench(game, options); },
+  getStatus() {
+    const value = window.__telosRuntimeDiagnostics;
+    if (!game.session || value?.session !== game.session) return null;
+    return Object.freeze({ ...value,
+      target:game.getRuntimeTarget(),
+      pausedCaptureReady:value.state === 'paused' && Number.isSafeInteger(value.activeThreads)
+        && value.activeThreads > 0 && Number.isSafeInteger(value.parkedThreads)
+        && value.activeThreads === value.parkedThreads,
+    });
+  },
+  capabilities() { return debugRuntime.capabilities(); },
+  request(request, options) { return debugRuntime.request(request, options); },
+  mountWorkbench(options) { return mountDebuggerWorkbench(game, { ...options, debugRuntime, mountRoot: $('cockpit') }); },
 });
+extensions.provide('debug.runtime', selectedDebugger.runtime);
+extensions.provide('debug.session-owner', selectedDebugger.owner);
+extensions.provide('debug.file-inspection', createStaticFileInspectionOwner(selectedDebugger.owner, selectedDebugger.runtime));
 const tasHost = {
   getGame: () => game, getTarget: () => target, selectTarget, openFootage,
+  async openReferenceDraft(file, isCurrent) {
+    if (!isCurrent()) return false;
+    await openFootage();
+    if (!isCurrent() || !footage) return false;
+    const opened = await footage.openObservationDraft(file, isCurrent);
+    if (!opened || !isCurrent()) return false;
+    window.TelosDock?.show('captured-footage');
+    return true;
+  },
   isEnabled: () => extensions.enabled(TAS_ID),
   onError(error) {
     console.error('TAS package load failed:', error);
@@ -124,11 +158,26 @@ catch (error) { console.error('Debug package registration failed:', error); }
 try { registerOptionalTas(tasHost); }
 catch (error) { console.error('TAS package registration failed:', error); }
 mountExtensionManager();
-extensions.addEventListener('change', updateTargetScope);
+function syncPackagePresentation() {
+  game.setPackagePresentation({ debug: extensions.enabled('telos.debug'), tas: document.body.dataset.tasExtension === 'enabled' });
+  updateTargetScope();
+}
+extensions.addEventListener('change', syncPackagePresentation);
+syncPackagePresentation();
 addEventListener('telos:tas-package-state', event => {
+  syncPackagePresentation();
   const status = document.querySelector('.extension-status');
   if (status && event.detail.phase === 'loading') status.textContent = 'Loading TAS tools…';
   if (status && event.detail.phase === 'ready') status.textContent = 'TAS tools ready. Open a panel from Extensions or Panels.';
 });
 selectTarget('original');
-game.open();
+if (['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname)) {
+  const link = document.createElement('a'); link.textContent = 'Saved recordings';
+  link.href = '/?view=saved-recordings'; link.target = '_blank'; link.rel = 'noopener';
+  link.className = 'btn small';
+  $('tab-original').parentElement.append(link);
+}
+if (recordingLibraryView) {
+  mountRecordingLibrary($('original-game'));
+  updateTargetScope();
+} else game.open();

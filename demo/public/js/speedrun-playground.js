@@ -1,8 +1,278 @@
 // Video browsing is independent of the stand-in simulator and its holorecord.
 // Overlay observations are partial evidence, never executable game inputs.
+import { createObservationDraft, unwrapObservationDraft, normalizeDraftPlacement } from './observation-draft.js';
+import { describeObservationSourceClock } from './observation-source-clock.js';
 
 const CATALOG = 'media/speedruns/catalog.json';
 const FPS = 60;
+const SHA256 = /^[a-f0-9]{64}$/i;
+
+function isRecord(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
+
+function normalizeSegmentEvidence(packet) {
+  const fail = () => { throw new Error('Unsupported or incomplete read-only observation evidence.'); };
+  if (!isRecord(packet) || packet.schema !== 'kptas.speedrun-segment-evidence/v1'
+    || packet.read_only !== true || packet.executable_score !== false || packet.replay_qualified !== false
+    || !isRecord(packet.source) || !isRecord(packet.span) || !isRecord(packet.state_at_start)
+    || !Array.isArray(packet.lanes) || !Array.isArray(packet.events) || !Array.isArray(packet.span.source_parts)
+    || !isRecord(packet.playback_alignment) || !isRecord(packet.binding_summary)
+    || !Array.isArray(packet.provenance_warnings) || packet.provenance_warnings.length === 0
+    || packet.provenance_warnings.length > 128 || packet.provenance_warnings.some(note => typeof note !== 'string' || note.length > 512)
+    || packet.lanes.length < 1 || packet.lanes.length > 512 || packet.events.length > 200000
+    || packet.span.source_parts.length < 1 || packet.span.source_parts.length > 4096) fail();
+  const { source, span } = packet;
+  const from = span.from_frame, to = span.to_frame_exclusive, count = span.frame_count;
+  if (typeof source.run_id !== 'string' || !source.run_id || source.run_id.length > 128
+    || typeof source.runner !== 'string' || !source.runner || source.runner.length > 128
+    || typeof source.artifact_id !== 'string' || !source.artifact_id || source.artifact_id.length > 256
+    || typeof source.observation_sha256 !== 'string' || !SHA256.test(source.observation_sha256)
+    || typeof source.catalog_sha256 !== 'string' || !SHA256.test(source.catalog_sha256)
+    || !Number.isSafeInteger(source.observation_bytes) || source.observation_bytes < 1
+    || typeof source.submission_url !== 'string' || source.submission_url.length > 2048
+    || typeof source.source_video_url !== 'string' || source.source_video_url.length > 2048
+    || source.observation_schema !== 'kptas.browser-visible-inputs/v1'
+    || source.submission_video_match_verified !== true && source.submission_video_match_verified !== false
+    || typeof span.coordinate !== 'string' || span.coordinate !== 'zero-based selected-observation ordinal; inclusive start, exclusive end'
+    || span.timeline_mode !== 'selected-observations' || span.player_alignment_qualified !== false
+    || span.physical_inputs_complete !== false || !Number.isSafeInteger(from) || from < 0
+    || !Number.isSafeInteger(to) || to <= from || !Number.isSafeInteger(count) || count !== to - from
+    || packet.state_at_start.frame < 0 || packet.state_at_start.frame > from || !Number.isSafeInteger(packet.state_at_start.frame)) fail();
+
+  const laneIds = new Set();
+  for (const lane of packet.lanes) {
+    if (!isRecord(lane) || typeof lane.id !== 'string' || !lane.id || lane.id.length > 128 || laneIds.has(lane.id)
+      || typeof lane.label !== 'string' || !lane.label || lane.label.length > 256
+      || lane.score_token !== null && (typeof lane.score_token !== 'string' || lane.score_token.length > 64)) fail();
+    laneIds.add(lane.id);
+  }
+  const validateState = state => {
+    if (!Array.isArray(state?.held) || !Array.isArray(state?.unknown)) fail();
+    const held = new Set(state.held), unknown = new Set(state.unknown);
+    if (held.size !== state.held.length || unknown.size !== state.unknown.length
+      || [...held, ...unknown].some(id => !laneIds.has(id)) || [...held].some(id => unknown.has(id))) fail();
+  };
+  validateState(packet.state_at_start);
+  let previousFrame = from - 1;
+  let eventAtStart = null;
+  for (const event of packet.events) {
+    if (!isRecord(event) || !Number.isSafeInteger(event.frame) || event.frame < from || event.frame >= to
+      || event.frame <= previousFrame) fail();
+    validateState(event);
+    if (event.frame === from) eventAtStart = event;
+    previousFrame = event.frame;
+  }
+  const sameMembers = (left, right) => left.length === right.length && left.every(id => right.includes(id));
+  if (eventAtStart && (!sameMembers(eventAtStart.held, packet.state_at_start.held)
+    || !sameMembers(eventAtStart.unknown, packet.state_at_start.unknown))) fail();
+
+  let nextSelected = from;
+  const parts = packet.span.source_parts.map(part => {
+    if (!isRecord(part) || !Number.isSafeInteger(part.source_part) || part.source_part < 0
+      || part.excerpt_selected_from_frame !== nextSelected
+      || !Number.isSafeInteger(part.excerpt_selected_to_frame_exclusive)
+      || part.excerpt_selected_to_frame_exclusive <= part.excerpt_selected_from_frame
+      || part.excerpt_selected_to_frame_exclusive > to
+      || part.excerpt_frame_count !== part.excerpt_selected_to_frame_exclusive - part.excerpt_selected_from_frame
+      || !Number.isSafeInteger(part.excerpt_source_first_frame) || part.excerpt_source_first_frame < 0
+      || !Number.isSafeInteger(part.excerpt_source_first_frame + part.excerpt_frame_count - 1)
+      || part.excerpt_source_last_frame !== part.excerpt_source_first_frame + part.excerpt_frame_count - 1) fail();
+    nextSelected = part.excerpt_selected_to_frame_exclusive;
+    return {
+      source_part:part.source_part,
+      first_source_frame:part.excerpt_source_first_frame,
+      last_source_frame:part.excerpt_source_last_frame,
+      selected_frame_count:part.excerpt_frame_count,
+      selected_offset:part.excerpt_selected_from_frame - from,
+    };
+  });
+  if (nextSelected !== to) fail();
+
+  const state = packet.state_at_start;
+  const events = [{ frame:0, held:[...state.held], unknown:[...state.unknown], ...(state.source ? { source:state.source } : {}) }];
+  for (const event of packet.events) {
+    if (event.frame <= from) continue;
+    events.push({ frame:event.frame - from, held:[...event.held], unknown:[...event.unknown], ...(event.source ? { source:event.source } : {}) });
+  }
+  return {
+    schema:'kptas.browser-visible-inputs/v1', artifact:source.artifact_id,
+    local_import_kind:'excerpt',
+    read_only:true, projection_execution_disabled:true, replay_qualified:false,
+    physical_inputs_complete:false, timeline_mode:'selected-observations',
+    frame_count:count, source_frame_origin:from, source_frame_base:from,
+    nominal_source_fps:span.coordinate_fps,
+    source:{ ...source, video_sha256:null }, parts,
+    playback_alignment:{
+      player_alignment_qualified:false, game_frame_alignment_qualified:false,
+      game_input_sampling_boundary_qualified:false, physical_hold_semantics_qualified:false,
+      scope:packet.playback_alignment?.scope || null,
+    },
+    lanes:packet.lanes, events, binding_summary:packet.binding_summary || {},
+    provenance:{ source_assembly:`observation packet sha256 ${source.observation_sha256}` },
+    provenance_warnings:packet.provenance_warnings,
+  };
+}
+
+function normalizeVisibleObservation(packet) {
+  const fail = () => { throw new Error('Unsupported or incomplete read-only observation track.'); };
+  if (!isRecord(packet) || packet.schema !== 'kptas.browser-visible-inputs/v1'
+    || packet.timeline_mode !== 'selected-observations' || packet.read_only !== true
+    || packet.projection_execution_disabled !== true || packet.replay_qualified !== false
+    || packet.physical_inputs_complete !== false || !isRecord(packet.source) || !isRecord(packet.playback_alignment)
+    || !Array.isArray(packet.lanes) || !Array.isArray(packet.events) || !Array.isArray(packet.parts)
+    || packet.lanes.length < 1 || packet.lanes.length > 512 || packet.events.length < 1 || packet.events.length > 200000
+    || packet.parts.length < 1 || packet.parts.length > 4096) fail();
+  const { source, playback_alignment:alignment } = packet;
+  // Older acquired tracks store this source claim at the packet root.
+  // Preserve its value; conflicting locations cannot establish provenance.
+  const correspondence = source.source_primary_correspondence_verified
+    ?? packet.source_primary_correspondence_verified;
+  if (typeof correspondence !== 'boolean'
+    || Object.hasOwn(source, 'source_primary_correspondence_verified')
+      && source.source_primary_correspondence_verified !== correspondence
+    || Object.hasOwn(packet, 'source_primary_correspondence_verified')
+      && packet.source_primary_correspondence_verified !== correspondence) fail();
+  const origin = packet.source_frame_origin, count = packet.frame_count;
+  const range = source.observed_source_frame_range;
+  if (typeof packet.artifact !== 'string' || !packet.artifact || packet.artifact.length > 256
+    || !Number.isSafeInteger(origin) || origin < 0 || !Number.isSafeInteger(count) || count < 1
+    || !Number.isSafeInteger(origin + count) || !Array.isArray(range) || range.length !== 2
+    || range[0] !== origin || range[1] !== origin + count
+    || typeof source.run_id !== 'string' || !source.run_id || source.run_id.length > 128
+    || typeof source.runner !== 'string' || !source.runner || source.runner.length > 128
+    || typeof source.video_sha256 !== 'string' || !SHA256.test(source.video_sha256)
+    || !Number.isSafeInteger(source.video_bytes) || source.video_bytes < 1
+    || typeof source.frame_rate !== 'string' || !source.frame_rate || source.frame_rate.length > 32
+    || typeof source.source_video_url !== 'string' || source.source_video_url.length > 2048
+    || typeof source.submission_url !== 'string' || source.submission_url.length > 2048
+    || typeof source.source_relationship !== 'string' || !source.source_relationship
+    || alignment.player_alignment_qualified !== false || alignment.game_frame_alignment_qualified !== false
+    || alignment.game_input_sampling_boundary_qualified !== false || alignment.physical_hold_semantics_qualified !== false
+    || packet.events[0]?.frame !== 0) fail();
+
+  const laneIds = new Set();
+  for (const lane of packet.lanes) {
+    if (!isRecord(lane) || typeof lane.id !== 'string' || !lane.id || lane.id.length > 128 || laneIds.has(lane.id)
+      || typeof lane.label !== 'string' || !lane.label || lane.label.length > 256
+      || lane.score_token !== null && (typeof lane.score_token !== 'string' || lane.score_token.length > 64)) fail();
+    laneIds.add(lane.id);
+  }
+  const validateState = state => {
+    if (!Array.isArray(state?.held) || !Array.isArray(state?.unknown)) fail();
+    const held = new Set(state.held), unknown = new Set(state.unknown);
+    if (held.size !== state.held.length || unknown.size !== state.unknown.length
+      || [...held, ...unknown].some(id => !laneIds.has(id)) || [...held].some(id => unknown.has(id))) fail();
+  };
+  let previousFrame = -1;
+  for (const event of packet.events) {
+    if (!isRecord(event) || !Number.isSafeInteger(event.frame) || event.frame < 0 || event.frame >= count
+      || event.frame <= previousFrame) fail();
+    validateState(event);
+    previousFrame = event.frame;
+  }
+  let selected = 0, sourceFrame = origin;
+  for (const part of packet.parts) {
+    const partCount = part?.selected_frame_count;
+    if (!isRecord(part) || !Number.isSafeInteger(part.source_part) || part.source_part < 0
+      || !Number.isSafeInteger(partCount) || partCount < 1
+      || part.first_source_frame !== sourceFrame
+      || !Number.isSafeInteger(part.last_source_frame)
+      || part.last_source_frame !== part.first_source_frame + partCount - 1) fail();
+    selected += partCount;
+    sourceFrame += partCount;
+    if (!Number.isSafeInteger(selected) || !Number.isSafeInteger(sourceFrame)) fail();
+  }
+  if (selected !== count || sourceFrame !== origin + count) fail();
+  return { ...packet, source:{ ...source, source_primary_correspondence_verified:correspondence },
+    source_frame_base:origin, local_import_kind:'track' };
+}
+
+function normalizeArchivedObservation(packet) {
+  const fail = () => { throw new Error('Unsupported or incomplete read-only archived observation track.'); };
+  if (!isRecord(packet) || packet.schema !== 'kptas.browser-visible-inputs/v1'
+    || packet.timeline_mode !== 'selected-observations' || packet.frame_scope !== 'selected-observations'
+    || packet.read_only !== true || packet.projection_execution_disabled !== true
+    || packet.replay_qualified !== false || packet.physical_inputs_complete !== false
+    || packet.video_time_origin_qualified !== false || packet.global_clip_timeline_qualified !== false
+    || !isRecord(packet.playback_alignment) || packet.playback_alignment.qualified !== false
+    || !isRecord(packet.provenance) || !isRecord(packet.provenance.input_sha256)
+    || typeof packet.artifact !== 'string' || !packet.artifact || packet.artifact.length > 256
+    || typeof packet.source_video_url !== 'string' || packet.source_video_url.length > 2048
+    || !Number.isSafeInteger(packet.frame_count) || packet.frame_count < 1
+    || !Array.isArray(packet.lanes) || packet.lanes.length < 1 || packet.lanes.length > 512
+    || !Array.isArray(packet.events) || packet.events.length < 1 || packet.events.length > 200000
+    || packet.events[0]?.frame !== 0) fail();
+  const provenance = packet.provenance;
+  for (const key of ['player_alignment_qualified', 'game_frame_alignment_qualified', 'game_input_sampling_boundary_qualified', 'physical_hold_semantics_qualified']) {
+    if (Object.hasOwn(packet.playback_alignment, key) && packet.playback_alignment[key] !== false) fail();
+  }
+  if (typeof provenance.source_assembly !== 'string' || provenance.source_assembly.length > 2048) fail();
+  for (const key of ['source_import_manifest_sha256', 'source_assembly_manifest_sha256', 'source_spans_sha256', 'adapter_sha256']) {
+    if (typeof provenance[key] !== 'string' || !SHA256.test(provenance[key])) fail();
+  }
+  const inputHashes = Object.entries(provenance.input_sha256);
+  if (inputHashes.length < 1 || inputHashes.length > 128
+    || inputHashes.some(([key, value]) => !key || key.length > 256 || typeof value !== 'string' || !SHA256.test(value))) fail();
+  const laneIds = new Set();
+  for (const lane of packet.lanes) {
+    if (!isRecord(lane) || typeof lane.id !== 'string' || !lane.id || lane.id.length > 128 || laneIds.has(lane.id)
+      || typeof lane.label !== 'string' || !lane.label || lane.label.length > 256
+      || lane.score_token !== null && (typeof lane.score_token !== 'string' || lane.score_token.length > 64)) fail();
+    laneIds.add(lane.id);
+  }
+  let previousFrame = -1;
+  for (const event of packet.events) {
+    if (!isRecord(event) || !Number.isSafeInteger(event.frame) || event.frame < 0 || event.frame >= packet.frame_count
+      || event.frame <= previousFrame || !Array.isArray(event.held) || !Array.isArray(event.unknown)
+      || !isRecord(event.source)) fail();
+    const held = new Set(event.held), unknown = new Set(event.unknown);
+    if (held.size !== event.held.length || unknown.size !== event.unknown.length
+      || [...held, ...unknown].some(id => !laneIds.has(id)) || [...held].some(id => unknown.has(id))) fail();
+    const source = event.source;
+    for (const key of ['source_frame', 'source_part', 'source_local_frame', 'first_selected_frame', 'last_selected_frame']) {
+      if (!Number.isSafeInteger(source[key]) || source[key] < 0) fail();
+    }
+    if (source.first_selected_frame !== event.frame || source.last_selected_frame < event.frame
+      || source.last_selected_frame >= packet.frame_count || !Number.isSafeInteger(source.frame_count)
+      || source.frame_count !== source.last_selected_frame - source.first_selected_frame + 1
+      || !Number.isSafeInteger(source.decoder_pts)
+      || typeof source.decoder_time_base !== 'string' || !source.decoder_time_base || source.decoder_time_base.length > 128
+      || typeof source.source_clock_offset !== 'string' || source.source_clock_offset.length > 128) fail();
+    previousFrame = event.frame;
+  }
+  // Event origins identify observed state changes; they do not qualify a mapping for intervening frames.
+  return { ...packet, parts:[], source_frame_origin:0, source_frame_base:0, local_import_kind:'archived-track' };
+}
+
+function archivedProvenanceText(data) {
+  const p = data.provenance;
+  return `import manifest SHA-256 ${p.source_import_manifest_sha256}; assembly manifest SHA-256 ${p.source_assembly_manifest_sha256}; source-span SHA-256 ${p.source_spans_sha256}; adapter SHA-256 ${p.adapter_sha256}; ${Object.keys(p.input_sha256).length} input-artifact digest claims`;
+}
+
+function normalizeImportedEvidence(packet) {
+  if (packet?.schema === 'kptas.speedrun-segment-evidence/v1') return normalizeSegmentEvidence(packet);
+  if (packet?.schema === 'kptas.browser-visible-inputs/v1') {
+    return isRecord(packet.source) || Array.isArray(packet.parts)
+      ? normalizeVisibleObservation(packet) : normalizeArchivedObservation(packet);
+  }
+  throw new Error('This local file is not a supported read-only observation track or excerpt.');
+}
+
+function locateSourceFrame(data, frame) {
+  let nextOffset = 0;
+  for (const part of data.parts || []) {
+    const offset = Number.isSafeInteger(part.selected_offset) ? part.selected_offset
+      : Number.isSafeInteger(part.excerpt_selected_from_frame) && Number.isSafeInteger(data.source_frame_origin)
+        ? part.excerpt_selected_from_frame - data.source_frame_origin : nextOffset;
+    const count = part.selected_frame_count ?? part.excerpt_frame_count;
+    const first = part.first_source_frame ?? part.excerpt_source_first_frame;
+    if (Number.isSafeInteger(count) && count > 0 && Number.isSafeInteger(first)
+      && frame >= offset && frame < offset + count) {
+      return { source_part:part.source_part, source_frame:first + frame - offset };
+    }
+    nextOffset = offset + (Number.isSafeInteger(count) ? count : 0);
+  }
+  return null;
+}
 
 function element(tag, cls, text) {
   const node = document.createElement(tag);
@@ -144,6 +414,7 @@ export class SpeedrunPlayground {
     this.root = root;
     this.abort = new AbortController();
     this.revision = 0;
+    this.observationRevision = 0;
     this.markers = [];
     this.sourceOffset = 0;
   }
@@ -257,6 +528,24 @@ export class SpeedrunPlayground {
     this.observationOrigin.style.overflowWrap = 'anywhere';
     this.observationInspection.append(cellRow, this.bindingInfo, this.observationOrigin);
     inputDetails.append(this.observationInspection);
+    this.draftControls = element('div');
+    const draftStartLabel = element('label', 'speedrun-field', 'Draft start tick ');
+    this.draftStart = element('input', 'mono'); this.draftStart.type = 'number';
+    this.draftStart.min = '0'; this.draftStart.step = '1'; this.draftStart.value = '0';
+    this.draftStart.setAttribute('aria-label', 'Observation draft start tick');
+    draftStartLabel.append(this.draftStart);
+    const uncertaintyLabel = element('label', 'speedrun-field', 'Uncertainty ');
+    this.draftUncertainty = element('input'); this.draftUncertainty.maxLength = 512;
+    this.draftUncertainty.value = 'Game-frame alignment, physical inputs and sampling boundary are unqualified.';
+    this.draftUncertainty.setAttribute('aria-label', 'Observation draft uncertainty');
+    uncertaintyLabel.append(this.draftUncertainty);
+    this.draftPosition = element('p', 'mono help');
+    this.exportDraftButton = button('Export observation draft', () => this.exportObservationDraft());
+    this.draftControls.append(draftStartLabel, uncertaintyLabel, this.draftPosition,
+      element('p', 'help', 'Draft mapping uses one selected observation per draft tick. It is an authoring hypothesis. Source PTS and unknown inputs remain in the evidence; no executable score is created.'), this.exportDraftButton);
+    this.draftStart.addEventListener('input', () => this.update());
+    this.draftUncertainty.addEventListener('input', () => this.update());
+    inputDetails.append(this.draftControls);
     inputDetails.addEventListener('toggle', () => this.update());
     this.inputDetails = inputDetails;
     fragment.append(inputDetails);
@@ -272,9 +561,20 @@ export class SpeedrunPlayground {
       if (selected) this.openFile(selected);
     });
     upload.append(this.file);
+    const observationUpload = element('label', 'btn small file', 'Open read-only observation packet');
+    this.observationFile = element('input', 'file-in');
+    this.observationFile.type = 'file';
+    this.observationFile.accept = '.json,application/json';
+    observationUpload.title = 'Read a local review packet in this browser. It is not uploaded or sent to the TAS.';
+    this.observationFile.addEventListener('change', () => {
+      const selected = this.observationFile.files[0];
+      this.observationFile.value = '';
+      if (selected) void this.openObservationEvidence(selected);
+    });
+    observationUpload.append(this.observationFile);
     const exportMarks = button('Save marks', () => this.exportMarks());
     this.exportButton = exportMarks;
-    fileRow.append(this.streamButton, upload, exportMarks);
+    fileRow.append(this.streamButton, upload, observationUpload, exportMarks);
     fragment.append(fileRow);
     this.markList = element('div', 'speedrun-marks');
     this.markList.setAttribute('role', 'group');
@@ -293,10 +593,19 @@ export class SpeedrunPlayground {
 
   async select(index) {
     const revision = ++this.revision;
+    this.observationRevision++;
+    const observationRevision = this.observationRevision;
     this.transport?.dispose();
     this.transport = null;
     this.run = this.catalog[index];
+    this.catalogPlayerMatch = true;
+    this.observationImported = false;
+    this.streamButton.textContent = 'Open source player';
+    this.streamButton.title = 'Open source player';
     this.data = null;
+    this.observationPacket = null;
+    this.draftStart.value = '0';
+    this.draftUncertainty.value = 'Game-frame alignment, physical inputs and sampling boundary are unqualified.';
     this.observationFrame = 0;
     this.observationCell.replaceChildren();
     this.held.textContent = 'Loading visible observations.';
@@ -322,23 +631,135 @@ export class SpeedrunPlayground {
     this.status.textContent = 'Loading visible-input observations.';
     this.update();
     try {
-      const data = await readJSON(this.run.observations, this.abort.signal);
-      if (this.disposed || revision !== this.revision) return;
-      if (data.schema !== 'kptas.browser-visible-inputs/v1' || !Array.isArray(data.lanes) || !Array.isArray(data.events)) throw new Error('Unsupported observation data.');
-      if (data.timeline_mode === 'selected-observations' && (data.read_only !== true || data.projection_execution_disabled !== true || data.replay_qualified !== false || !Number.isSafeInteger(data.frame_count) || data.frame_count < 1 || data.events[0]?.frame !== 0)) throw new Error('This input-observation file is not supported.');
+      const rawData = await readJSON(this.run.observations, this.abort.signal);
+      if (this.disposed || revision !== this.revision || observationRevision !== this.observationRevision) return;
+      if (rawData?.schema !== 'kptas.browser-visible-inputs/v1' || !Array.isArray(rawData.lanes) || !Array.isArray(rawData.events)) throw new Error('Unsupported observation data.');
+      const data = rawData.timeline_mode === 'selected-observations' ? normalizeImportedEvidence(rawData) : rawData;
       this.data = data;
+      this.observationPacket = rawData;
       const independent = data.timeline_mode === 'selected-observations';
       if (independent) {
         this.description.textContent = 'Browse the observed inputs below. Open the video separately when you want to compare the footage.';
         this.observationCell.replaceChildren(...data.lanes.map(lane => new Option(lane.label, lane.id)));
         this.inputDetails.open = true;
+        const source = data.source && typeof data.source === 'object' ? data.source : {};
+        const alignment = data.playback_alignment && typeof data.playback_alignment === 'object' ? data.playback_alignment : {};
+        const digest = key => typeof source[key] === 'string' && SHA256.test(source[key]) ? source[key].toLowerCase() : 'unavailable';
+        const ranges = (data.parts || []).flatMap(part => {
+          const first = part.first_source_frame ?? part.excerpt_source_first_frame;
+          const last = part.last_source_frame ?? part.excerpt_source_last_frame;
+          if (!Number.isSafeInteger(first) || !Number.isSafeInteger(last) || last < first) return [];
+          const end = last + 1;
+          if (!Number.isSafeInteger(end)) return [];
+          return [`part ${part.source_part ?? '—'} [${first}, ${end})`];
+        });
+        const rangeSummary = ranges.length ? `${ranges.slice(0, 4).join('; ')}${ranges.length > 4 ? `; and ${ranges.length - 4} more parts` : ''}` : 'source frame mapping unavailable';
+        const ordinalStart = Number.isSafeInteger(data.source_frame_origin) ? data.source_frame_origin : 0;
+        const ordinalEnd = Number.isSafeInteger(data.frame_count) && Number.isSafeInteger(ordinalStart + data.frame_count) ? ordinalStart + data.frame_count : null;
+        const alignmentStatus = key => alignment[key] === true ? 'qualified' : 'not qualified';
+        this.sourceInfo.append(element('p', 'help', `Source-reported observation provenance: run ${source.run_id || 'unknown'} · video SHA-256 ${digest('video_sha256')} · observation SHA-256 ${digest('observation_sha256')} · catalog SHA-256 ${digest('catalog_sha256')} · selected ordinals [${ordinalStart}, ${ordinalEnd ?? 'unknown'}) · decoded source frames ${rangeSummary} · ${source.frame_rate || `${data.nominal_source_fps || 'unknown'} fps`}.`));
+        if (data.local_import_kind === 'archived-track') {
+          this.sourceInfo.append(element('p', 'help', `Archived track reports ${archivedProvenanceText(data)}. These claims are not authenticated by this viewer. Source mapping is recorded at state changes; no mapping between them is asserted.`));
+        }
+        this.sourceInfo.append(element('p', 'help', `Qualification: replay ${data.replay_qualified === true ? 'qualified' : 'not qualified'}; physical inputs ${data.physical_inputs_complete === true ? 'complete' : 'incomplete or unknown'}; player alignment ${alignmentStatus('player_alignment_qualified')}; game-frame alignment ${alignmentStatus('game_frame_alignment_qualified')}; input-sampling boundary ${alignmentStatus('game_input_sampling_boundary_qualified')}; physical hold semantics ${alignmentStatus('physical_hold_semantics_qualified')}.`));
       }
       this.status.textContent = `${data.frame_count.toLocaleString()} observed frames. ${independent ? 'Observations use a separate timeline from the video.' : 'Align the observation timeline with the video.'}`;
       this.update();
-    } catch (error) { if (!this.disposed && revision === this.revision) this.status.textContent = error.message; }
+    } catch (error) { if (!this.disposed && revision === this.revision && observationRevision === this.observationRevision) this.status.textContent = error.message; }
+  }
+
+  async openObservationEvidence(file, isCurrent = () => true) {
+    if (!isCurrent()) return false;
+    const request = ++this.observationRevision;
+    if (file.size > 64 * 1024 * 1024) {
+      this.status.textContent = 'Observation packet exceeds the 64 MiB local import limit.';
+      return false;
+    }
+    this.status.textContent = 'Reading observation evidence locally; the file is not uploaded.';
+    try {
+      const packet = JSON.parse(await file.text());
+      if (this.disposed || request !== this.observationRevision || !isCurrent()) return false;
+      const imported = unwrapObservationDraft(packet);
+      const data = normalizeImportedEvidence(imported.evidence);
+      const placement = imported.placement === null ? null : normalizeDraftPlacement(imported.placement, data.frame_count);
+      this.data = data;
+      this.observationPacket = imported.evidence;
+      this.observationImported = true;
+      this.draftStart.value = String(placement?.start_tick ?? 0);
+      this.draftUncertainty.value = placement?.uncertainty ?? 'Game-frame alignment, physical inputs and sampling boundary are unqualified.';
+      this.observationFrame = 0;
+      this.observationCell.replaceChildren(...data.lanes.map(lane => new Option(lane.label, lane.id)));
+      this.inputDetails.open = true;
+      const source = isRecord(data.source) ? data.source : {};
+      const archived = data.local_import_kind === 'archived-track';
+      const identity = archived ? `artifact ${data.artifact}` : `${source.runner} (${source.run_id})`;
+      const evidenceKind = data.local_import_kind === 'excerpt' ? 'excerpt' : 'track';
+      this.title.textContent = `${identity} · Read-only observations`;
+      this.description.textContent = `Read-only observation ${evidenceKind} from ${identity}. Player synchronization and executable input are unqualified.`;
+      this.sourceInfo.querySelector('[data-imported-evidence]')?.remove();
+      const importedInfo = element('div');
+      importedInfo.dataset.importedEvidence = 'true';
+      const reportedLink = archived ? archivedProvenanceText(data) : data.local_import_kind === 'excerpt'
+        ? `observation SHA-256 ${source.observation_sha256} and catalog SHA-256 ${source.catalog_sha256}; submission-video match ${source.submission_video_match_verified ? 'claimed verified' : 'reported unverified'}`
+        : `source-video SHA-256 ${source.video_sha256}; source/submission correspondence ${source.source_primary_correspondence_verified ? 'claimed verified' : 'not verified'}`;
+      importedInfo.append(element('p', 'help', `Imported file reports ${reportedLink}. These metadata claims are not independently authenticated by this viewer.`));
+      if (archived) importedInfo.append(element('p', 'help', 'This wrapper embeds no run or runner identity. Source mapping is recorded at state changes; no mapping between them is asserted.'));
+      if (typeof source.source_relationship === 'string') importedInfo.append(element('p', 'help', `Reported source relationship: ${source.source_relationship}`));
+      const sourceVideo = archived ? data.source_video_url : source.source_video_url;
+      // Matching reported URLs only chooses a catalog player; it does not
+      // authenticate a source or grant player/game/input alignment.
+      this.catalogPlayerMatch = !archived && typeof sourceVideo === 'string'
+        && sourceVideo === this.run.source_video_url
+        && typeof source.submission_url === 'string' && source.submission_url === this.run.submission_url;
+      this.streamButton.textContent = 'Open catalog player';
+      this.streamButton.title = 'Open catalog player';
+      if (!this.transport) this.view.textContent = this.catalogPlayerMatch
+        ? 'Open the catalog player or choose a local video.'
+        : 'Choose a local video or select a matching catalog entry.';
+      importedInfo.append(element('p', 'help', this.catalogPlayerMatch
+        ? 'Reported source and submission URLs match the selected catalog player. Player alignment remains unqualified.'
+        : 'The selected catalog player has no matching reported source and submission URLs. Select a matching catalog entry or open a local video.'));
+      if (typeof sourceVideo === 'string') importedInfo.append(element('p', 'help', `Reported source video: ${sourceVideo}`));
+      if (typeof source.submission_url === 'string') importedInfo.append(element('p', 'help', `Reported submission: ${source.submission_url}`));
+      this.sourceInfo.replaceChildren(importedInfo);
+      this.status.textContent = `${data.frame_count.toLocaleString()} read-only observation frames loaded${placement ? ' with draft authoring positions' : ''}. Replay is not qualified; no score was created or uploaded.`;
+      this.lastRoll = null;
+      this.update();
+      return true;
+    } catch (error) {
+      if (!this.disposed && request === this.observationRevision && isCurrent()) {
+        this.status.textContent = error instanceof Error ? error.message : 'Observation packet could not be read.';
+      }
+      return false;
+    }
+  }
+
+  exportObservationDraft() {
+    if (this.disposed || this.data?.timeline_mode !== 'selected-observations' || !this.observationPacket) return;
+    let url;
+    try {
+      const placement = normalizeDraftPlacement({ unit:'draft-tick', mapping:'one-selected-observation-per-draft-tick', qualified:false,
+        start_tick:this.draftStart.value.trim() ? Number(this.draftStart.value) : NaN,
+        uncertainty:this.draftUncertainty.value }, this.data.frame_count);
+      const draft = createObservationDraft(this.observationPacket, placement, this.data.frame_count);
+      const blob = new Blob([JSON.stringify(draft, null, 2)], { type:'application/json' });
+      if (blob.size > 64 * 1024 * 1024) throw new Error('The draft exceeds the 64 MiB local import limit.');
+      url = URL.createObjectURL(blob);
+      const link = element('a'); link.href = url;
+      link.download = `${String(this.data?.artifact || this.run?.id || 'observations').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0,128)}.reference-draft.json`;
+      this.root.append(link); link.click(); link.remove();
+      if (this.draftDownloadUrl) URL.revokeObjectURL(this.draftDownloadUrl);
+      this.draftDownloadUrl = url; url = null;
+      this.status.textContent = 'Observation draft download requested. Unknown inputs, source timing and provenance are retained. Replay remains unqualified.';
+    } catch (error) { this.status.textContent = error.message || 'The observation draft could not be exported.'; }
+    finally { if (url) URL.revokeObjectURL(url); }
   }
 
   async openStream() {
+    if (this.catalogPlayerMatch === false) {
+      this.status.textContent = 'The selected catalog player does not match the imported observation metadata.';
+      return;
+    }
     const revision = this.revision;
     this.transport?.dispose();
     const transport = new TwitchVideo();
@@ -439,10 +860,24 @@ export class SpeedrunPlayground {
     this.exportButton.disabled = !this.markers.length;
     this.stepBack.disabled = this.stepForward.disabled = !ready || !transport.canStepTime;
     this.rate.disabled = !ready || !transport.canStepTime;
-    this.metrics.textContent = transport ? transport.stats() : `${this.run?.source_dimensions.join('×') || '—'} • 60 fps source`;
+    this.streamButton.disabled = this.catalogPlayerMatch === false;
+    this.metrics.textContent = transport ? transport.stats() : this.observationImported
+      ? 'No source player open. Observation time and player alignment remain unqualified.'
+      : `${this.run?.source_dimensions.join('×') || '—'} • 60 fps source`;
     const independent = this.data?.timeline_mode === 'selected-observations';
     this.roll.setAttribute('aria-label', independent ? 'Visible keyboard and mouse observations near the selected frame' : 'Visible keyboard and mouse highlights near the estimated video frame');
     this.observationControls.hidden = this.observationInspection.hidden = !independent;
+    this.draftControls.hidden = !independent;
+    this.exportDraftButton.disabled = !independent || !this.observationPacket;
+    if (independent) {
+      try {
+        const placement = normalizeDraftPlacement({ unit:'draft-tick', mapping:'one-selected-observation-per-draft-tick', qualified:false,
+          start_tick:this.draftStart.value.trim() ? Number(this.draftStart.value) : NaN,
+          uncertainty:this.draftUncertainty.value }, this.data.frame_count);
+        const event = this.data.events[eventAt(this.data.events, this.observationFrame)];
+        this.draftPosition.textContent = `Draft tick ${placement.start_tick + this.observationFrame} · selected observation ${this.observationFrame + (this.data.source_frame_base || 0)} · ${describeObservationSourceClock(event, this.data.source_frame_base || 0)} · uncertainty: ${placement.uncertainty}`;
+      } catch (error) { this.draftPosition.textContent = error.message; this.exportDraftButton.disabled = true; }
+    }
     this.observedStart.hidden = this.alignmentLabel.hidden = independent;
     this.observedStart.disabled = !ready || !this.data;
     if (independent) {
@@ -474,10 +909,16 @@ export class SpeedrunPlayground {
           const lane = this.data.lanes.find(item => item.id === this.observationCell.value);
           if (lane) {
             const visible = event.unknown.includes(lane.id) ? 'visible state unknown' : event.held.includes(lane.id) ? 'visibly highlighted' : 'visibly inactive';
-            this.bindingInfo.textContent = `${lane.label}: ${visible}. ${lane.binding?.status === 'unresolved' ? lane.binding.detail : `Candidate score input: ${lane.score_token}. Verify its mapping and timing against the footage.`}`;
+            const binding = lane.binding?.status === 'unresolved' ? lane.binding.detail
+              : typeof lane.score_token === 'string' ? `Candidate score input: ${lane.score_token}. Verify its mapping and timing against the footage.`
+                : 'No score-input binding is established for this visual lane.';
+            this.bindingInfo.textContent = `${lane.label}: ${visible}. ${binding}`;
           }
-          const origin = event.source || {};
-          this.observationOrigin.textContent = `Source span starts at part ${origin.source_part ?? '—'}, local frame ${origin.source_local_frame ?? '—'}; native PTS ${origin.decoder_pts ?? '—'} (${origin.decoder_time_base || 'time base unavailable'}).${origin.recovery_artifact ? ` Recovery: ${origin.recovery_artifact}, frame ${origin.recovery_local_frame ?? '—'}.` : ''} Source assembly: ${this.data.provenance?.source_assembly || '—'}.`;
+          const mapped = locateSourceFrame(this.data, frame);
+          const changeOrigin = isRecord(event.source) ? event.source : {};
+          const origin = mapped || changeOrigin;
+          const changeFrame = event.frame + (this.data.source_frame_base || 0);
+          this.observationOrigin.textContent = `Source part ${origin.source_part ?? '—'} · decoded source frame ${origin.source_frame ?? origin.source_local_frame ?? '—'}${mapped ? '' : ` at observation state change ${changeFrame}`} · state-change PTS ${changeOrigin.decoder_pts ?? '—'} (${changeOrigin.decoder_time_base || 'time base unavailable'}).${changeOrigin.recovery_artifact ? ` Recovery: ${changeOrigin.recovery_artifact}, frame ${changeOrigin.recovery_local_frame ?? '—'}.` : ''} Source assembly: ${this.data.provenance?.source_assembly || '—'}.`;
         }
       }
       this.drawRoll(frame);
@@ -537,6 +978,8 @@ export class SpeedrunPlayground {
 
   dispose() {
     this.disposed = true;
+    if (this.draftDownloadUrl) URL.revokeObjectURL(this.draftDownloadUrl);
+    this.draftDownloadUrl = null; this.observationPacket = null;
     this.abort.abort();
     this.transport?.dispose();
     this.resize?.disconnect();

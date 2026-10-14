@@ -97,7 +97,10 @@ function mappedRange(ranges, value, length) {
 }
 // File layout is independent of import parsing and never describes live mappings.
 async function fileLayout(reader, header, is64, peOffset = null) {
-  const layout = { status:'unavailable', entries:[], reason:null };
+  const layout = { status:'unavailable', entries:[], reason:null,
+    scope:peOffset !== null
+      ? 'PE section headers; addresses are relative virtual addresses, not captured runtime mappings.'
+      : 'ELF load segments and section headers; declared virtual addresses are not captured runtime mappings.' };
   const read = metadataReader(reader);
   const little = peOffset !== null || header[5] === 1;
   const word = (bytes, at) => is64 ? u64(bytes, at, little) : BigInt(u32(bytes, at, little));
@@ -321,7 +324,74 @@ async function parseElf(reader, bytes) {
   });
 }
 
-function parseMachO(bytes, magic) {
+async function machMetadata(reader, header, is64, little) {
+  const layout = { status:'unavailable', entries:[], reason:null,
+    scope:'Thin Mach-O segment and section declarations only; nested filesets and live mappings are not inspected.' };
+  const metadata = { status:'unavailable', entryPoint:null, dependencies:[],
+    scope:'Mach-O dylib load-command names only; rpaths, symbols and runtime-loaded libraries are not resolved.' };
+  const read = metadataReader(reader);
+  const word = (bytes, at) => is64 ? u64(bytes, at, little) : BigInt(u32(bytes, at, little));
+  const nameOf = bytes => {
+    const end = bytes.indexOf(0);
+    return Array.from(end < 0 ? bytes : bytes.subarray(0, end), byte => byte >= 32 && byte < 127
+      ? String.fromCharCode(byte) : `\\x${byte.toString(16).padStart(2, '0')}`).join('') || '(unnamed)';
+  };
+  const add = (name, kind, virtualAddress, offset, fileSize, memorySize, permissions) => {
+    if (layout.entries.length >= 512) throw new Error('Mach-O layout exceeds 512 entries');
+    if (fileSize && (offset > BigInt(reader.size) || fileSize > BigInt(reader.size) - offset)) throw new Error('Mach-O file range is outside the file');
+    layout.entries.push({ name, kind, address:address(virtualAddress), offset:address(offset),
+      fileSize:fileSize.toString(), memorySize:memorySize.toString(), permissions });
+  };
+  let layoutError = null, dependencyError = null;
+  try {
+    const count = u32(header, 16, little), total = u32(header, 20, little), start = is64 ? 32 : 28;
+    if (count > MAX_TABLE_ENTRIES || total > MAX_METADATA_BYTES || total > reader.size - start) throw new Error('Mach-O command table exceeds file or inspection limits');
+    let offset = start;
+    for (let i = 0; i < count; i++) {
+      if (start + total - offset < 8) throw new Error('Mach-O command header is truncated');
+      const head = await read(offset, 8), cmd = u32(head, 0, little), size = u32(head, 4, little);
+      if (size < 8 || size % (is64 ? 8 : 4) || size > start + total - offset) throw new Error('Mach-O command size or alignment is invalid');
+      if (cmd === 1 || cmd === 0x19) {
+        try {
+          if ((cmd === 0x19) !== is64) throw new Error('Mach-O segment width differs from header width');
+          const fixed = is64 ? 72 : 56, stride = is64 ? 80 : 68;
+          if (size < fixed) throw new Error('Mach-O segment command is truncated');
+          const segment = await read(offset, fixed), sections = u32(segment, is64 ? 64 : 48, little);
+          if (sections > MAX_TABLE_ENTRIES || sections * stride > size - fixed) throw new Error('Mach-O section table exceeds command or inspection limits');
+          const protection = u32(segment, is64 ? 60 : 44, little);
+          add(nameOf(segment.subarray(8, 24)), 'Mach-O segment · declared VA', word(segment, 24), word(segment, is64 ? 40 : 32),
+            word(segment, is64 ? 48 : 36), word(segment, is64 ? 32 : 28), `init_prot=0x${protection.toString(16)}`);
+          for (let section = 0; section < sections; section++) {
+            const row = await read(offset + fixed + section * stride, stride), flags = u32(row, is64 ? 64 : 56, little);
+            const zeroFill = [1, 0xc, 0x12].includes(flags & 0xff), length = word(row, is64 ? 40 : 36);
+            add(`${nameOf(row.subarray(16, 32))}/${nameOf(row.subarray(0, 16))}`,
+              zeroFill ? 'Mach-O section · declared VA · zero fill' : 'Mach-O section · declared VA',
+              word(row, 32), BigInt(u32(row, is64 ? 48 : 40, little)), zeroFill ? 0n : length, length, `flags=0x${flags.toString(16)}`);
+          }
+        } catch (error) { layoutError ||= error.message; }
+      } else if ([0xc, 0x80000018, 0x8000001f, 0x20, 0x80000023].includes(cmd)) {
+        try {
+          if (size < 24) throw new Error('Mach-O dylib command is truncated');
+          const command = await read(offset, 24), name = u32(command, 8, little);
+          if (name < 24 || name >= size || metadata.dependencies.length >= MAX_TABLE_ENTRIES) throw new Error('Mach-O dylib name offset or count is invalid');
+          metadata.dependencies.push(await dependencyName(read, offset + name, size - name));
+        } catch (error) { dependencyError ||= error.message; }
+      }
+      offset += size;
+    }
+    if (offset !== start + total) throw new Error('Mach-O command count does not cover its declared byte span');
+    layout.status = layoutError ? layout.entries.length ? 'partial' : 'unavailable' : 'available';
+    metadata.status = dependencyError ? metadata.dependencies.length ? 'partial' : 'unavailable' : 'available';
+  } catch (error) {
+    layoutError ||= error.message; dependencyError ||= error.message;
+    layout.status = layout.entries.length ? 'partial' : 'unavailable';
+    metadata.status = metadata.dependencies.length ? 'partial' : 'unavailable';
+  }
+  layout.reason = layoutError; if (dependencyError) metadata.reason = dependencyError;
+  return { layout, metadata };
+}
+
+function classifyMachO(bytes, magic) {
   const little = magic === 'cefaedfe' || magic === 'cffaedfe';
   const is64 = magic === 'cffaedfe' || magic === 'feedfacf';
   if (bytes.length < (is64 ? 32 : 28)) return result('unknown', null, null, null, 'truncated-mach-o-header');
@@ -331,6 +401,63 @@ function parseMachO(bytes, magic) {
     widthMismatch ? 'cpu-header-width-mismatch' : architecture ? 'abi-not-in-header' : 'unknown-mach-o-cpu', {
     byteOrder:little ? 'little' : 'big', evidence:['Mach-O magic', `CPU type 0x${cpu.toString(16)}`],
   });
+}
+
+async function parseMachO(reader, bytes, magic) {
+  const identity = classifyMachO(bytes, magic);
+  if (!identity.format) return identity;
+  const tables = await machMetadata(reader, bytes, identity.format === 'macho64', identity.byteOrder === 'little');
+  return { ...identity, ...tables };
+}
+
+async function wasmLayout(reader) {
+  const layout = { status:'unavailable', entries:[], reason:null,
+    scope:'WebAssembly section file spans and bounded custom names only; contents, ordering, imports and executable validity are not validated.' };
+  const read = metadataReader(reader);
+  const labels = ['Custom', 'Type', 'Import', 'Function', 'Table', 'Memory', 'Global',
+    'Export', 'Start', 'Element', 'Code', 'Data', 'Data count', 'Tag'];
+  const leb32 = (bytes, offset) => {
+    let value = 0n;
+    for (let i = 0; i < 5; i++) {
+      if (offset + i >= bytes.length) throw new Error('Wasm section integer is truncated');
+      const byte = bytes[offset + i];
+      value |= BigInt(byte & 0x7f) << BigInt(i * 7);
+      if (!(byte & 0x80)) {
+        if (value > 0xffffffffn) throw new Error('Wasm section integer exceeds u32');
+        return { value:Number(value), size:i + 1 };
+      }
+    }
+    throw new Error('Wasm section integer exceeds five bytes');
+  };
+  try {
+    let offset = 8;
+    while (offset < reader.size) {
+      if (layout.entries.length >= MAX_TABLE_ENTRIES) throw new Error('Wasm section count exceeds 256');
+      const header = await read(offset, Math.min(6, reader.size - offset));
+      const id = header[0], length = leb32(header, 1), body = offset + 1 + length.size;
+      if (length.value > reader.size - body) throw new Error('Wasm section extends beyond the file');
+      let name = labels[id] || `Unknown section id ${id}`;
+      if (id === 0) {
+        const prefix = await read(body, Math.min(5, length.value)), declaredName = leb32(prefix, 0);
+        if (declaredName.value > MAX_NAME_BYTES - 1 || declaredName.value > length.value - declaredName.size) {
+          throw new Error('Wasm custom name exceeds its section or inspection limit');
+        }
+        const bytes = await read(body + declaredName.size, declaredName.value);
+        new TextDecoder('utf-8', { fatal:true }).decode(bytes);
+        const escaped = Array.from(bytes, byte => byte >= 32 && byte < 127
+          ? String.fromCharCode(byte) : `\\x${byte.toString(16).padStart(2, '0')}`).join('');
+        name = `Custom · ${escaped || '(empty name)'}`;
+      }
+      layout.entries.push({ name, kind:`Wasm section id ${id} · file span`, address:'Unavailable',
+        offset:address(BigInt(offset)), fileSize:String(1 + length.size + length.value),
+        memorySize:'Unavailable', permissions:'Unavailable' });
+      offset = body + length.value;
+    }
+    layout.status = 'available';
+  } catch (error) {
+    layout.status = layout.entries.length ? 'partial' : 'unavailable'; layout.reason = error.message;
+  }
+  return layout;
 }
 
 async function parseFat(reader, firstFour) {
@@ -361,7 +488,7 @@ async function parseFat(reader, firstFour) {
     if (!sliceHeader || sliceHeader.length !== sliceSize || sliceHeader.length < 4) return result('unknown', null, null, null, 'truncated-fat-slice-header');
     const sliceMagic = hexMagic(sliceHeader.subarray(0, 4));
     if (!['cefaedfe', 'feedface', 'cffaedfe', 'feedfacf'].includes(sliceMagic)) return result('unknown', null, null, null, 'invalid-fat-slice-magic');
-    const sliceIdentity = parseMachO(sliceHeader, sliceMagic);
+    const sliceIdentity = classifyMachO(sliceHeader, sliceMagic);
     if (sliceIdentity.reason === 'truncated-mach-o-header') return result('unknown', null, null, null, 'truncated-fat-slice-header');
     if (sliceIdentity.evidence?.[1] !== `CPU type 0x${cpu.toString(16)}`) return result('ambiguous', 'macho-fat', null, null, 'fat-slice-cpu-mismatch');
     if (sliceIdentity.reason === 'cpu-header-width-mismatch') return result('ambiguous', 'macho-fat', null, null, 'fat-slice-width-mismatch');
@@ -383,7 +510,7 @@ async function parseFat(reader, firstFour) {
 }
 
 /**
- * Classify a Blob/File, ArrayBuffer, or typed-array view from format headers and bounded PE/ELF dependency tables.
+ * Classify a Blob/File, ArrayBuffer, or typed-array view from headers and bounded PE/ELF/Mach-O/Wasm metadata.
  * Resolves to telos.binary-identity/v1. `status` is identified, ambiguous, or
  * unknown; absent format, architecture, and ABI facts are null (never guessed).
  * `format` values are pe32, pe32+, pe (unknown PE optional header), elf32,
@@ -403,11 +530,12 @@ export async function identifyBinaryHeader(input) {
       if (first.length < 8) return result('unknown', null, null, null, 'truncated-wasm-header');
       const version = u32(first, 4, true);
       return version === 1
-        ? result('ambiguous', 'wasm', null, null, 'architecture-and-abi-not-in-header', { byteOrder:'little', evidence:['WebAssembly magic', 'core module version 1'] })
+        ? result('ambiguous', 'wasm', null, null, 'architecture-and-abi-not-in-header', {
+          byteOrder:'little', evidence:['WebAssembly magic', 'core module version 1'], layout:await wasmLayout(reader) })
         : result('unknown', null, null, null, 'unsupported-wasm-version');
     }
     const magic = hexMagic(first.subarray(0, 4));
-    if (['cefaedfe', 'feedface', 'cffaedfe', 'feedfacf'].includes(magic)) return parseMachO(first, magic);
+    if (['cefaedfe', 'feedface', 'cffaedfe', 'feedfacf'].includes(magic)) return await parseMachO(reader, first, magic);
     if (['cafebabe', 'bebafeca', 'cafebabf', 'bfbafeca'].includes(magic)) return await parseFat(reader, first.subarray(0, 4));
     return result('unknown', null, null, null, 'unrecognized-magic');
   } catch {

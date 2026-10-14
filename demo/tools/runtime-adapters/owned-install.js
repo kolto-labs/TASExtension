@@ -185,6 +185,15 @@ async function receiveOwnedFileSnapshots(manifest) {
 let ownedProfileFlushReady = false;
 let ownedProfileSyncInFlight = null;
 let ownedProfileSyncTimer = null;
+function describeOwnedProfileSyncError(error) {
+  const name = typeof error?.name === 'string'
+    ? error.name.replace(/[\x00-\x1f\x7f]/g, '').slice(0, 80) : 'Error';
+  const errno = Number.isSafeInteger(error?.errno) && error.errno >= 0 && error.errno <= 4096
+    ? `; errno=${error.errno}` : '';
+  const message = typeof error?.message === 'string'
+    ? error.message.replace(/[\x00-\x1f\x7f]/g, ' ').slice(0, 512) : '';
+  return `Browser profile sync failed (${name || 'Error'}${errno})${message ? ': ' + message : '.'}`;
+}
 function syncOwnedProfile() {
   if (!ownedProfileFlushReady) return Promise.reject(new Error('The browser profile is not ready to save.'));
   const previous = ownedProfileSyncInFlight;
@@ -198,7 +207,7 @@ function syncOwnedProfile() {
 }
 function syncOwnedProfileInBackground() {
   if (!ownedProfileFlushReady || ownedProfileSyncInFlight) return;
-  syncOwnedProfile().catch(error => console.warn('KOTOR profile background sync failed:', error));
+  syncOwnedProfile().catch(error => console.warn(describeOwnedProfileSyncError(error)));
 }
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') syncOwnedProfileInBackground();
@@ -207,7 +216,7 @@ addEventListener('pagehide', syncOwnedProfileInBackground);
 addEventListener('message', event => {
   if (parent === window || !telosParentOrigin || event.source !== parent || event.origin !== telosParentOrigin || event.data?.type !== 'telos-flush-profile' || typeof event.data.request !== 'string') return;
   const request = event.data.request;
-  const reply = error => parent.postMessage({ type:'telos-profile-flushed', request, ok:!error, error:error ? String(error) : null }, telosParentOrigin);
+  const reply = error => parent.postMessage({ type:'telos-profile-flushed', request, ok:!error, error:error ? describeOwnedProfileSyncError(error) : null }, telosParentOrigin);
   if (!ownedProfileFlushReady) { reply(new Error('The browser profile is not ready to save. Keep this runtime open and retry.')); return; }
   syncOwnedProfile().then(() => reply(null), error => reply(error || new Error('The browser profile could not be saved.')));
 });
@@ -255,9 +264,11 @@ async function mountOwnedInstall() {
   // Keep synchronous guest reads within the browser-verified 64 KiB block.
   // Larger loopback ranges can fail inside sync XHR before the game draws.
   const chunkSize = 64 * 1024;
-  // User-selected Blob snapshots still use x-user-defined text because some
-  // Chromium builds truncate synchronous Blob-XHR responses. Server ranges
-  // use binary ArrayBuffer responses below and never adapt down to tiny reads.
+  // User-selected Blob snapshots still use 16 KiB x-user-defined text slices
+  // because some Chromium builds truncate synchronous Blob-XHR responses.
+  // For loopback HTTP, consume the original range response as text when the
+  // synchronous window context rejects ArrayBuffer mode; retry in slices only
+  // when that first response is actually short.
   const maxSnapshotTextSlice = 16_000;
   // Retain more of KOTOR's repeatedly probed BIF ranges; the small cache was
   // evicting player.bif during scene-load scans and forcing sync HTTP rereads.
@@ -366,17 +377,23 @@ async function mountOwnedInstall() {
           if (!(request.response instanceof ArrayBuffer)) throw readFailure(file, 'binary range response was not an ArrayBuffer');
           bytes = new Uint8Array(request.response);
         } else {
-          text = readTextSlices(file, start, end, (cursor, next) => {
-            const fallback = new XMLHttpRequest();
-            fallback.open('GET', file.url, false);
-            fallback.overrideMimeType('text/plain; charset=x-user-defined');
-            fallback.setRequestHeader('Range', `bytes=${cursor}-${next - 1}`);
-            fallback.send();
-            io.requests++;
-            const fallbackRange = `bytes ${cursor}-${next - 1}/${file.bytes}`;
-            if (fallback.status !== 206 || fallback.getResponseHeader('Content-Range') !== fallbackRange) throw readFailure(file, `range rejected, HTTP ${fallback.status}, ${fallbackRange}`);
-            return fallback.responseText;
-          });
+          text = request.responseText;
+          const requestedBytes = end - start + 1;
+          if (text.length > requestedBytes) throw readFailure(file, `oversized range, ${text.length} bytes instead of ${requestedBytes}`);
+          if (text.length < requestedBytes) {
+            io.shortReads++; io.readRetries++;
+            text = readTextSlices(file, start, end, (cursor, next) => {
+              const fallback = new XMLHttpRequest();
+              fallback.open('GET', file.url, false);
+              fallback.overrideMimeType('text/plain; charset=x-user-defined');
+              fallback.setRequestHeader('Range', `bytes=${cursor}-${next - 1}`);
+              fallback.send();
+              io.requests++;
+              const fallbackRange = `bytes ${cursor}-${next - 1}/${file.bytes}`;
+              if (fallback.status !== 206 || fallback.getResponseHeader('Content-Range') !== fallbackRange) throw readFailure(file, `range rejected, HTTP ${fallback.status}, ${fallbackRange}`);
+              return fallback.responseText;
+            });
+          }
         }
       }
       if (snapshot && text.length !== end - start + 1) throw readFailure(file, `short range, ${text.length} bytes instead of ${end - start + 1}`);

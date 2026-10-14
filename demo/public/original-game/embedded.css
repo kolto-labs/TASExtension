@@ -5,6 +5,10 @@ body { background:#080c10; color:#ced8e0; margin:0; }
 #loading { position:absolute; inset:0 0 auto; z-index:2; }
 #console { position:absolute; right:0; bottom:0; width:auto; max-width:calc(100% - 1rem); margin:.5rem; z-index:2; background:#080c10; } #console summary { cursor:pointer; }
 #console[open] { left:0; }
+#game-recording { position:absolute; top:0; right:0; z-index:3; max-width:calc(100% - 1rem); margin:.5rem; padding:.35rem; background:#080c10; font:12px system-ui; }
+#game-recording button { margin:.15rem; }
+#game-recording summary { cursor:pointer; }
+#game-recording [role=status] { display:block; max-width:28rem; padding:.2rem; }
 #dropzone { padding:0; }
 #dropzone div.emscripten_border { border:0; flex:none; width:min(100vw, calc(100vh * var(--boxedwine-canvas-aspect))); }
 
@@ -13,3 +17,4 @@ body { background:#080c10; color:#ced8e0; margin:0; }
    guest present that removes the startup cover. */
 .game-starting #loading { display:none; }
 #game-startup { position:absolute; inset:0; z-index:4; display:grid; place-items:center; min-height:100%; padding:24px; box-sizing:border-box; color:#ced8e0; background:#080c10; font:14px system-ui; pointer-events:none; }
+#game-startup[hidden] { display:none; }

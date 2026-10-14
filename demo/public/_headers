@@ -20,6 +20,12 @@
 /js/*
   Cache-Control: public, max-age=300, must-revalidate
 
+/packages/*
+  Cache-Control: no-store
+
+/debugger/*
+  Cache-Control: no-store
+
 /favicon.svg
   Cache-Control: public, max-age=86400
 
@@ -33,6 +39,9 @@
 
 /js/original-game.js
   Cache-Control: no-store
+
+/original-game/recordings.html
+  Content-Security-Policy: default-src 'none'; script-src 'self'; style-src 'self'; media-src blob:; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'
 
 /js/original-game-entry.js
   Cache-Control: no-store

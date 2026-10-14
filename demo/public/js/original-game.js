@@ -1,5 +1,9 @@
 import { DEFAULT_GAME_PROFILE, gameProfileById, identifyGameProfile } from './game-profiles.js';
 import { GameStartup } from './game-startup.js';
+import { normalizeMappedFileCapture } from '../debugger/mapped-file-capture.js';
+import { normalizeGuestGlErrorReplies } from '../debugger/guest-gl-error-replies.js';
+import { normalizeHostGlQueryOutputs } from '../debugger/host-gl-query-outputs.js';
+import { mountAudioObservationDownload } from './audio-observation-download.js';
 
 // Supported game profiles share this runtime path; assets stay in the selected install.
 const DIRECTORIES = new Set(['data', 'texturepacks', 'modules', 'rims', 'lips', 'movies', 'streammusic', 'streamsounds', 'streamwaves', 'sounds', 'music', 'override', 'miles']);
@@ -20,6 +24,10 @@ const guestTraceRequested = LOCAL_AUTO_INSTALL
   && new URLSearchParams(location.search).get('guestTrace') === '1';
 const ioTraceRequested = LOCAL_AUTO_INSTALL
   && new URLSearchParams(location.search).get('ioTrace') === '1';
+// Sparse SDK timing is opt-in for a future loopback launch. It never changes
+// the environment of an already-running guest or a published runtime.
+const glDispatchTimingRequested = LOCAL_AUTO_INSTALL
+  && new URLSearchParams(location.search).get('glDispatchTiming') === '1';
 // BoxedWine documents this workaround for older multi-threaded games. Keep it
 // an explicit loopback-only launch experiment until KOTOR acceptance confirms it.
 const cpuAffinityRequested = LOCAL_AUTO_INSTALL
@@ -32,7 +40,8 @@ function runtimeStorageMode() {
   const requested = new URLSearchParams(location.search).get('runtimeStorage')?.trim().toLowerCase();
   return requested === 'memory' ? 'memory' : 'indexed_db';
 }
-const TAS_KEYS = new Set(['w','a','s','d','q','e','space','tab','esc','enter','up','down','left','right','1','2','3','4','5','6','7','8','9']);
+const TAS_BASE_KEYS = Object.freeze(['w','a','s','d','q','e','space','tab','esc','enter','up','down','left','right','1','2','3','4','5','6','7','8','9']);
+const TAS_KEYS = new Set([...TAS_BASE_KEYS, 'i']);
 const MAX_REPORTED_THREADS = 1_000_000;
 function validVmCounter(value, maximum = Number.MAX_SAFE_INTEGER) {
   return Number.isSafeInteger(value) && value >= 0 && value <= maximum;
@@ -44,7 +53,7 @@ function normalizeVmCommandProvenance(value) {
       || value.recentTransitions.length > 8) return null;
   const normalizeCommand = (command, transition = false) => {
     if (!command || !validVmCounter(command.id) || command.id === 0 || !validVmCounter(command.atMs)
-        || !['vm-control','score-input'].includes(command.source)
+        || !['vm-control','score-input','score-alignment'].includes(command.source)
         || !['pause','resume','step'].includes(command.action)
         || !['dispatched','admitted','completed','failed','timed-out','superseded'].includes(command.phase)
         || !['pending','completed','failed','timed-out','superseded'].includes(command.outcome)
@@ -98,19 +107,81 @@ function normalizeVmStatus(value) {
     && validVmCounter(rawDispatch.callbackMicros);
   if (hasThreadCounts && !validThreadCounts) return null;
   if (value.presents !== null && !validPresents) return null;
+  const rawStates = value.threadStateCounts;
+  const stateKeys = ['starting','running','kernelWait','paused','exiting'];
+  const validStates = rawStates && typeof rawStates === 'object' && !Array.isArray(rawStates)
+    && stateKeys.every(key => validVmCounter(rawStates[key], 4096))
+    && validVmCounter(rawStates.total, 4096)
+    && stateKeys.reduce((sum, key) => sum + rawStates[key], 0) === rawStates.total;
+  const rawIo = value.assetIo;
+  const ioKeys = ['requests','bytes','cacheHits','failures','shortReads','readRetries',
+    'residentBytes','cacheEntries','filesRead'];
+  const validIo = rawIo && typeof rawIo === 'object' && !Array.isArray(rawIo)
+    && ioKeys.every(key => validVmCounter(rawIo[key]))
+    && Number.isFinite(rawIo.milliseconds) && rawIo.milliseconds >= 0
+    && rawIo.milliseconds <= Number.MAX_SAFE_INTEGER;
+  const gl = value.glCounts;
+  const validGl = value.state === 'paused' && validThreadCounts && value.activeThreads > 0
+    && value.activeThreads === value.parkedThreads && ['telos.paused-gl-counts/v1', 'telos.paused-gl-counts/v2'].includes(gl?.schema)
+    && validVmCounter(gl.slots, 4096) && gl.slots > 0 && validVmCounter(gl.nonzero, gl.slots)
+    && Array.isArray(gl.entries) && gl.entries.length === (gl.schema === 'telos.paused-gl-counts/v2' ? gl.nonzero : Math.min(gl.nonzero, 16))
+    && gl.truncated === (gl.nonzero > gl.entries.length)
+    && gl.entries.every((entry, index, entries) => validVmCounter(entry?.index, gl.slots - 1)
+      && validVmCounter(entry?.count) && entry.count > 0
+      && typeof entry.name === 'string' && /^[\x20-\x7e]{1,127}$/.test(entry.name)
+      && (!index || entries[index - 1].count > entry.count
+        || (entries[index - 1].count === entry.count && entries[index - 1].index < entry.index)))
+    && new Set(gl.entries.map(entry => entry.index)).size === gl.entries.length;
+  const progress = value.dispatchProgress;
+  const validProgress = ['pausing','paused'].includes(value.state) && progress?.schema === 'telos.published-dispatch-progress/v1'
+    && progress.semantics === 'best-effort-published-trace' && Array.isArray(progress.entries) && progress.entries.length <= 64
+    && Array.from(progress.entries).every(entry => entry && ['tid','pid','entryEip','reportedEip','tableIndex','sequence','ageMs'].every(key => validVmCounter(entry[key], 0xffffffff))
+      && entry.tid > 0 && typeof entry.kernelWait === 'boolean')
+    && new Set(progress.entries.map(entry => entry.tid)).size === progress.entries.length;
   return Object.freeze({
     state:value.state,
+    guestGlErrorReplies:value.state === 'paused' && validThreadCounts && value.activeThreads > 0
+      && value.activeThreads === value.parkedThreads ? normalizeGuestGlErrorReplies(value.guestGlErrorReplies) : null,
+    hostGlQueryOutputs:value.state === 'paused' && validThreadCounts && value.activeThreads > 0
+      && value.activeThreads === value.parkedThreads ? normalizeHostGlQueryOutputs(value.hostGlQueryOutputs) : null,
     unit:value.unit,
     activeThreads:validThreadCounts ? value.activeThreads : null,
     parkedThreads:validThreadCounts ? value.parkedThreads : null,
+    // This is one control-map snapshot; legacy totals are separate observations.
+    threadStateCounts:validStates ? Object.freeze({starting:rawStates.starting,
+      running:rawStates.running,kernelWait:rawStates.kernelWait,paused:rawStates.paused,
+      exiting:rawStates.exiting,total:rawStates.total}) : null,
+    dispatchProgress:validProgress ? Object.freeze({schema:progress.schema,semantics:progress.semantics,
+      entries:Object.freeze(progress.entries.map(entry => Object.freeze({tid:entry.tid,pid:entry.pid,
+        entryEip:entry.entryEip,reportedEip:entry.reportedEip,tableIndex:entry.tableIndex,
+        sequence:entry.sequence,ageMs:entry.ageMs,kernelWait:entry.kernelWait})))}) : null,
     presents:validPresents ? value.presents : null,
     sdlDispatch:validDispatch ? Object.freeze({
       calls:rawDispatch.calls,
       callerMicros:rawDispatch.callerMicros,
       callbackMicros:rawDispatch.callbackMicros,
     }) : null,
+    // Optional cumulative counters from the existing private file owner.
+    // Invalid or absent telemetry cannot invalidate execution controls.
+    assetIo:validIo ? Object.freeze({ schema:'telos.owned-file-io/v1',
+      ...Object.fromEntries(ioKeys.map(key => [key, rawIo[key]])),
+      milliseconds:rawIo.milliseconds }) : null,
+    glCounts:validGl ? Object.freeze({ schema:gl.schema, slots:gl.slots, nonzero:gl.nonzero,
+      truncated:gl.truncated,
+      sampleInterval:validVmCounter(gl.sampleInterval, 4096) && gl.sampleInterval > 0 ? gl.sampleInterval : null,
+      timingReadScope:validVmCounter(gl.sampleInterval, 4096) && gl.sampleInterval > 0
+        && gl.schema === 'telos.paused-gl-counts/v2' && !gl.truncated
+        && gl.timingReadScope === 'all-nonzero-entries' ? gl.timingReadScope : null,
+      entries:Object.freeze(gl.entries.map(entry => Object.freeze({index:entry.index, name:entry.name, count:entry.count,
+        timing:validVmCounter(gl.sampleInterval, 4096) && gl.sampleInterval > 0
+          && entry.timing && typeof entry.timing === 'object' && !Array.isArray(entry.timing)
+          && ['samples','callerMicros','callbackMicros'].every(key => validVmCounter(entry.timing[key]))
+          && entry.timing.samples <= entry.count
+          ? Object.freeze({ samples:entry.timing.samples, callerMicros:entry.timing.callerMicros,
+            callbackMicros:entry.timing.callbackMicros }) : null }))) }) : null,
     commandProvenance:normalizeVmCommandProvenance(value.commandProvenance),
     error:typeof value.error === 'string' ? value.error.slice(0, 240) : null,
+    lastControlError:typeof value.lastControlError === 'string' ? value.lastControlError.slice(0, 240) : null,
   });
 }
 function normalizeTasInput(detail) {
@@ -121,7 +192,8 @@ function normalizeTasInput(detail) {
   const mouse = detail.mouse === null ? null : detail.mouse;
   if (mouse !== null && (!mouse || !Number.isSafeInteger(mouse.x) || !Number.isSafeInteger(mouse.y) || mouse.x < 0 || mouse.x > 9999 || mouse.y < 0 || mouse.y > 9999)) return null;
   const hz = Number.isFinite(detail.hz) ? Math.max(10, Math.min(240, detail.hz)) : 60;
-  return { tick:detail.tick, hz, keys, buttons, mouse };
+  return Object.freeze({ tick:detail.tick, hz, keys:Object.freeze(keys), buttons:Object.freeze(buttons),
+    mouse:mouse === null ? null : Object.freeze({x:mouse.x,y:mouse.y}) });
 }
 function assetName(name) {
   const parts = name.replaceAll('\\', '/').split('/');
@@ -284,8 +356,13 @@ async function selectedRuntime() {
   // qualification. A published host requires the separately approved release.
   const local = ['127.0.0.1', 'localhost', '[::1]'].includes(location.hostname);
   const publicTransport = new URLSearchParams(location.search).get('originalRootTransport') === 'public';
+  const candidate = new URLSearchParams(location.search).get('runtimeCandidate');
+  if (candidate !== null && (!local || publicTransport || !/^[0-9a-f]{64}$/.test(candidate))) {
+    throw new Error('Runtime candidates require a localhost address and a full release identifier.');
+  }
   const controller = new AbortController();
-  const descriptorPath = `/original-game/runtime-${local && !publicTransport ? 'local' : 'qualified'}.json`;
+  const descriptorPath = candidate !== null ? `/original-game/runtime-candidates/${candidate}.json`
+    : `/original-game/runtime-${local && !publicTransport ? 'local' : 'qualified'}.json`;
   // Loopback may be served from a cold local checkout. Give that small
   // descriptor a finite but realistic deadline; retain the shorter
   // public-host deadline and the existing release qualification policy.
@@ -307,13 +384,15 @@ async function selectedRuntime() {
       throw error;
     }
     if (runtime.schema !== 'telos.original-runtime/v1' || !/^[0-9a-f]{64}$/.test(runtime.release || '') || runtime.entry !== `/original-game/runtime-releases/${runtime.release}/game-runtime.html` || typeof runtime.qualified !== 'boolean') throw new Error('KOTOR player setup failed. Refresh the page and try again.');
+    if (candidate !== null && runtime.release !== candidate) throw new Error('The runtime candidate does not match the requested release.');
     if ((!local || publicTransport) && !runtime.qualified) throw new Error('KOTOR is not available at this address yet.');
     const root = runtime.root;
     const reviewedRoots = { '2d07dd116b32abfff40f8cb2fad79544f90c88b33f59aff23ea8c0e15aec2277':99556813, 'a14446b27adbaccd4fac25dfb4e951da2dd4978fecfbf6e16aa718871fe4b0c5':99450694, '472c4d9475dde72b2057c72f39e43aba3947561e6ff9e7ee0e29f97acf2f3270':99450694 };
     if (!root || reviewedRoots[root.sha256] !== root.bytes || root.base !== `/original-game/wine-roots/${root.sha256}/` || root.localFile !== '.local-root.zip' || root.publicFile !== 'wine-root.zip') throw new Error('KOTOR support files do not match this version. Refresh the page and try again.');
     // A loopback Workers preview can qualify the accepted release's public
     // transport inside this prototype before deployment.
-    return { ...runtime, rootFile:local && !publicTransport ? root.localFile : root.publicFile };
+    return { ...runtime, candidate:candidate !== null,
+      rootFile:local && !publicTransport ? root.localFile : root.publicFile };
   } catch (error) {
     if (error.name === 'AbortError') {
       const phase = timedOutPhase || descriptorPhase;
@@ -322,18 +401,33 @@ async function selectedRuntime() {
     throw error;
   } finally { clearTimeout(timeout); }
 }
+function runtimeProfileArchive(runtime, gameProfile, profile) {
+  // IDBFS uses this name for both the Wine prefix and its writable D: drive.
+  // Candidate gameplay must not share the selected runtime's live profile.
+  const candidateSuffix = runtime.candidate ? `-candidate-${runtime.release}` : '';
+  return `${gameProfile.archiveNamespace}-${profile}${candidateSuffix}.zip`;
+}
 export class OriginalGame {
+  setPackagePresentation({ debug = false, tas = false } = {}) {
+    this.packagePresentation = { debug: debug === true, tas: debug === true && tas === true };
+    if (this.debugPresentation) this.debugPresentation.hidden = !this.packagePresentation.debug;
+    if (this.tasPresentation) this.tasPresentation.hidden = !this.packagePresentation.tas;
+  }
+
   constructor(root) {
     this.root = root; this.session = null; this.generation = 0; this.closed = false; this.localManifest = null;
     this.lifecycle = Promise.resolve(); this.folderPersistence = Promise.resolve(); this.candidate = null;
     this.activeSession = null; this.pendingRevocations = new Map(); this.disposing = null;
     this.runtimeProfileReady = false;
+    this.profileSaveBusy = false;
     this.runtimeGuestId = null; this.runtimeRelease = null; this.runtimeVmCapabilities = null; this.runtimeTasAvailable = false; this.runtimeGuestMemoryAvailable = false; this.runtimeVmStatus = 'idle'; this.runtimeVmStatusRequest = 0;
     this.guestMemorySequence = 0; this.guestMemoryRequests = new Map();
+    this.vmControlRequests = new Map();
     this.allowStopWithoutSaving = false; this.tasTargetActive = false; this.tasBridgeReady = false;
-    this.tasSequence = 0; this.tasLastAck = 0; this.tasPending = null; this.tasWaitingInput = null; this.tasStatus = null;
+    this.tasSequence = 0; this.tasLastAck = 0; this.tasReleaseSequences = new Set(); this.tasPending = null; this.tasWaitingInput = null; this.tasStatus = null;
     this.tasVmReady = false; this.tasVmSequence = 0; this.tasVmStatus = null; this.tasVmButtons = [];
     this.runtimeStoppedSession = null;
+    this.packagePresentation = { debug: false, tas: false };
     this.receiveTasTarget = event => {
       this.tasTargetActive = event.detail?.active === true;
       if (!this.tasTargetActive) this.releaseTasInputs();
@@ -355,6 +449,11 @@ export class OriginalGame {
         this.failTasTransport(`Score tick ${input.tick} arrived before runtime acknowledgement for tick ${this.tasPending.tick}. Playback stopped to avoid skipping input.`);
         return;
       }
+      const unsupportedKeys = input.keys.filter(key => !(this.tasSupportedKeys || TAS_BASE_KEYS).includes(key));
+      if (unsupportedKeys.length) {
+        this.failTasTransport(`Score tick ${input.tick} uses keys unavailable in this game session: ${unsupportedKeys.join(', ')}. No input was sent.`);
+        return;
+      }
       const frame = this.host?.querySelector('iframe');
       if (!frame?.contentWindow) {
         this.failTasTransport(`The game frame is unavailable at score tick ${input.tick}.`);
@@ -362,13 +461,17 @@ export class OriginalGame {
       }
       const sequence = ++this.tasSequence;
       const sentAt = performance.now();
-      const pending = { sequence, tick:input.tick, hz:input.hz, sentAt, timer:0 };
+      const requestedInput = Object.freeze({schema:'telos.requested-input/v1', source:'workspace-request',
+        keys:input.keys,buttons:input.buttons,mouse:input.mouse});
+      const pending = { sequence, tick:input.tick, hz:input.hz, sentAt, requestedInput, timer:0 };
       this.tasPending = pending;
       dispatchEvent(new CustomEvent('telos:wasm-pending', { detail:{ pending:true, tick:input.tick } }));
       pending.timer = setTimeout(() => {
         if (this.tasPending !== pending) return;
-        this.failTasTransport(`Game frame ${pending.tick} did not finish before the input deadline. Playback stopped without skipping ahead.`);
-      }, 10000);
+        // Pause can cancel an active bridge job before its queued release.
+        const pauseRequested = this.sendVmControl('pause');
+        this.failTasTransport(`Score tick ${pending.tick} did not finish before the input deadline. Playback stopped without skipping ahead. Input may already have reached the guest. ${pauseRequested ? 'Pause was requested.' : 'Pause could not be sent.'}`);
+      }, this.tasInputDeadlineMs || 10000);
       try { frame.contentWindow.postMessage({ type:'telos-wasm-tas', session:this.session, sequence, action:'input', ...input }, this.runtimeOrigin(frame)); }
       catch (error) { this.failTasTransport(`Could not send score tick ${input.tick} to the runtime: ${error.message || error}`); }
     };
@@ -380,7 +483,14 @@ export class OriginalGame {
       // cannot keep advancing. Resuming is limited to the active game target.
       if (action === 'pause' || action === 'status' || (action === 'resume' && this.tasTargetActive) || (action === 'frame' && this.tasTargetActive)) this.sendVmControl(action);
     };
-    this.onPageBlur = () => this.releaseTasInputs();
+    this.onPageBlur = () => {
+      const ownerSession = this.session;
+      // Focusing the owned iframe blurs this window while the workspace still
+      // has focus. Release only when focus actually leaves the workspace.
+      queueMicrotask(() => {
+        if (this.session === ownerSession && !document.hasFocus()) this.releaseTasInputs();
+      });
+    };
     this.onVisibilityChange = () => { if (document.visibilityState !== 'visible') this.releaseTasInputs(); };
     addEventListener('telos:wasm-target', this.receiveTasTarget);
     addEventListener('telos:wasm-input', this.receiveTasInput);
@@ -394,17 +504,62 @@ export class OriginalGame {
     const frame = this.host?.querySelector('iframe');
     if (!frame?.contentWindow || !this.session || !this.tasBridgeReady) return false;
     const sequence = ++this.tasSequence;
+    if (message.action === 'release') {
+      this.tasReleaseSequences.add(sequence);
+      if (this.tasReleaseSequences.size > 32) this.tasReleaseSequences.delete(this.tasReleaseSequences.values().next().value);
+    }
     try { frame.contentWindow.postMessage({ type:'telos-wasm-tas', session:this.session, sequence, ...message }, this.runtimeOrigin(frame)); return true; }
-    catch { return false; }
+    catch { this.tasReleaseSequences.delete(sequence); return false; }
   }
-  sendVmControl(action) {
+  sendVmControl(action, pending = null) {
     const frame = this.host?.querySelector('iframe');
     if (!this.tasVmReady || !frame?.contentWindow || !this.session || !['pause','resume','step','frame','status'].includes(action)) return false;
     const request = ++this.tasVmSequence;
+    if (pending) { pending.request = request; this.vmControlRequests.set(request, pending); }
     const message = { type:'telos-wasm-vm-control', schema:'telos-wasm-vm-control/v1', session:this.session, request, action };
     if (action === 'step' || action === 'frame') message.unit = 'render-present';
     try { frame.contentWindow.postMessage(message, this.runtimeOrigin(frame)); return true; }
     catch { return false; }
+  }
+  requestVmControl(action, { signal } = {}) {
+    if (signal && (typeof signal.aborted !== 'boolean' || typeof signal.addEventListener !== 'function' || typeof signal.removeEventListener !== 'function')) return Promise.reject(new Error('Execution cancellation requires an AbortSignal.'));
+    if (!['pause','resume','step'].includes(action) || !this.tasVmReady || !this.session) return Promise.reject(new Error('Game execution controls are unavailable.'));
+    if (this.vmControlRequests.size >= 4) return Promise.reject(new Error('Too many game execution requests are pending.'));
+    if (signal?.aborted) return Promise.reject(new Error('The game execution request was cancelled.'));
+    return new Promise((resolve, reject) => {
+      const pending = { session:this.session, action, request:null, timer:0, finish:null };
+      let finished = false;
+      const abort = () => pending.finish(new Error('The game execution request was cancelled; the command may already have been applied.'));
+      pending.finish = (error, result) => {
+        if (finished) return;
+        finished = true;
+        clearTimeout(pending.timer);
+        signal?.removeEventListener('abort', abort);
+        if (pending.request !== null) this.vmControlRequests.delete(pending.request);
+        if (error) reject(error); else resolve(result);
+      };
+      signal?.addEventListener('abort', abort, { once:true });
+      if (signal?.aborted) { abort(); return; }
+      // Allow the bridge's bounded 60-second render wait plus reply time.
+      pending.timer = setTimeout(() => pending.finish(new Error('The runtime did not confirm execution completion; the command may already have been applied.')), action === 'step' ? 70000 : 15000);
+      if (!this.sendVmControl(action, pending)) pending.finish(new Error('The game execution command could not be sent.'));
+    });
+  }
+  rejectVmControlRequests(message = 'The game session changed before execution completion was confirmed.') {
+    for (const pending of [...this.vmControlRequests.values()]) pending.finish(new Error(message));
+  }
+  settleVmControlRequests(status) {
+    const provenance = status.commandProvenance;
+    if (!provenance) return;
+    const commands = [...provenance.recentCommands, ...(provenance.lastCommand ? [provenance.lastCommand] : [])];
+    for (const pending of [...this.vmControlRequests.values()]) {
+      if (pending.session !== this.session) { pending.finish(new Error('The game session changed before execution completion was confirmed.')); continue; }
+      const command = commands.find(value => value.source === 'vm-control' && value.request === pending.request && value.action === pending.action);
+      if (!command || command.outcome === 'pending') continue;
+      if (command.outcome !== 'completed') { pending.finish(new Error(`The game execution command was ${command.outcome}.`)); continue; }
+      pending.finish(null, { action:pending.action, request:pending.request, acknowledged:true, unit:'render-present',
+        command, state:status.state, presents:status.presents, activeThreads:status.activeThreads, parkedThreads:status.parkedThreads });
+    }
   }
   rejectGuestMemoryRequests(message = 'The game session changed before the guest memory request completed.') {
     for (const pending of this.guestMemoryRequests.values()) { clearTimeout(pending.timer); pending.reject(new Error(message)); }
@@ -415,7 +570,7 @@ export class OriginalGame {
     if (!session || !this.runtimeGuestMemoryAvailable || !frame?.contentWindow) return Promise.reject(new Error('Guest memory reading is unavailable in this game session.'));
     const request = ++this.guestMemorySequence;
     return new Promise((resolve, reject) => {
-      const pending = { session, operation, length:params.length, resolve, reject, timer:0 };
+      const pending = { session, operation, length:params.length, pid:params.pid, address:params.address, resolve, reject, timer:0 };
       pending.timer = setTimeout(() => {
         if (this.guestMemoryRequests.get(request) !== pending) return;
         this.guestMemoryRequests.delete(request);
@@ -427,6 +582,22 @@ export class OriginalGame {
     });
   }
   getGuestProcesses() { return this.requestGuestMemory('processes').then(value => value.processes); }
+  captureGuestRegisters(pid) {
+    if (this.runtimeVmCapabilities?.registers !== true || !Number.isSafeInteger(pid) || pid < 1 || pid > 0xffffffff) return Promise.reject(new Error('Paused register capture requires a supported runtime and valid process ID.'));
+    return this.requestGuestMemory('registers', { pid });
+  }
+  listGuestThreads(pid) {
+    if (this.runtimeVmCapabilities?.threadList !== true || !Number.isSafeInteger(pid) || pid < 1 || pid > 0xffffffff) return Promise.reject(new Error('Paused thread listing requires a supported runtime and valid process ID.'));
+    return this.requestGuestMemory('threads', { pid });
+  }
+  captureGuestMapping(pid, address) {
+    if (this.runtimeVmCapabilities?.addressMapping !== true
+      || !Number.isSafeInteger(pid) || pid < 1 || pid > 0xffffffff
+      || !Number.isSafeInteger(address) || address < 0 || address > 0xffffffff) {
+      return Promise.reject(new Error('Backing-file capture requires a supported runtime, PID and 32-bit address.'));
+    }
+    return this.requestGuestMemory('mapping', { pid, address });
+  }
   readGuestMemory(pid, address, length) {
     if (!Number.isSafeInteger(pid) || pid <= 0 || pid > 0xffffffff || !Number.isSafeInteger(address) || address < 0 || address > 0xffffffff
       || !Number.isSafeInteger(length) || length < 1 || length > 65536 || address + length > 0x100000000) {
@@ -434,36 +605,46 @@ export class OriginalGame {
     }
     return this.requestGuestMemory('read', { pid, address, length }).then(value => new Uint8Array(value.buffer).slice());
   }
+  getRuntimeTarget() {
+    const profile = gameProfileById(this.runtimeGuestId);
+    return this.session && profile
+      ? Object.freeze({ profile:profile.id, format:'pe32', architecture:'x86', osAbi:'windows-32', pointerBits:32, byteOrder:'little' }) : null;
+  }
   publishRuntimeSession() {
     if (!this.session) return;
     const vm = this.runtimeVmCapabilities || {};
     const runtimeReady = vm.pause === true && vm.resume === true;
     const state = (available, qualified = true) => !qualified ? 'not-qualified' : available ? 'available' : runtimeReady ? 'unsupported' : 'unavailable';
     const operation = (available, unit = null, qualified = true) => Object.freeze({ state:state(available, qualified), ...(unit ? { unit } : {}) });
-    const profile = gameProfileById(this.runtimeGuestId);
+    const target = this.getRuntimeTarget();
     const descriptor = Object.freeze({
       schema:'telos-runtime-session/v1', session:this.session,
       runtimeProtocol:'telos-wasm-vm-control/v1', guestId:this.runtimeGuestId,
       backend:Object.freeze({ id:'boxedwine-wasm', version:this.runtimeRelease || 'unavailable' }),
-      target:profile ? Object.freeze({ profile:profile.id, format:'pe32', architecture:'x86', osAbi:'windows-32' }) : null,
+      target,
       debugger:Object.freeze({
         schema:'telos.debug-capabilities/v1',
         operations:Object.freeze({
-          input:operation(this.runtimeTasAvailable, 'render-present'),
+          input:Object.freeze({ state:this.tasBridgeReady ? state(this.runtimeTasAvailable) : 'unavailable', unit:'render-present' }),
           pause:operation(vm.pause === true),
           resume:operation(vm.resume === true),
           step:operation(vm.step === true && vm.frameStep === true, vm.unit || null),
           threadCounts:operation(runtimeReady),
-          threadList:operation(false), memoryRead:operation(this.runtimeGuestMemoryAvailable), registers:operation(false),
+          threadList:operation(this.runtimeGuestMemoryAvailable && vm.threadList === true), memoryRead:operation(this.runtimeGuestMemoryAvailable), registers:operation(this.runtimeGuestMemoryAvailable && vm.registers === true),
+          addressMapping:operation(this.runtimeGuestMemoryAvailable && vm.addressMapping === true),
           disassembly:operation(false), breakpoints:operation(false), snapshot:operation(false), restore:operation(false),
         }),
       }),
       executionBoundary:vm.unit === 'render-present' ? vm.unit : null,
+      inputKeys:this.runtimeTasAvailable && this.tasBridgeReady
+        ? Object.freeze([...(this.tasSupportedKeys || TAS_BASE_KEYS)]) : null,
+      inputAdmission:this.runtimeTasAvailable && this.tasBridgeReady
+        ? this.tasConsumptionBridge ? 'quiescent-pause-and-consumption' : this.tasQuiescentBridge ? 'quiescent-pause' : this.tasAlignedBridge ? 'pre-input-present-baseline' : 'legacy-render-drain' : null,
       status:this.runtimeVmStatus,
       capabilities:Object.freeze({
         pause:vm.pause === true, resume:vm.resume === true,
         renderStep:vm.step === true && vm.frameStep === true, input:this.runtimeTasAvailable,
-        memory:this.runtimeGuestMemoryAvailable, registers:false, disassembly:false, snapshot:false, rewind:false,
+        memory:this.runtimeGuestMemoryAvailable, registers:this.runtimeGuestMemoryAvailable && vm.registers === true, disassembly:false, snapshot:false, rewind:false,
       }),
     });
     dispatchEvent(new CustomEvent('telos:runtime-session', { detail:descriptor }));
@@ -480,12 +661,12 @@ export class OriginalGame {
     dispatchEvent(new CustomEvent('telos:wasm-pending', { detail:{ pending:false, tick:pending.tick } }));
     return pending;
   }
-  failTasTransport(message) {
+  failTasTransport(message, release = true) {
     const pending = this.clearTasPending();
     const waitingInput = this.tasWaitingInput;
     this.tasWaitingInput = null;
     if (waitingInput) dispatchEvent(new CustomEvent('telos:wasm-pending', { detail:{ pending:false, tick:waitingInput.tick } }));
-    this.releaseTasInputs();
+    if (release) this.releaseTasInputs();
     // A rejected frame does not unload the iframe bridge. Keep the validated
     // session ready so the user can seek back and retry after the VM parks.
     dispatchEvent(new CustomEvent('telos:wasm-transport-error', { detail:{ session:this.session, message, tick:pending?.tick ?? null } }));
@@ -495,13 +676,40 @@ export class OriginalGame {
     if (!this.tasBridgeReady || !this.session) return;
     this.sendTas({ action:'release', tick:0 });
   }
+  updateCoreConnectionStatus(message, failed = false) {
+    if (!this.coreConnectionStatus) return;
+    this.coreConnectionStatus.textContent = message;
+    this.coreConnectionStatus.className = failed ? 'status bad' : 'status';
+    this.coreConnectionStatus.setAttribute('role', failed ? 'alert' : 'status');
+  }
+  updateCoreControlReadiness() {
+    if (this.tasVmReady) {
+      this.updateCoreConnectionStatus(this.runtimeTasAvailable
+        ? 'Game execution and input connected to Telos Core.'
+        : 'Game execution connected to Telos Core. Waiting for game input.');
+    } else if (this.runtimeVmCapabilities) {
+      this.updateCoreConnectionStatus(this.runtimeTasAvailable
+        ? 'Game input connected to Telos Core. Execution controls are unavailable.'
+        : 'Game runtime connected to Telos Core. Execution controls are unavailable.');
+    } else if (this.runtimeTasAvailable) {
+      this.updateCoreConnectionStatus('Game input connected to Telos Core. Waiting for execution controls.');
+    }
+  }
   resetTasControls() {
+    this.updateProfileSaveButton();
+    if (this.profileSaveNote) this.profileSaveNote.textContent = '';
     const starting = !!this.session;
+    this.tasAlignedBridge = false;
+    this.tasQuiescentBridge = false;
+    this.tasConsumptionBridge = false;
+    this.tasSupportedKeys = TAS_BASE_KEYS;
+    this.tasInputDeadlineMs = 10000;
     this.tasBridgeReady = false; this.tasVmReady = false;
-    this.tasSequence = 0; this.tasLastAck = 0; this.tasVmSequence = 0; this.runtimeVmStatusRequest = 0;
+    this.tasSequence = 0; this.tasLastAck = 0; this.tasReleaseSequences = new Set(); this.tasVmSequence = 0; this.runtimeVmStatusRequest = 0;
     for (const button of this.tasVmButtons) button.disabled = true;
+    this.updateCoreConnectionStatus(starting ? 'Connecting the game to Telos Core…' : 'Telos Core is ready. Connect a game to continue.');
     if (this.tasStatus) this.tasStatus.textContent = starting
-      ? 'Connecting TAS controls…'
+      ? 'Score input is waiting for the game connection.'
       : 'No KOTOR session connected. Sample scene and editor state are separate from live KOTOR.';
     if (this.tasVmStatus) {
       this.tasVmStatus.textContent = starting ? 'Game controls are starting.' : 'Game controls are unavailable until KOTOR starts.';
@@ -513,7 +721,9 @@ export class OriginalGame {
     this.startup?.update(state, message);
     const displayMessage = state === 'error'
       ? 'KOTOR stopped after an error. Open Diagnostics for details.' : 'KOTOR has stopped.';
+    this.updateCoreConnectionStatus(displayMessage, state === 'error');
     this.runtimeStoppedSession = this.session;
+    this.rejectVmControlRequests('Execution controls stopped with this runtime session.');
     this.rejectGuestMemoryRequests('Guest memory reading stopped with this runtime session.');
     this.runtimeGuestMemoryAvailable = false;
     this.tasBridgeReady = false;
@@ -546,12 +756,14 @@ export class OriginalGame {
         script.onerror = () => {
           if (!current()) return;
           this.tasBridgeReady = false;
-          if (this.tasStatus) this.tasStatus.textContent = 'TAS controls could not connect. You can still play with the keyboard and mouse.';
+          this.updateCoreConnectionStatus('Telos Core could not connect to the game controls.', true);
+          if (this.tasStatus) this.tasStatus.textContent = 'Score input is unavailable. You can still play with the keyboard and mouse.';
         };
         doc.head.append(script);
       } catch {
         this.tasBridgeReady = false;
-        if (this.tasStatus) this.tasStatus.textContent = 'TAS controls could not connect. You can still play with the keyboard and mouse.';
+        this.updateCoreConnectionStatus('Telos Core could not connect to the game controls.', true);
+        if (this.tasStatus) this.tasStatus.textContent = 'Score input is unavailable. You can still play with the keyboard and mouse.';
       }
     }, { once:true });
   }
@@ -588,6 +800,9 @@ export class OriginalGame {
       const option = document.createElement('option'); option.value = value; option.textContent = label; originSelect.append(option);
     }
     originLabel.append(originSelect); originLabel.hidden = true;
+    this.coreConnectionStatus = document.createElement('p');
+    this.coreConnectionStatus.dataset.telosOwner = 'core';
+    this.coreConnectionStatus.setAttribute('aria-live', 'polite');
     this.status = document.createElement('p'); this.status.className = 'status';
     this.status.setAttribute('role', 'status'); this.status.setAttribute('aria-live', 'polite');
     this.status.textContent = LOCAL_AUTO_INSTALL ? 'Looking for the configured KOTOR installation…' : 'Choose your installed KOTOR folder. Game files stay on your device and are read from disk only when needed.';
@@ -621,7 +836,19 @@ export class OriginalGame {
     const setup = document.createElement('details'); setup.className = 'game-setup'; setup.open = true;
     const setupSummary = document.createElement('summary'); setupSummary.textContent = 'Game files';
     setup.append(setupSummary, intro, this.checks, alternatives);
-    controls.append(actions, this.status, vmControls, setup, this.tasStatus, this.tasVmStatus, fallback, loose); this.root.replaceChildren(controls, this.host);
+    // Core retains session APIs; package-owned presentation is opt-in. Wrappers
+    // remain hidden even when runtime status updates toggle their child nodes.
+    this.debugPresentation = document.createElement('div');
+    this.debugPresentation.dataset.extensionOwner = 'telos.debug';
+    this.debugPresentation.append(vmControls, this.tasVmStatus);
+    this.tasPresentation = document.createElement('div');
+    this.tasPresentation.dataset.extensionOwner = 'telos.tas';
+    this.tasPresentation.append(this.tasStatus);
+    this.setPackagePresentation(this.packagePresentation);
+    this.audioObservationDownload?.dispose();
+    this.audioObservationDownload = mountAudioObservationDownload();
+    this.audioObservationDownload.setSession(this.session);
+    controls.append(actions, this.coreConnectionStatus, this.status, this.audioObservationDownload.root, this.debugPresentation, setup, this.tasPresentation, fallback, loose); this.root.replaceChildren(controls, this.host);
     this.setupDetails = setup;
     this.pendingFiles = new Map();
     this.assessment = null;
@@ -633,6 +860,15 @@ export class OriginalGame {
       const value = event.data;
       const frame = this.host?.querySelector('iframe');
       if (this.closed || !this.session || !frame || event.source !== frame.contentWindow || event.origin !== this.runtimeOrigin(frame) || value?.session !== this.session) return;
+      if (value.type === 'telos-recording-audio-export' && typeof value.request === 'string' && /^[0-9a-f-]{36}$/.test(value.request)) {
+        this.audioObservationDownload.prepare(value.file, value.session, value.recording).then(prepared => {
+          if (prepared && !this.closed && this.session === value.session && this.host?.querySelector('iframe') === frame) {
+            frame.contentWindow.postMessage({type:'telos-recording-audio-export-ready', session:value.session,
+              request:value.request}, this.runtimeOrigin(frame));
+          }
+        });
+        return;
+      }
       // A worker failure is terminal for this session; delayed ready/running
       // messages cannot revive its controls or overwrite the failure.
       if (this.runtimeStoppedSession === this.session) return;
@@ -678,18 +914,45 @@ export class OriginalGame {
       }
       if (value.type === 'telos-wasm-tas-ready') {
         const caps = value.capabilities;
-        const validCaps = caps?.version === 'telos-wasm-tas-bridge/v8'
+        const consumptionBridge = caps?.version === 'telos-wasm-tas-bridge/v12';
+        const quiescentBridge = caps?.version === 'telos-wasm-tas-bridge/v11' || consumptionBridge;
+        const declaredKeysBridge = caps?.version === 'telos-wasm-tas-bridge/v10' || quiescentBridge;
+        const alignedBridge = caps?.version === 'telos-wasm-tas-bridge/v9' || declaredKeysBridge;
+        const declaredKeys = declaredKeysBridge ? caps.supportedKeys : TAS_BASE_KEYS;
+        const validKeys = Array.isArray(declaredKeys)
+          && [TAS_BASE_KEYS.length, TAS_BASE_KEYS.length + 1].includes(declaredKeys.length)
+          && [...TAS_BASE_KEYS, 'i'].slice(0, declaredKeys.length).every((key, index) => declaredKeys[index] === key);
+        const extendedInputDeadline = alignedBridge && caps.inputDeadlineMs === 90000 && caps.renderDeadlineMs === 60000;
+        const validDeadline = (caps?.inputDeadlineMs === undefined && caps?.renderDeadlineMs === undefined) || extendedInputDeadline;
+        const validCaps = (caps?.version === 'telos-wasm-tas-bridge/v8' || alignedBridge)
+          && validDeadline && validKeys
           && caps.input === 'boxedwine-native-key-export;boxedwine-native-mouse-exports'
           && caps.mouse === 'absolute-canvas-pixel-native-events;pointer-lock-relative-unavailable'
-          && caps.acknowledgement === 'native-input-dispatch-and-one-render'
-          && caps.frameAlignment === 'bounded-gl-present-drain-per-score-step';
+          && caps.acknowledgement === (consumptionBridge ? 'native-event-consumption-then-next-render' : 'native-input-dispatch-and-one-render')
+          && caps.frameAlignment === (consumptionBridge ? 'quiescent-pause-and-next-gl-present-after-native-consumption' : quiescentBridge
+            ? 'quiescent-pause-and-bounded-gl-present-per-score-step' : alignedBridge
+            ? 'pre-input-present-baseline-and-bounded-gl-present-per-score-step'
+            : 'bounded-gl-present-drain-per-score-step');
         if (!validCaps) {
-          this.failTasTransport('TAS controls could not connect to this game session.');
+          this.updateCoreConnectionStatus('Telos Core could not connect to this game session.', true);
+          this.failTasTransport('Telos Core could not connect to this game session.');
           return;
         }
-        this.tasBridgeReady = true; this.tasSequence = 0; this.tasLastAck = 0;
+        this.tasBridgeReady = true; this.tasSequence = 0; this.tasLastAck = 0; this.tasReleaseSequences = new Set();
+        this.tasSupportedKeys = Object.freeze([...declaredKeys]);
+        this.tasAlignedBridge = alignedBridge;
+        this.tasQuiescentBridge = quiescentBridge;
+        this.tasConsumptionBridge = consumptionBridge;
+        this.tasInputDeadlineMs = extendedInputDeadline ? 90000 : 10000;
         this.runtimeTasAvailable = true; this.publishRuntimeSession();
-        if (this.tasStatus) this.tasStatus.textContent = 'TAS connected · keyboard and mouse ready.';
+        this.updateCoreControlReadiness();
+        if (this.tasStatus) this.tasStatus.textContent = consumptionBridge
+          ? 'Score input waits for a complete worker pause, native event consumption, then the next GL presentation. Earlier presentations are counted separately. Game frames and replay remain unverified.' : quiescentBridge
+          ? 'Score input bridge connected. Input waits for a complete worker pause. No pre-input render is required. Guest input sampling, simulation cadence and replay remain unverified.' : alignedBridge
+          ? 'Score input bridge connected. A new input boundary advances one pre-input render.' +
+            (extendedInputDeadline ? ' A scored render may wait up to 60 seconds during loading.' : '') +
+            ' Guest input consumption and replay qualification remain unverified.'
+          : 'Score input bridge connected. Guest input consumption and replay qualification remain unverified.';
         if (this.tasWaitingInput) {
           const input = this.tasWaitingInput;
           this.tasWaitingInput = null;
@@ -707,9 +970,37 @@ export class OriginalGame {
           error.statusCode = Number.isInteger(value.status) && value.status >= 1 && value.status <= 5 ? value.status : null;
           pending.reject(error);
         }
+        else if (value.operation === 'mapping') {
+          try { pending.resolve(normalizeMappedFileCapture(value, { pid:pending.pid, address:pending.address })); }
+          catch (error) { pending.reject(error); }
+        }
         else if (value.operation === 'processes' && Array.isArray(value.processes)
-          && value.processes.length <= 4096 && value.processes.every(item => Number.isSafeInteger(item?.pid) && item.pid > 0 && item.pid <= 0xffffffff)) {
-          pending.resolve({ processes:value.processes.map(({ pid }) => ({ pid })) });
+          && value.processes.length <= 4096 && value.processes.every(item => Number.isSafeInteger(item?.pid) && item.pid > 0 && item.pid <= 0xffffffff
+            && (item.name == null || (typeof item.name === 'string' && item.name.length <= 1024 && !/[\x00-\x1f\x7f/\\]/.test(item.name)))
+            && (item.presentationOwner == null || typeof item.presentationOwner === 'boolean'))
+          && new Set(value.processes.map(item => item.pid)).size === value.processes.length) {
+          if (value.processes.filter(item => item.presentationOwner === true).length > 1) {
+            pending.reject(new Error('The runtime returned multiple presentation owners.')); return;
+          }
+          pending.resolve({ processes:value.processes.map(({ pid, name, presentationOwner }) => ({ pid, name:name ?? null,
+            presentationOwner:presentationOwner ?? null })) });
+        } else if (value.operation === 'registers' && value.pid === pending.pid && value.captured === true
+          && value.architecture === 'x86' && value.semantics === 'saved-guest-registers'
+          && Array.isArray(value.threads) && value.threads.length <= 128
+          && value.threads.every(thread => Number.isSafeInteger(thread?.id) && thread.id > 0 && thread.id <= 0xffffffff
+            && thread.pid === pending.pid && ['kernel-wait','paused'].includes(thread.state)
+            && Array.isArray(thread.registers) && thread.registers.length === 9
+            && thread.registers.every((register, index) => register?.name === ['eip','eax','ecx','edx','ebx','esp','ebp','esi','edi'][index]
+              && typeof register.value === 'string' && /^0x[0-9a-f]{8}$/.test(register.value)))
+          && new Set(value.threads.map(thread => thread.id)).size === value.threads.length) {
+          pending.resolve({ pid:value.pid, captured:true, architecture:'x86', semantics:'saved-guest-registers',
+            threads:value.threads.map(({ id, pid, state, registers }) => ({ id, pid, state, registers:registers.map(({ name, value }) => ({ name, value })) })) });
+        } else if (value.operation === 'threads' && value.pid === pending.pid && value.captured === true && value.locationAvailable === false
+          && Array.isArray(value.threads) && value.threads.length <= 4096
+          && value.threads.every(item => Number.isSafeInteger(item?.id) && item.id > 0 && item.id <= 0xffffffff
+            && item.pid === pending.pid && ['kernel-wait','paused'].includes(item.state))
+          && new Set(value.threads.map(item => item.id)).size === value.threads.length) {
+          pending.resolve({ pid:value.pid, threads:value.threads.map(({ id, pid, state }) => ({ id, pid, state })), captured:true, locationAvailable:false });
         } else if (value.operation === 'read' && value.buffer instanceof ArrayBuffer && value.buffer.byteLength === pending.length) {
           pending.resolve({ buffer:value.buffer });
         } else pending.reject(new Error('The runtime returned a malformed guest memory reply.'));
@@ -719,7 +1010,10 @@ export class OriginalGame {
         const caps = value.capabilities;
         if (!caps || typeof value.available !== 'boolean' || value.unit !== 'render-present'
           || ['pause','resume','step','frameStep','checkpoint','restore','seek','presentMarker'].some(key => typeof caps[key] !== 'boolean')
-          || (caps.memoryRead !== undefined && typeof caps.memoryRead !== 'boolean')) return;
+          || (caps.memoryRead !== undefined && typeof caps.memoryRead !== 'boolean')
+          || (caps.threadList !== undefined && typeof caps.threadList !== 'boolean')
+          || (caps.addressMapping !== undefined && typeof caps.addressMapping !== 'boolean')
+          || (caps.registers !== undefined && typeof caps.registers !== 'boolean')) return;
         if (this.runtimeVmCapabilities?.pause === true && value.available !== true) return;
         const memoryWasAvailable = this.runtimeGuestMemoryAvailable;
         this.runtimeVmCapabilities = { ...caps, memoryRead:caps.memoryRead === true, unit:value.unit };
@@ -727,6 +1021,8 @@ export class OriginalGame {
         if (memoryWasAvailable && !this.runtimeGuestMemoryAvailable) this.rejectGuestMemoryRequests('Guest memory reading became unavailable in this runtime.');
         this.tasVmReady = value.available === true && caps.pause === true && caps.resume === true
           && caps.step === true && caps.frameStep === true;
+        if (!this.tasVmReady) this.rejectVmControlRequests('Execution controls became unavailable in this runtime.');
+        this.updateCoreControlReadiness();
         this.publishRuntimeSession();
         for (const button of this.tasVmButtons || []) button.disabled = !this.tasVmReady;
         if (this.tasVmStatus) {
@@ -740,6 +1036,9 @@ export class OriginalGame {
         if (!status) return;
         if (value.ackRequest !== null && (!Number.isSafeInteger(value.ackRequest) || value.ackRequest <= this.runtimeVmStatusRequest || value.ackRequest > this.tasVmSequence)) return;
         if (value.ackRequest !== null) this.runtimeVmStatusRequest = value.ackRequest;
+        const failedControl = status.error && this.vmControlRequests.get(value.ackRequest);
+        if (failedControl) failedControl.finish(new Error(status.error));
+        this.settleVmControlRequests(status);
         window.__telosRuntimeDiagnostics = { ...status, session:this.session, receivedAt:performance.now() };
         this.startup?.observe(status);
         this.runtimeVmStatus = status.state; this.publishRuntimeSession();
@@ -749,6 +1048,7 @@ export class OriginalGame {
           paused:'Control: paused',
           stepping:'Control: stepping'
         }[status.state];
+        const displayError = status.error || status.lastControlError;
         const renderLabel = status.presents === null ? 'Render count not reported'
           : status.presents === 0 ? 'No game image yet' : 'Game image observed';
         const runtimeLabel = `${controlLabel} · ${renderLabel}`;
@@ -763,34 +1063,95 @@ export class OriginalGame {
           const threads = status.activeThreads !== null
             ? ` · ${status.parkedThreads}/${status.activeThreads} workers at a safe point` : '';
           const presents = status.presents !== null ? ` · present ${status.presents}` : '';
-          this.tasVmStatus.title = `${runtimeLabel} · boundary: ${status.unit}${threads}${presents}${status.error ? ` · ${status.error}` : ''}`;
-          const compactStatus = `${runtimeLabel}${status.error ? ` · ${status.error}` : ''}`;
+          this.tasVmStatus.title = `${runtimeLabel} · boundary: ${status.unit}${threads}${presents}${displayError ? ` · ${displayError}` : ''}`;
+          const compactStatus = `${runtimeLabel}${displayError ? ` · ${displayError}` : ''}`;
           if (this.tasVmStatus.textContent !== compactStatus) this.tasVmStatus.textContent = compactStatus;
         }
         return;
       }
       if (value.type === 'telos-wasm-tas-ack') {
         if (!['input-applied','released','error'].includes(value.state) || !Number.isSafeInteger(value.sequence) || value.sequence <= this.tasLastAck) return;
-        if (value.state === 'error') { this.failTasTransport(value.error || 'The guest rejected TAS input.'); return; }
-        if (value.state === 'released') { this.tasLastAck = value.sequence; return; }
+        const releaseReply = value.tick === 0 && this.tasReleaseSequences.has(value.sequence);
+        if (value.tick === 0 && !releaseReply) return;
+        if (value.state === 'error') {
+          if (!releaseReply && (!this.tasPending || value.sequence !== this.tasPending.sequence || value.tick !== this.tasPending.tick)) return;
+          if (releaseReply) this.tasReleaseSequences.delete(value.sequence);
+          // A failed release must stop playback without sending another release
+          // and recursively generating the same error acknowledgement.
+          this.failTasTransport(value.error || 'The guest rejected TAS input.', !releaseReply);
+          return;
+        }
+        if (value.state === 'released') {
+          if (!releaseReply) return;
+          this.tasReleaseSequences.delete(value.sequence); this.tasLastAck = value.sequence;
+          const boundaries = ['input-dispatch', 'queued-native-events', 'consumed-native-events', 'no-held-input-events'];
+          dispatchEvent(new CustomEvent('telos:wasm-release', { detail:{ schema:'telos.input-release-observation/v1', session:this.session,
+            sequence:value.sequence, boundary:boundaries.includes(value.releaseBoundary) ? value.releaseBoundary : null } }));
+          return;
+        }
         const pending = this.tasPending;
         if (!pending || value.sequence !== pending.sequence || value.tick !== pending.tick) return;
         const latencyMs = Math.max(0, performance.now() - pending.sentAt);
-        if (!Number.isSafeInteger(value.present) || !Number.isSafeInteger(value.eventsDispatched) || value.eventsDispatched < 0 || !Number.isSafeInteger(value.eventsConsumed) || value.eventsConsumed < 0 || !Number.isSafeInteger(value.presentsAdvanced) || value.presentsAdvanced !== 1 || !(value.inputPresentOffset === null || (Number.isSafeInteger(value.inputPresentOffset) && value.inputPresentOffset >= 0 && value.inputPresentOffset <= 1))) { this.failTasTransport('TAS controls could not confirm the input. Playback stopped.'); return; }
-        if (!['guest-consumed-events','native-mouse-position','unchanged-held-state'].includes(value.inputBoundary) || value.frameBoundary !== 'bounded-boxedwine-gl-present' || (value.inputBoundary === 'guest-consumed-events' && (value.eventsDispatched < 1 || value.eventsConsumed < 1 || !Number.isSafeInteger(value.inputPresentOffset))) || (value.inputBoundary === 'native-mouse-position' && (value.eventsDispatched < 1 || value.eventsConsumed !== 0 || value.inputPresentOffset !== null)) || (value.inputBoundary === 'unchanged-held-state' && (value.eventsDispatched !== 0 || value.inputPresentOffset !== null))) { this.failTasTransport('TAS controls could not confirm the input. Playback stopped.'); return; }
+        // A delayed timer must not turn an acknowledgement received after its
+        // parent budget into a completed score frame.
+        if (latencyMs >= (this.tasInputDeadlineMs || 10000)) {
+          const pauseRequested = this.sendVmControl('pause');
+          this.failTasTransport(`Score tick ${pending.tick} was acknowledged after its input deadline. Input may already have reached the guest. ${pauseRequested ? 'Pause was requested.' : 'Pause could not be sent.'}`);
+          return;
+        }
+        const alignment = value.alignment;
+        if (this.tasAlignedBridge) {
+          const uint32 = number => Number.isSafeInteger(number) && number >= 0 && number <= 0xffffffff;
+          if (alignment?.schema !== (this.tasQuiescentBridge ? 'telos.input-quiescent-alignment/v1' : 'telos.input-present-alignment/v1') || alignment.beforeInput !== true ||
+              !uint32(alignment.fromPresent) || !uint32(alignment.toPresent) ||
+              !(this.tasQuiescentBridge ? alignment.presentsAdvanced === 0 : [0,1].includes(alignment.presentsAdvanced)) ||
+              ((alignment.toPresent - alignment.fromPresent) >>> 0) !== alignment.presentsAdvanced ||
+              !uint32(value.present) || !uint32(value.presentsAdvanced) ||
+              !(this.tasConsumptionBridge ? value.presentsAdvanced >= 1 && value.presentsAdvanced <= 4096 : value.presentsAdvanced === 1) ||
+              ((value.present - alignment.toPresent) >>> 0) !== (this.tasConsumptionBridge ? value.presentsAdvanced : 1)) {
+            this.failTasTransport('TAS controls could not confirm the declared input admission boundary. Playback stopped.'); return;
+          }
+        } else if (alignment !== undefined) {
+          this.failTasTransport('The legacy input bridge supplied an undeclared render baseline. Playback stopped.'); return;
+        }
+        // Native presents are uint32 and tagged batches contain at most 64
+        // events. A safe JS integer alone does not establish those bounds.
+        if (!Number.isSafeInteger(value.present) || value.present < 0 || value.present > 0xffffffff || !Number.isSafeInteger(value.eventsDispatched) || value.eventsDispatched < 0 || value.eventsDispatched > 64 || !Number.isSafeInteger(value.eventsConsumed) || value.eventsConsumed < 0 || value.eventsConsumed > 64 || !Number.isSafeInteger(value.presentsAdvanced) || !(this.tasConsumptionBridge ? value.presentsAdvanced >= 1 && value.presentsAdvanced <= 4096 : value.presentsAdvanced === 1) || !(value.inputPresentOffset === null || (Number.isSafeInteger(value.inputPresentOffset) && value.inputPresentOffset >= 0 && value.inputPresentOffset <= (this.tasConsumptionBridge ? value.presentsAdvanced : 1)))) { this.failTasTransport('TAS controls could not confirm the input. Playback stopped.'); return; }
+        if (!['guest-consumed-events','native-mouse-position','unchanged-held-state'].includes(value.inputBoundary) || value.frameBoundary !== (this.tasConsumptionBridge ? 'bounded-boxedwine-gl-present-with-consumption-gate' : 'bounded-boxedwine-gl-present') || (value.inputBoundary === 'guest-consumed-events' && (value.eventsDispatched < 1 || value.eventsConsumed < 1 || !Number.isSafeInteger(value.inputPresentOffset))) || (value.inputBoundary === 'native-mouse-position' && (value.eventsDispatched < 1 || value.eventsConsumed !== 0 || value.inputPresentOffset !== null)) || (value.inputBoundary === 'unchanged-held-state' && (value.eventsDispatched !== 0 || value.eventsConsumed !== 0 || value.inputPresentOffset !== null))) { this.failTasTransport('TAS controls could not confirm the input. Playback stopped.'); return; }
+        let presentationReceipt = null;
+        if (this.tasConsumptionBridge) {
+          const r = value.presentationReceipt;
+          const consumed = value.inputBoundary === 'guest-consumed-events';
+          if (r?.schema !== 'telos.input-consumption-present/v1' || r.total !== value.presentsAdvanced
+            || r.requiresConsumption !== consumed
+            || (consumed ? !Number.isSafeInteger(r.beforeConsumption) || r.beforeConsumption < 0
+              || r.beforeConsumption !== value.inputPresentOffset || r.afterConsumption !== 1
+              || r.total !== r.beforeConsumption + r.afterConsumption
+              : r.beforeConsumption !== null || r.afterConsumption !== null || r.total !== 1)) {
+            this.failTasTransport('TAS controls could not confirm native consumption and its following presentation.'); return;
+          }
+          presentationReceipt = Object.freeze({schema:r.schema,total:r.total,requiresConsumption:r.requiresConsumption,
+            beforeConsumption:r.beforeConsumption,afterConsumption:r.afterConsumption});
+        }
         // The bridge only supplies a consumption count and present offset when its
         // guest-side sequence matches this acknowledgement's sequence.
         this.tasLastAck = value.sequence;
         this.clearTasPending();
-        if (this.tasStatus) this.tasStatus.textContent = value.eventsDispatched
+        const presentationLabel = presentationReceipt ? ` GL presentations: ${presentationReceipt.total}${presentationReceipt.requiresConsumption ? ` (${presentationReceipt.beforeConsumption} before native consumption, 1 after)` : ' (no native event required)'}.` : '';
+        const alignmentLabel = alignment?.presentsAdvanced === 1
+          ? ` Pre-input baseline advanced one render (${alignment.fromPresent} → ${alignment.toPresent}).` : '';
+        if (this.tasStatus) this.tasStatus.textContent = (value.eventsDispatched
           ? `Tick ${value.tick} · sent ${value.eventsDispatched} input changes · present ${value.present} · ${latencyMs.toFixed(1)} ms.`
-          : `Tick ${value.tick} · inputs held · present ${value.present} · ${latencyMs.toFixed(1)} ms.`;
-        dispatchEvent(new CustomEvent('telos:wasm-ack', { detail:{ session:this.session, tick:value.tick, sequence:value.sequence, latencyMs, present:value.present, eventsConsumed:value.eventsConsumed, presentsAdvanced:value.presentsAdvanced, inputPresentOffset:value.inputPresentOffset, delayed:latencyMs > 1000 / pending.hz } }));
+          : `Tick ${value.tick} · no new input changes · present ${value.present} · ${latencyMs.toFixed(1)} ms.`) + alignmentLabel + presentationLabel;
+        dispatchEvent(new CustomEvent('telos:wasm-ack', { detail:{ session:this.session, tick:value.tick, sequence:value.sequence, latencyMs, present:value.present, eventsConsumed:value.eventsConsumed, presentsAdvanced:value.presentsAdvanced, inputPresentOffset:value.inputPresentOffset, presentationReceipt, requestedInput:pending.requestedInput, alignment:alignment || null, delayed:latencyMs > 1000 / pending.hz } }));
         return;
       }
       if (value.type !== 'telos-game-status') return;
       if (!['starting','files-ready','error'].includes(value.state) || typeof value.message !== 'string') return;
-      if (value.state === 'files-ready') this.runtimeProfileReady = true;
+      if (value.state === 'files-ready') {
+        this.runtimeProfileReady = true;
+        this.updateProfileSaveButton();
+      }
       this.startup?.update(value.state, value.message);
       this.status.textContent = value.state === 'files-ready'
         ? 'Game files connected. Waiting for the first KOTOR frame…' : 'Starting KOTOR…';
@@ -1025,6 +1386,29 @@ export class OriginalGame {
       } catch (error) { this.status.textContent = error.message; }
     });
     const release = document.createElement('button'); release.type = 'button'; release.className = 'game-action close'; release.textContent = 'Close game'; release.hidden = true;
+    const saveProfile = document.createElement('button'); saveProfile.type = 'button'; saveProfile.className = 'game-action'; saveProfile.textContent = 'Save browser profile'; saveProfile.hidden = true;
+    saveProfile.title = 'Save changes to this browser without closing the game.';
+    const profileSaveNote = document.createElement('span'); profileSaveNote.className = 'status'; profileSaveNote.setAttribute('role', 'status');
+    this.profileSaveButton = saveProfile;
+    this.profileSaveNote = profileSaveNote;
+    saveProfile.addEventListener('click', async () => {
+      if (this.profileSaveBusy || !this.session) return;
+      const session = this.session;
+      this.profileSaveBusy = true; this.updateProfileSaveButton();
+      profileSaveNote.textContent = 'Saving browser profile…';
+      try {
+        await this.serializeLifecycle(() => {
+          if (this.session !== session) throw new Error('The game session changed before saving.');
+          return this.flushProfile();
+        });
+        if (this.session === session) profileSaveNote.textContent = 'Browser profile saved. Use KOTOR’s Save Game menu to save progress.';
+      } catch (error) {
+        if (this.session === session) profileSaveNote.textContent = error.message;
+      } finally {
+        this.profileSaveBusy = false; this.updateProfileSaveButton();
+        if (this.session !== session) profileSaveNote.textContent = '';
+      }
+    });
     const stopWithoutSaving = document.createElement('button'); stopWithoutSaving.type = 'button'; stopWithoutSaving.className = 'game-action close'; stopWithoutSaving.textContent = 'Stop without saving'; stopWithoutSaving.title = 'Disconnect KOTOR without saving changes made since the last browser profile sync'; stopWithoutSaving.hidden = true;
     release.addEventListener('click', async () => {
       try {
@@ -1049,8 +1433,11 @@ export class OriginalGame {
       } catch (error) { this.status.textContent = error.message; }
       finally { stopWithoutSaving.disabled = false; }
     });
-    actions.append(release, stopWithoutSaving); this.releaseButton = release; this.stopWithoutSavingButton = stopWithoutSaving;
+    const retryLocal = document.createElement('button'); retryLocal.type = 'button'; retryLocal.className = 'game-action'; retryLocal.textContent = 'Retry local installation';
+    retryLocal.title = 'Reconnect to the configured localhost installation and start KOTOR.';
+    actions.append(retryLocal, saveProfile, profileSaveNote, release, stopWithoutSaving); this.releaseButton = release; this.stopWithoutSavingButton = stopWithoutSaving;
     this.renderFileState = () => {
+      this.updateProfileSaveButton();
       const automaticInstall = !compatibleFolderPickerRequested && (this.localInstallPending || !!this.localManifest);
       choose.hidden = automaticInstall;
       alternatives.hidden = automaticInstall;
@@ -1108,6 +1495,8 @@ export class OriginalGame {
         this.status.textContent = this.localInstallPending ? 'Looking for a connected KOTOR installation…' : this.rememberedHandle ? 'A game folder is saved. Connect to check its current files.' : 'Choose your installed game folder, or drop the folder/files here.';
         this.status.className = 'status';
       }
+      retryLocal.hidden = !LOCAL_AUTO_INSTALL || !!this.session || !!this.localManifest;
+      retryLocal.disabled = this.localInstallPending || launchPending || !!this.session;
       start.disabled = launchPending || !result?.ready || !!this.session || !!(this.compatibleExecutable && this.compatibleExecutableSource === 'unspecified');
       forget.disabled = !!this.session;
       compatibleButton.hidden = result?.profile?.id === 'k2';
@@ -1118,37 +1507,49 @@ export class OriginalGame {
       start.hidden = automaticInstall || !!this.session;
     };
     this.renderFileState();
-    const localInstallGeneration = this.restoreGeneration;
-    this.connectLocalInstall(localInstallGeneration).then(async connected => {
-      if (this.closed) return;
-      this.localInstallPending = false;
-      if (localInstallGeneration !== this.restoreGeneration) return;
-      this.renderFileState();
-      if (connected && this.assessment?.ready) {
-        // Compatibility mode changes the fallback picker, not the configured
-        // installation's automatic launch after Play opens this panel.
-        return launchConnectedGame();
-      }
-      await this.restoreRememberedFolder();
-    }).catch(async error => {
-      if (this.closed) return;
-      this.localInstallPending = false;
-      if (localInstallGeneration !== this.restoreGeneration) return;
-      this.renderFileState();
-      // Only surface our validation messages. Browser JSON errors can include
-      // response contents, so report their type without leaking paths or data.
-      const detail = /^The local KOTOR [A-Za-z .]+(?:\(HTTP \d{3}\))?\.$/.test(error?.message || '')
-        ? error.message : `${['TypeError', 'SyntaxError', 'SecurityError', 'OperationError', 'NotSupportedError'].includes(error?.name) ? error.name : 'Error'} while reading or validating the local installation index.`;
-      const report = () => {
-        this.status.textContent = `LOCAL_INSTALL_CONNECTION_FAILED: ${detail} Choose your KOTOR installation folder to connect the game files.`;
-        this.status.className = 'status bad'; this.status.setAttribute('role', 'alert');
+    const reconnectLocalInstall = (initial = false) => {
+      if (this.closed || this.session || launchPending || (!initial && this.localInstallPending)) return;
+      const localInstallGeneration = initial ? this.restoreGeneration : ++this.restoreGeneration;
+      this.localInstallAttemptGeneration = localInstallGeneration;
+      const finishLocalAttempt = () => {
+        if (this.closed || this.localInstallAttemptGeneration !== localInstallGeneration) return;
+        this.localInstallAttemptGeneration = null;
+        this.localInstallPending = false;
+        this.renderFileState();
       };
-      report();
-      const restore = this.restoreRememberedFolder();
-      const fallbackGeneration = this.restoreGeneration;
-      await restore;
-      if (!this.closed && fallbackGeneration === this.restoreGeneration && !this.assessment?.ready) report();
-    });
+      this.localInstallPending = LOCAL_AUTO_INSTALL;
+      this.renderFileState();
+      return this.connectLocalInstall(localInstallGeneration).then(async connected => {
+        finishLocalAttempt();
+        if (this.closed || localInstallGeneration !== this.restoreGeneration) return;
+        if (connected && this.assessment?.ready) {
+          // Compatibility mode changes the fallback picker, not the configured
+          // installation's automatic launch after Play opens this panel.
+          return launchConnectedGame();
+        }
+        if (initial) await this.restoreRememberedFolder();
+        else { this.status.textContent = 'No local installation is configured. Your connected files were kept.'; this.status.className = 'status'; this.status.setAttribute('role', 'status'); }
+      }).catch(async error => {
+        finishLocalAttempt();
+        if (this.closed || localInstallGeneration !== this.restoreGeneration) return;
+        // Only surface our validation messages. Browser JSON errors can include
+        // response contents, so report their type without leaking paths or data.
+        const detail = /^The local KOTOR [A-Za-z .]+(?:\(HTTP \d{3}\))?\.$/.test(error?.message || '')
+          ? error.message : `${['TypeError', 'SyntaxError', 'SecurityError', 'OperationError', 'NotSupportedError'].includes(error?.name) ? error.name : 'Error'} while reading or validating the local installation index.`;
+        const report = () => {
+          this.status.textContent = `LOCAL_INSTALL_CONNECTION_FAILED: ${detail} Choose your KOTOR installation folder to connect the game files.`;
+          this.status.className = 'status bad'; this.status.setAttribute('role', 'alert');
+        };
+        report();
+        if (!initial) return;
+        const restore = this.restoreRememberedFolder();
+        const fallbackGeneration = this.restoreGeneration;
+        await restore;
+        if (!this.closed && fallbackGeneration === this.restoreGeneration && !this.assessment?.ready) report();
+      });
+    };
+    retryLocal.addEventListener('click', () => reconnectLocalInstall());
+    reconnectLocalInstall(true);
     this.onClose = () => { this.dispose().catch(() => {}); };
     addEventListener('pagehide', this.onClose, { once: true });
   }
@@ -1254,18 +1655,20 @@ export class OriginalGame {
     if (previous) { await this.flushProfile(); if (!current()) return false; await this.releaseSession(previous); }
     if (!current()) return false;
     this.runtimeProfileReady = false;
+    this.rejectVmControlRequests();
     this.rejectGuestMemoryRequests(); this.guestMemorySequence = 0; this.runtimeGuestMemoryAvailable = false;
     const session = crypto.randomUUID();
     this.session = session; this.files = null; this.activeSession = null;
+    this.audioObservationDownload?.setSession(session);
     this.runtimeGuestId = gameProfile.id; this.runtimeRelease = runtime.release; this.runtimeVmCapabilities = null; this.runtimeTasAvailable = false; this.runtimeVmStatus = 'starting'; this.runtimeVmStatusRequest = 0;
     this.publishRuntimeSession();
-    const query = new URLSearchParams({ rootBase:runtime.root.base, root:runtime.rootFile, appBase:'/original-game/', app:`${gameProfile.archiveNamespace}-${profile}.zip`, p:gameProfile.executable, auto:'true', desktop:'false', resolution:'800x600', sound:'true', storage:runtimeStorageMode(), wasmModuleBroker:'0', ownedSession:session, localInstall:'1', parentOrigin:location.origin, libraryProfile:`${manifest.libraryProfile.id}:${manifest.libraryProfile.identity}`, ownedIndex:manifest.indexIdentity });
+    const query = new URLSearchParams({ rootBase:runtime.root.base, root:runtime.rootFile, appBase:'/original-game/', app:runtimeProfileArchive(runtime, gameProfile, profile), p:gameProfile.executable, auto:'true', desktop:'false', resolution:'800x600', sound:'true', storage:runtimeStorageMode(), wasmModuleBroker:'0', ownedSession:session, localInstall:'1', parentOrigin:location.origin, libraryProfile:`${manifest.libraryProfile.id}:${manifest.libraryProfile.identity}`, ownedIndex:manifest.indexIdentity });
     const runtimeUrl = new URL(runtime.entry, location.href);
     if (LOCAL_AUTO_INSTALL && location.hostname === '127.0.0.1') runtimeUrl.hostname = 'localhost';
     // GL4ES defaults limited-NPOT hardware to CLAMP. Preserve desktop GL's
     // default REPEAT so GL4ES can expand repeating NPOT textures before upload.
-    runtimeUrl.search = query.toString() + `&em-env=%22LIBGL_DEFAULTWRAP:0;${textureTraceRequested ? 'LIBGL_KPTAS_TEXTRACE:1;' : ''}%22${guestTraceRequested ? '&guestTrace=1' : ''}${ioTraceRequested ? '&ioTrace=1' : ''}${cpuAffinityRequested ? '&cpuAffinity=1' : ''}`;
-    const frame = document.createElement('iframe'); frame.title = 'KOTOR'; frame.allow = 'cross-origin-isolated'; frame.src = runtimeUrl.href; frame.className = 'original-game-frame';
+    runtimeUrl.search = query.toString() + `&em-env=%22LIBGL_DEFAULTWRAP:0;${textureTraceRequested ? 'LIBGL_KPTAS_TEXTRACE:1;' : ''}${glDispatchTimingRequested ? 'BOXEDWINE_GL_DISPATCH_TIMING:1;' : ''}%22${guestTraceRequested ? '&guestTrace=1' : ''}${ioTraceRequested ? '&ioTrace=1' : ''}${cpuAffinityRequested ? '&cpuAffinity=1' : ''}`;
+    const frame = document.createElement('iframe'); frame.title = 'KOTOR'; frame.allow = 'cross-origin-isolated; autoplay'; frame.src = runtimeUrl.href; frame.className = 'original-game-frame';
     this.resetTasControls();
     this.installTasBridge(frame, session);
     this.host.replaceChildren(frame);
@@ -1332,6 +1735,7 @@ export class OriginalGame {
     await registration.update();
     const worker = await waitForOwnedWorker(registration, workerScript);
     if (!current()) return false;
+      this.rejectVmControlRequests();
       this.rejectGuestMemoryRequests(); this.guestMemorySequence = 0; this.runtimeGuestMemoryAvailable = false;
       const session = crypto.randomUUID();
     const candidate = { worker, session, leasePort: null, workerReleased: false, leaseReleased: true, release: null };
@@ -1355,13 +1759,14 @@ export class OriginalGame {
       this.runtimeProfileReady = false;
       this.worker = worker;
       this.session = session;
+      this.audioObservationDownload?.setSession(session);
       this.runtimeGuestId = gameProfile.id; this.runtimeRelease = runtime.release; this.runtimeVmCapabilities = null; this.runtimeTasAvailable = false; this.runtimeVmStatus = 'starting'; this.runtimeVmStatusRequest = 0;
       this.publishRuntimeSession();
       this.activeSession = candidate;
       this.files = files;
       this.renderFileState();
-      const query = new URLSearchParams({ rootBase: runtime.root.base, root: runtime.rootFile, appBase: '/original-game/', app: `${gameProfile.archiveNamespace}-${profile}.zip`, p: gameProfile.executable, auto: 'true', desktop: 'false', resolution: '800x600', sound: 'true', storage: runtimeStorageMode(), wasmModuleBroker: '0', ownedSession: session, parentOrigin: location.origin });
-      const frame = document.createElement('iframe'); frame.title = 'KOTOR'; frame.src = `${runtime.entry}?${query}${textureTraceRequested ? '&em-env=%22LIBGL_DEFAULTWRAP:0;LIBGL_KPTAS_TEXTRACE:1;%22' : ''}`;
+      const query = new URLSearchParams({ rootBase: runtime.root.base, root: runtime.rootFile, appBase: '/original-game/', app: runtimeProfileArchive(runtime, gameProfile, profile), p: gameProfile.executable, auto: 'true', desktop: 'false', resolution: '800x600', sound: 'true', storage: runtimeStorageMode(), wasmModuleBroker: '0', ownedSession: session, parentOrigin: location.origin });
+      const frame = document.createElement('iframe'); frame.title = 'KOTOR'; frame.allow = 'autoplay'; frame.src = `${runtime.entry}?${query}${textureTraceRequested || glDispatchTimingRequested ? `&em-env=%22LIBGL_DEFAULTWRAP:0;${textureTraceRequested ? 'LIBGL_KPTAS_TEXTRACE:1;' : ''}${glDispatchTimingRequested ? 'BOXEDWINE_GL_DISPATCH_TIMING:1;' : ''}%22` : ''}`;
       frame.className = 'original-game-frame';
       this.resetTasControls();
       this.installTasBridge(frame, session);
@@ -1427,6 +1832,7 @@ export class OriginalGame {
     this.root.classList.remove('game-running'); this.setupDetails.open = true;
     if (this.activeSession) this.pendingRevocations.set(this.activeSession.session, this.activeSession);
     dispatchEvent(new CustomEvent('telos:runtime-session', { detail:null }));
+    this.rejectVmControlRequests();
     this.rejectGuestMemoryRequests(); this.runtimeGuestMemoryAvailable = false;
     this.session = null;
     this.runtimeGuestId = null; this.runtimeRelease = null; this.runtimeVmCapabilities = null; this.runtimeTasAvailable = false; this.runtimeVmStatus = 'idle';
@@ -1437,19 +1843,35 @@ export class OriginalGame {
     if (!this.closed) this.renderFileState?.();
     await this.retryRevocations();
   }
+  updateProfileSaveButton() {
+    if (!this.profileSaveButton) return;
+    this.profileSaveButton.hidden = !this.session;
+    this.profileSaveButton.disabled = !this.session || !this.runtimeProfileReady || this.profileSaveBusy;
+  }
   flushProfile() {
     const frame = this.host?.querySelector('iframe');
-    if (!frame || !this.runtimeProfileReady) return Promise.resolve();
+    if (!this.session) return Promise.resolve();
+    if (!frame?.contentWindow || !this.runtimeProfileReady) {
+      return Promise.reject(new Error('The browser profile is not ready to save. Keep the game open and retry.'));
+    }
+    const session = this.session;
+    const source = frame.contentWindow;
+    const origin = this.runtimeOrigin(frame);
     return new Promise((resolve, reject) => {
       const request = crypto.randomUUID();
       const finish = event => {
-        if (event.source !== frame.contentWindow || event.origin !== this.runtimeOrigin(frame) || event.data?.type !== 'telos-profile-flushed' || event.data.request !== request) return;
+        if (event.source !== source || event.origin !== origin || event.data?.type !== 'telos-profile-flushed' || event.data.request !== request) return;
         clearTimeout(timeout); removeEventListener('message', finish);
-        event.data.ok ? resolve() : reject(new Error('The profile could not be saved. Keep the game open and retry.'));
+        if (this.session !== session || this.host?.querySelector('iframe') !== frame) {
+          reject(new Error('The game session changed while saving its browser profile.'));
+          return;
+        }
+        event.data.ok === true ? resolve() : reject(new Error('The profile could not be saved. Keep the game open and retry.'));
       };
       const timeout = setTimeout(() => { removeEventListener('message', finish); reject(new Error('The game did not acknowledge the profile save. It remains open.')); }, 10000);
       addEventListener('message', finish);
-      frame.contentWindow.postMessage({ type:'telos-flush-profile', request }, this.runtimeOrigin(frame));
+      try { source.postMessage({ type:'telos-flush-profile', request }, origin); }
+      catch (error) { clearTimeout(timeout); removeEventListener('message', finish); reject(error); }
     });
   }
   leaseMessage(value, port = this.lease?.port) {
@@ -1467,6 +1889,7 @@ export class OriginalGame {
   dispose() {
     if (this.disposing) return this.disposing;
     this.closed = true; ++this.generation;
+    this.audioObservationDownload?.dispose();
     this.clearTasPending();
     if (this.onClose) removeEventListener('pagehide', this.onClose);
     if (this.receiveStatus) removeEventListener('message', this.receiveStatus);

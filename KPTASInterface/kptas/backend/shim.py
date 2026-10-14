@@ -246,6 +246,8 @@ class ShimBackend:
         self._caps: Caps | None = None
         self._tier: Tier | None = None
         self._started = False
+        self._restore_poisoned = False
+        self._relaunching = False
         self._epoch = 0
         self._wine = True
         self._events: deque[EngineEvent] = deque()
@@ -428,6 +430,9 @@ class ShimBackend:
 
     def _call(self, verb: str, args: Mapping[str, Any] | None = None, timeout_s: float | None = None
               ) -> dict[str, Any]:
+        recovery_setup = self._relaunching and verb in {"tier.lock", "clock"}
+        if self._restore_poisoned and verb not in {"restore", "verify"} and not recovery_setup:
+            raise BackendError(f"{verb} refused after an unverified restore; perform a verified restore or relaunch")
         if self.wire is None:
             raise BackendError("not attached")
         allowed = VERB_ALLOW.get(verb, frozenset())
@@ -592,6 +597,8 @@ class ShimBackend:
                           input_sha256_by_tick=self._take_input_sha256(self._epoch, tick))
 
     def _one(self, verb: str, args: Mapping[str, Any]) -> StepReport:
+        if self._restore_poisoned:
+            raise BackendError(f"{verb} refused after an unverified restore; perform a verified restore or relaunch")
         try:
             res = self._call(verb, args, timeout_s=0)
         except (BackendError, OSError) as e:
@@ -670,6 +677,8 @@ class ShimBackend:
         return dataclasses.replace(rep, verbclass=rep.verbclass | VerbClass.WAIT)
 
     def input(self, note: Any) -> int:
+        if self._restore_poisoned:
+            raise BackendError("input refused after an unverified restore; perform a verified restore or relaunch")
         result = self._call("input", note_args(note))
         tick = result.get("for_tick")
         if type(tick) is not int or tick < 0:
@@ -682,6 +691,8 @@ class ShimBackend:
     # ------------------------------------------------------------------ capture and restore
 
     def capture(self, kind: Literal["dirty", "full"], enabled: bool = True) -> dict[str, Any]:
+        if self._restore_poisoned:
+            raise BackendError("capture refused after an unverified restore; perform a verified restore or relaunch")
         cap = self.cfg.get("capture", {})
         self._ensure_ring()
         return self._call("capture", {"enabled": enabled, "tracker": cap.get("tracker", "auto"),
@@ -698,31 +709,75 @@ class ShimBackend:
         """Write the page set W (a restore set file in the session directory) and let the shim verify the
         whole sim set against root. Put the tick's files first (put_files)."""
         assert self.session_dir is not None
+        if self.wire is None:
+            raise BackendError("not attached")
+        if type(tick) is not int or tick < 0 or tick > 0xFFFFFFFFFFFFFFFF:
+            raise BackendError("restore tick must be an unsigned 64-bit integer")
+        if type(root) is not bytes or len(root) != 32:
+            raise BackendError("restore root must be exactly 32 bytes")
         self._seq += 1
         path = self.session_dir / f"restore-{self._seq:06d}.rec"
-        n = write_records(path, pages)
-        t0 = time.perf_counter_ns()
+        wire_path = win_path(path, self._wine)
+        args = {"tick": tick, "root": root.hex(), "path": wire_path}
+
+        def restore_pages() -> Iterator[StagingRecord]:
+            for record in pages:
+                if not isinstance(record, StagingRecord):
+                    raise BackendError("restore set contains a non-staging record")
+                if record.kind is not RecordKind.PAGE:
+                    raise BackendError("restore set may contain only PAGE records")
+                if record.tick != tick:
+                    raise BackendError("restore PAGE tick does not match the requested target")
+                yield record
         try:
-            res = self._call("restore", {"tick": tick, "root": root.hex(), "path": win_path(path, self._wine)},
-                             timeout_s=0)
+            n = write_records(path, restore_pages())
+        except BaseException:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            raise
+        t0 = time.perf_counter_ns()
+        # Once the write-set is about to be applied, assume the live process may
+        # be partially changed until the shim proves the requested root and tick.
+        self._restore_poisoned = True
+        try:
+            res = self._call("restore", args, timeout_s=0)
         finally:
             path.unlink(missing_ok=True)
-        us = int(res.get("us", (time.perf_counter_ns() - t0) // 1000))
-        ok = (bool(res.get("verified")) and res.get("root") == root.hex()
-              and int(res.get("tick", tick)) == tick)
-        from_tick, self._tick = self._tick, int(res.get("tick", tick))
-        return Receipt(kind="seek", result="pass" if ok else "fail", from_tick=from_tick,
-                       to_tick=int(res.get("tick", tick)), mode=SeekMode.RESTORE,
-                       verify_level=VerifyLevel.FULL_ROOT, write_pages=int(res.get("pages", n)), micros=us,
-                       state_root=str(res.get("root", "")), verifier=self.name)
+        reported_tick, reported_root, verified = res.get("tick"), res.get("root"), res.get("verified")
+        if type(reported_tick) is not int or reported_tick < 0 or type(reported_root) is not str or type(verified) is not bool:
+            raise BackendError("restore reply is missing a valid tick, root, or boolean verification result")
+        us = res.get("us", (time.perf_counter_ns() - t0) // 1000)
+        write_pages = res.get("pages", n)
+        if type(us) is not int or us < 0 or type(write_pages) is not int or write_pages < 0:
+            raise BackendError("restore reply has invalid duration or page count")
+        ok = verified is True and reported_root == root.hex() and reported_tick == tick
+        from_tick = self._tick
+        receipt = Receipt(kind="seek", result="pass" if ok else "fail", from_tick=from_tick,
+                          to_tick=reported_tick, mode=SeekMode.RESTORE,
+                          verify_level=VerifyLevel.FULL_ROOT, write_pages=write_pages, micros=us,
+                          state_root=reported_root, verifier=self.name)
+        if ok:
+            self._tick = reported_tick
+            self._restore_poisoned = False
+        return receipt
 
     def put_files(self, rows: Sequence[Sequence[Any]], blob: Callable[[str], bytes]) -> None:
-        """Make the stage's writable files equal a recorded tree, at the gate, before a restore."""
+        """Replay the recorded file tree as the first phase of a page restore.
+
+        Poison before writing because a partial file-tree failure leaves the
+        live process inconsistent. A later exact, verified page restore clears
+        poison; allowing this method while poisoned is required for that retry.
+        """
         if self._files is None:
             raise BackendError("this backend does not track the game's files (game.dir or files.store)")
+        self._restore_poisoned = True
         self._files.write(rows, blob)
 
     def digest(self, regions: Sequence[str]) -> dict[str, str]:
+        if self._restore_poisoned:
+            raise BackendError("digest refused after an unverified restore; perform a verified restore or relaunch")
         return self._call("digest", {"regions": list(regions)})
 
     def snap(self, kind: Literal["digest", "full", "semantic"]) -> dict[str, Any]:
@@ -755,6 +810,8 @@ class ShimBackend:
     def files(self, op: Literal["snap", "put"], blob: bytes | None = None) -> bytes | None:
         """The stage's writable files. With the stage tracked here they are read and written directly;
         otherwise the shim's files verb carries them."""
+        if self._restore_poisoned and op == "put":
+            raise BackendError("file write refused after an unverified restore; perform a verified restore or relaunch")
         if self._files is not None:
             if op == "snap":
                 return self._files.snapshot()
@@ -890,11 +947,16 @@ class ShimBackend:
         self._started = False
         self._epoch += 1
         assert self._listener is not None
-        self._connect(self._listener.getsockname()[1], int(self.cfg.get("shim", {}).get("connect_timeout_s", 30)))
-        if tier is not None:
-            self.lock_tier(tier)
-        if self._clock_args is not None:
-            self.clock(*self._clock_args)   # the new process needs its clock request again
+        self._relaunching = True
+        try:
+            self._connect(self._listener.getsockname()[1], int(self.cfg.get("shim", {}).get("connect_timeout_s", 30)))
+            if tier is not None:
+                self.lock_tier(tier)
+            if self._clock_args is not None:
+                self.clock(*self._clock_args)   # the new process needs its clock request again
+            self._restore_poisoned = False
+        finally:
+            self._relaunching = False
         return ProcOutcome.ALIVE
 
     def watch(self, wid: str, addr: int, length: int, cond: str) -> None:

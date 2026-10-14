@@ -1,0 +1,7 @@
+# Preserve scored input within the workspace
+
+The actual d920 owner completed title input1 at presentation29/full51workerpause. After interacting with embedded recording controls, the next score action was refused before dispatch because an earlier input batch was queued. No second action acceptance is claimed. The parent unconditionally released TAS inputs on window blur; focusing its iframe can blur the parent window without leaving the workspace. The child independently released scored held state when focus returned to the editor. These source paths do not preserve authoring state while using the game's controls.
+
+The parent now defers its focus check through a microtask and releases only when the document no longer has focus and the owner session remains current. Visibility loss, target change, transport failure and explicit release retain existing behavior. In an embedded runtime, iframe blur no longer independently releases TAS state; its owning workspace controls release. Standalone runtime blur and pagehide still release. Native physical pointer capture has separate handlers.
+
+Pending-event admission remains fail closed. Its error now includes the paused native bookkeeping values rather than implying an exact cause. Existing loaded pages are unchanged; internal focus transitions and true workspace/tab loss require actual live qualification in a fresh owner. No tests or probes were run.

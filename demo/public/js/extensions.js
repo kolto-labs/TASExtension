@@ -5,12 +5,33 @@ export { CORE_API };
 export const TAS_ID = 'telos.tas';
 export const extensions = new ExtensionHost();
 
+// Static panel ownership metadata must be available before the optional pack
+// downloads. Include legacy IDs so saved layouts cannot expose dormant tools.
+const TAS_PANEL_IDS = Object.freeze(['score', 'right', 'branches', 'transport', 'timeline',
+  'piano-roll', 'score-history', 'sample-state', 'sample-hex', 'sample-scene', 'console']);
+
 // Only catalog metadata is loaded by Core. The optional pack owns its UI,
 // editor, render loop, and input lifecycle; none is downloaded before enable.
 export function registerOptionalTas(host) {
   const choiceKey = 'telos.tas.explicit-choice.v1';
-  let admitted = false, wanted = false, generation = 0, pack = null, loading = null;
+  let admitted = false, wanted = false, ready = false, generation = 0, pack = null, loading = null;
   try { admitted = localStorage.getItem(choiceKey) === '1'; } catch { /* session-only state */ }
+  const syncVisibility = () => {
+    const available = admitted && wanted && ready && extensions.enabled(TAS_ID);
+    document.body.dataset.tasExtension = available ? 'enabled' : 'disabled';
+    // Availability does not rewrite saved visibility or user geometry.
+    window.TelosDock?.setAvailable?.(TAS_PANEL_IDS, available);
+  };
+  window.addEventListener('telos:dock-ready', syncVisibility);
+  window.addEventListener('telos:tas-package-state', event => {
+    if (!['loading', 'ready', 'disabled', 'error'].includes(event.detail?.phase)) return;
+    ready = event.detail.phase === 'ready' && wanted && extensions.enabled(TAS_ID);
+    syncVisibility();
+  });
+  extensions.addEventListener('change', event => {
+    if (event.detail.id === TAS_ID) syncVisibility();
+  });
+  syncVisibility();
   const load = async (ticket) => {
     try {
       loading ||= import('../packages/tas-ui/index.js').finally(() => { loading = null; });
@@ -19,20 +40,24 @@ export function registerOptionalTas(host) {
       pack ||= module.createTasUi(host);
       pack.activate();
     } catch (error) {
-      if (wanted && ticket === generation) host.onError(error);
+      if (wanted && ticket === generation) {
+        ready = false; syncVisibility(); host.onError(error);
+      }
     }
   };
   extensions.register(TAS_MANIFEST, {
     activate() {
       if (!admitted) return;
-      wanted = true;
+      wanted = true; ready = false;
+      syncVisibility();
       void load(++generation);
     },
     deactivate() {
-      wanted = false; generation++;
-      pack?.deactivate();
+      wanted = false; ready = false; generation++;
+      syncVisibility();
+      try { pack?.deactivate(); } finally { syncVisibility(); }
     },
-  });
+  }, { restore: admitted });
   // Earlier shells auto-enabled the editor. Keep their data and layouts but
   // require the package's existing explicit-choice migration before loading.
   if (!admitted) {
@@ -40,6 +65,7 @@ export function registerOptionalTas(host) {
     try { localStorage.setItem(choiceKey, '1'); } catch { /* session-only state */ }
   }
   admitted = true;
+  syncVisibility();
 }
 
 const stateLabel = (state) => state.cleanupPending ? 'Cleanup required'
@@ -249,12 +275,12 @@ export function mountExtensionManager() {
       if (manifest.id === TAS_ID) {
         const scope = document.createElement('p');
         scope.className = 'extension-note';
-        scope.textContent = 'TAS adds score editing, input recording, and branch tools. Live actions depend on the connected game session; installing TAS does not add runtime capabilities.';
+        scope.textContent = 'Score editor, Transport / Timeline, Branches and input recording belong to this optional pack. They remain hidden until TAS is enabled and ready. Live actions depend on the connected game session.';
         tools.append(scope);
         if (state.enabled) {
           const shortcuts = document.createElement('div');
           shortcuts.className = 'extension-actions';
-          for (const [id, label] of [['score', 'score editor'], ['piano-roll', 'piano roll']]) {
+          for (const [id, label] of [['score', 'score editor'], ['transport', 'transport / timeline'], ['right', 'branches'], ['piano-roll', 'piano roll']]) {
             const shortcut = document.createElement('button');
             shortcut.type = 'button'; shortcut.className = 'btn';
             shortcut.textContent = `Open ${label}`;

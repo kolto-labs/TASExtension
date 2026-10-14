@@ -1,9 +1,50 @@
-import { debuggerQualificationView } from '../debugger/debugger-contract.js';
+import { DEBUG_OPERATIONS, DebugTargetAdapterRegistry, debuggerQualificationView, resolveDebuggerCapabilities } from '../debugger/debugger-contract.js';
 import { identifyBinaryHeader } from './binary-identity.js';
 import { createCapturedMemoryInspector } from './captured-memory-inspector.js';
+import { createAdapterDetails, createCapabilityDirectory } from './debugger-capability-directory.js';
+import { DEBUG_REQUEST_SCHEMA, DEBUG_REPLY_SCHEMA } from '../packages/debug-runtime/runtime.js';
+
+function boundedInputKeys(value) {
+  if (!Array.isArray(value) || !value.length || value.length > 32
+    || Array.from(value).some(key => typeof key !== 'string' || !/^[a-z0-9][a-z0-9-]{0,31}$/.test(key))
+    || new Set(value).size !== value.length) return null;
+  return [...value];
+}
+
+function boundedThreadLifecycle(value) {
+  if (!value || typeof value !== 'object') return null;
+  const keys = ['starting', 'running', 'kernelWait', 'paused', 'exiting', 'total'];
+  if (!keys.every(key => Number.isSafeInteger(value[key]) && value[key] >= 0 && value[key] <= 4095)) return null;
+  if (keys.slice(0, 5).reduce((sum, key) => sum + value[key], 0) !== value.total) return null;
+  return Object.fromEntries(keys.map(key => [key, value[key]]));
+}
 
 // Observe the session owner; the existing transport remains the only controller.
-export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
+export function mountDebuggerWorkbench(game, { isEnabled = () => true, debugRuntime, mountRoot = document.getElementById('cockpit') } = {}) {
+  if (!(mountRoot instanceof HTMLElement) || !mountRoot.isConnected) {
+    throw new Error('The debugger workspace mount point is unavailable.');
+  }
+  let debugRequestSequence = 0;
+  async function requestDebug(operation, params = {}) {
+    const requestSession = game.session;
+    if (!requestSession || typeof debugRuntime?.request !== 'function') throw new Error('The debugger request service is unavailable.');
+    const reply = await debugRuntime.request({ schema:DEBUG_REQUEST_SCHEMA, id:`debug-workbench-${++debugRequestSequence}`,
+      session:requestSession, operation, params });
+    if (reply?.schema !== DEBUG_REPLY_SCHEMA || reply.session !== requestSession
+      || reply.operation !== operation || game.session !== requestSession) {
+      throw new Error('The game session changed or returned an invalid debugger reply.');
+    }
+    return reply.data;
+  }
+  async function readMemory(pid, address, length) {
+    const data = await requestDebug('memory.read', { pid, address, length });
+    if (data?.pid !== pid || data.address !== address || data.length !== length
+      || !Array.isArray(data.bytes) || data.bytes.length !== length
+      || data.bytes.some(byte => !Number.isInteger(byte) || byte < 0 || byte > 255)) {
+      throw new Error('The debugger returned an invalid memory response.');
+    }
+    return Uint8Array.from(data.bytes);
+  }
   const make = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -15,14 +56,14 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
   panel.dataset.telosDockTitle = 'Debugger';
   panel.open = false;
   const summary = make('summary', 'dw-summary');
-  const title = make('span', 'dw-title', 'Advanced diagnostics');
+  const title = make('span', 'dw-title', 'Debugger workbench');
   const badge = make('span', 'dw-status', 'Disconnected');
   summary.append(title, badge);
   const body = make('div', 'dw-body');
   const provenance = make('p', 'dw-provenance', 'Live runtime session');
   const grid = make('dl', 'dw-metrics');
   const fields = new Map();
-  for (const label of ['Session', 'Target', 'Format', 'Architecture', 'OS / ABI', 'Execution boundary', 'Rendered images', 'Parked workers']) {
+  for (const label of ['Session', 'Target', 'Executable', 'Build SHA-256', 'Backend', 'Release', 'Format', 'Architecture', 'OS / ABI', 'Pointer width', 'Byte order', 'Execution boundary', 'Input admission', 'Score keys', 'Rendered images', 'Parked workers', 'Worker lifecycle snapshot']) {
     const row = make('div');
     const value = make('dd', '', '—');
     row.append(make('dt', '', label), value);
@@ -33,7 +74,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
   capabilities.setAttribute('aria-label', 'Advertised runtime capabilities');
   const note = make('p', 'dw-note', 'Waiting for a capability handshake from the selected session.');
   const support = make('details', 'dw-support');
-  const supportSummary = make('summary', '', 'Session capabilities');
+  const supportSummary = make('summary', '', 'Runtime capability advertisements');
   const supportList = make('dl', 'dw-support-list');
   supportList.setAttribute('aria-label', 'Debugger operation support reported by this session');
   support.hidden = true;
@@ -73,9 +114,9 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
   lengthInput.step = '1';
   lengthInput.value = '256';
   lengthLabel.append(lengthInput);
-  const readMemory = make('button', 'btn small', 'Read memory');
-  readMemory.type = 'submit';
-  memoryControls.append(processLabel, refreshProcesses, addressLabel, lengthLabel, readMemory);
+  const readMemoryButton = make('button', 'btn small', 'Read memory');
+  readMemoryButton.type = 'submit';
+  memoryControls.append(processLabel, refreshProcesses, addressLabel, lengthLabel, readMemoryButton);
   memoryForm.append(memoryControls);
   const memoryStatus = make('p', 'dw-note');
   memoryStatus.setAttribute('role', 'status');
@@ -127,7 +168,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
   inputHead.append(make('h3', '', 'Latest acknowledged input'), inputTime);
   const inputValues = make('dl', 'dw-metrics');
   const inputFields = new Map();
-  for (const label of ['Score tick', 'Render present', 'Consumed events', 'Round trip']) {
+  for (const label of ['Score tick', 'Render present', 'Consumed events', 'Requested keys', 'Requested buttons', 'Requested mouse', 'GL presentations during input', 'GL presentations before consumption', 'GL presentations after consumption', 'Round trip']) {
     const row = make('div');
     const value = make('dd', '', '—');
     row.append(make('dt', '', label), value);
@@ -144,6 +185,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
   exportInspection.disabled = true;
   exportInspection.setAttribute('aria-label', 'Export captured inspection and session activity as JSON');
   historyHead.append(make('h3', '', 'Session activity'), exportInspection, clear);
+  historyHead.tabIndex = -1;
   const history = make('ol', 'dw-history');
   history.setAttribute('aria-label', 'Recent session activity, newest first');
   const empty = make('p', 'dw-empty', 'Runtime changes and acknowledged inputs will appear here.');
@@ -158,10 +200,37 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
   pickerLabel.append(picker);
   const binaryStatus = make('p', 'dw-note', 'Choose a file to inspect its metadata locally. Nothing is uploaded.');
   binaryStatus.setAttribute('role', 'status');
+  const adapterRegistry = new DebugTargetAdapterRegistry();
+  const liveAdapter = createAdapterDetails(make, adapterRegistry);
+  const fileAdapter = createAdapterDetails(make, adapterRegistry, true);
+  const inspectionDirectory = createCapabilityDirectory(make, destination => {
+    if (['threads', 'registers', 'address-mapping'].includes(destination)) {
+      const dock = window.TelosDock;
+      if (typeof dock?.reveal === 'function') dock.reveal(`debug-${destination}`);
+      else dock?.show(`debug-${destination}`);
+      return;
+    }
+    const target = destination === 'memory' ? memoryPanel : destination === 'file' ? binary : historyHead;
+    if (target.tagName === 'DETAILS') target.open = true;
+    target.scrollIntoView({ block:'nearest' });
+    (target.querySelector('summary') || target).focus({ preventScroll:true });
+  });
+  let inspectedTarget = null;
+  const adapterLabel = make('label', 'dw-binary-picker', 'Load a target adapter manifest (JSON)');
+  const adapterPicker = make('input');
+  adapterPicker.type = 'file';
+  adapterPicker.accept = '.json,application/json';
+  adapterLabel.append(adapterPicker);
+  const adapterStatus = make('p', 'dw-note', 'No target adapter registered. Local SHA-256 supports exact-build identity for files up to 128 MiB. Manifests do not load code or grant runtime operations.');
+  adapterStatus.setAttribute('role', 'status');
+  let lastAdapterStatus = adapterStatus.textContent;
+  const setAdapterStatus = text => {
+    if (text !== lastAdapterStatus) adapterStatus.textContent = lastAdapterStatus = text;
+  };
   const binaryValues = make('dl', 'dw-metrics');
   binaryValues.hidden = true;
   const binaryFields = new Map();
-  for (const label of ['File', 'Format', 'Architecture', 'ABI', 'Identification', 'Reason', 'Declared entry', 'Preferred image base']) {
+  for (const label of ['File', 'Format', 'Architecture', 'ABI', 'Identification', 'SHA-256', 'Reason', 'Declared entry', 'Preferred image base']) {
     const row = make('div');
     const value = make('dd', '', 'Unknown');
     row.append(make('dt', '', label), value);
@@ -198,12 +267,44 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
   layoutPanel.append(layoutStatus, layoutScroll,
     make('p', 'dw-note', 'PE sections and ELF load segments show R/W/X permissions. ELF sections show W/X/A flags; A means allocated and does not establish read permission. ELF addresses may need a load bias. NOBITS sections have no file bytes. PE names are the eight-byte header names. Inspection is capped at 256 sections and 256 program headers; extended ELF numbering is unavailable.'));
   layoutPanel.hidden = true;
-  binary.append(pickerLabel, binaryStatus, binaryValues, evidence, metadataStatus, dependencyList, metadataScope, layoutPanel,
+  binary.append(pickerLabel, binaryStatus, binaryValues, evidence, metadataStatus, dependencyList, metadataScope, layoutPanel, adapterLabel, adapterStatus, fileAdapter.element,
     make('p', 'dw-note', 'Header identification is separate from runtime compatibility. Inspecting a file does not change the active game.'));
+  const showAdapterMatch = () => {
+    let resolution = null, error = null;
+    if (session && descriptor?.capabilityReports != null) {
+      try { resolution = resolveDebuggerCapabilities({session, revision:descriptor.revision, target:descriptor.target, reports:descriptor.capabilityReports}); }
+      catch (cause) { error = cause instanceof Error ? cause.message : 'Invalid capability reports'; }
+    }
+    liveAdapter.update(descriptor?.target, resolution);
+    fileAdapter.update(inspectedTarget, null);
+    inspectionDirectory.update({ session, descriptor, resolution, error });
+  };
+  let adapterInspection = 0;
+  adapterPicker.addEventListener('change', async () => {
+    const request = ++adapterInspection;
+    const file = adapterPicker.files?.[0];
+    adapterPicker.value = '';
+    if (!file) return;
+    if (file.size > 256 * 1024) { setAdapterStatus('Manifest exceeds the 256 KiB limit.'); return; }
+    setAdapterStatus('Reading target adapter manifest…');
+    try {
+      const text = await file.text();
+      if (request !== adapterInspection) return;
+      const manifest = JSON.parse(text);
+      const registered = adapterRegistry.register(manifest);
+      setAdapterStatus(`Registered declarative adapter ${registered.id} ${registered.version}; executable code was not loaded.`);
+      showAdapterMatch();
+    } catch (error) {
+      if (request !== adapterInspection) return;
+      setAdapterStatus(`Manifest rejected: ${error instanceof Error ? error.message : 'invalid manifest'}`);
+    }
+  });
   let inspection = 0;
   picker.addEventListener('change', async () => {
     const request = ++inspection;
     const file = picker.files?.[0];
+    inspectedTarget = null;
+    showAdapterMatch();
     binaryValues.hidden = true;
     layoutPanel.hidden = true;
     layoutRows.replaceChildren();
@@ -216,9 +317,31 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
     try {
       const value = await identifyBinaryHeader(file);
       if (request !== inspection) return;
+      if (['identified', 'ambiguous'].includes(value.status)) {
+        let sha256 = null;
+        let hashStatus = 'Exact-build matching unavailable: Web Crypto SHA-256 is not available in this context.';
+        if (file.size <= 128 * 1024 * 1024 && typeof globalThis.crypto?.subtle?.digest === 'function') {
+          try {
+            binaryStatus.textContent = 'Calculating SHA-256 locally… file contents stay in this browser.';
+            const digest = await globalThis.crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+            if (request !== inspection) return;
+            sha256 = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+            hashStatus = 'SHA-256 calculated locally; file contents were not uploaded.';
+          } catch {
+            hashStatus = 'Exact-build matching unavailable: the local SHA-256 calculation failed.';
+          }
+        } else if (file.size > 128 * 1024 * 1024) {
+          hashStatus = 'Exact-build matching unavailable: executable exceeds the 128 MiB local hashing limit.';
+        }
+        if (request !== inspection) return;
+        inspectedTarget = { profile:null, executable:null, sha256, format:value.format,
+          architecture:value.architecture || null, osAbi:value.abi || null,
+          pointerBits:value.metadata?.pointerBits ?? null, byteOrder:value.byteOrder || null };
+        binaryStatus.textContent = `${file.name}: ${value.status}. ${hashStatus}`;
+      }
       const identified = value.status === 'identified' ? 'Identified' : value.status === 'ambiguous' ? 'Ambiguous' : 'Unknown';
       const metadata = value.metadata, entry = metadata?.entryPoint;
-      const values = [file.name, value.format, value.architecture || value.architectures?.join(', '), value.abi, identified, value.reason?.replaceAll('-', ' '),
+      const values = [file.name, value.format, value.architecture || value.architectures?.join(', '), value.abi, identified, inspectedTarget?.sha256 || 'Unavailable', value.reason?.replaceAll('-', ' '),
         entry ? `${entry.address} (${entry.kind}) · ${entry.note}` : 'Unavailable', entry?.imageBase || 'Unavailable'];
       [...binaryFields.values()].forEach((node, index) => { node.textContent = values[index] || 'Unknown'; });
       evidence.replaceChildren(...(value.evidence || []).map(text => make('li', '', text)));
@@ -239,14 +362,17 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
       }));
       layoutScroll.hidden = !layout?.entries.length;
       binaryValues.hidden = false;
-      binaryStatus.textContent = `${file.name}: ${identified.toLowerCase()}.`;
+      if (!inspectedTarget) binaryStatus.textContent = `${file.name}: ${identified.toLowerCase()}.`;
+      showAdapterMatch();
     } catch {
-      if (request === inspection) binaryStatus.textContent = 'Could not read this file. Choose it again to retry.';
+      if (request === inspection) { binaryStatus.textContent = 'Could not read this file. Choose it again to retry.'; showAdapterMatch(); }
     }
   });
-  body.append(provenance, grid, capabilities, note, support, qualificationPanel, boundaryNote, memoryPanel, handoffs, inputWatch, historyHead, empty, history, retention, binary);
+  body.append(provenance, grid, capabilities, note, liveAdapter.element, inspectionDirectory.element, support, qualificationPanel, boundaryNote, memoryPanel, handoffs, inputWatch, historyHead, empty, history, retention, binary);
   panel.append(summary, body);
-  game.root.append(panel);
+  // The game owner replaces its own children while opening. Keep package UI
+  // in the stable workspace even when Debug activates before the dock owner.
+  mountRoot.append(panel);
   window.TelosDock?.register('debugger', 'Debugger', panel);
 
   let session = game.session || null;
@@ -360,7 +486,13 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
   const listeners = [];
   const count = value => Number.isSafeInteger(value) && value >= 0 ? value.toLocaleString() : '—';
   const identity = value => typeof value === 'string' && value.trim() ? value : 'Not identified';
-  const operationLabels = { input:'Input', pause:'Pause', resume:'Resume', step:'Step', threadCounts:'Thread counts', threadList:'Thread list', memoryRead:'Memory read', registers:'Registers', disassembly:'Disassembly', breakpoints:'Breakpoints', snapshot:'Snapshot', restore:'Restore' };
+  const operationLabels = { input:'Input', pause:'Pause', resume:'Resume', step:'Step', threadCounts:'Thread counts', threadList:'Thread list', memoryRead:'Memory read', registers:'Registers', addressMapping:'Address backing file', disassembly:'Disassembly', breakpoints:'Breakpoints', snapshot:'Snapshot', restore:'Restore' };
+  const runtimeOperationAliases = Object.freeze({
+  'input.apply':'input', 'execution.pause':'pause', 'execution.resume':'resume', 'execution.step':'step',
+  'threads.count':'threadCounts', 'threads.list':'threadList', 'memory.read':'memoryRead',
+  'registers.read':'registers', 'memory.mapping':'addressMapping', 'code.disassemble':'disassembly', 'breakpoints.manage':'breakpoints',
+  'state.snapshot':'snapshot', 'state.restore':'restore',
+});
   const set = (node, text) => { if (node.textContent !== text) node.textContent = text; };
   const resetHistory = () => {
     activityRecords = [];
@@ -421,10 +553,16 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
     resetHistory();
   };
   const record = (label, text, error = false) => {
-    activityRecords.unshift({ receivedAt:new Date().toISOString(), session, label, text, error });
+    const received = new Date();
+    activityRecords.unshift({ receivedAt:received.toISOString(), session, label, text, error });
     activityRecords.length = Math.min(activityRecords.length, 40);
     const row = make('li', error ? 'dw-error' : '');
-    row.append(make('strong', '', label), make('span', '', text));
+    const heading = make('strong', '', label);
+    const time = make('time', 'dw-note', received.toLocaleTimeString());
+    time.dateTime = received.toISOString();
+    time.title = received.toISOString();
+    heading.append(make('br'), time);
+    row.append(heading, make('span', '', text));
     history.prepend(row);
     while (history.children.length > 40) history.lastElementChild.remove();
     empty.hidden = true;
@@ -440,11 +578,20 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
       const observed = candidate?.session === session ? candidate : null;
       const age = observed ? performance.now() - observed.receivedAt : NaN;
       const operations = descriptor?.debugger?.schema === 'telos.debug-capabilities/v1' ? descriptor.debugger.operations : null;
+      const serviceStatus = debugRuntime?.capabilities?.();
+      const serviceOperations = serviceStatus?.schema === 'telos.debug-adapter-status/v1' && serviceStatus.session === session
+        ? Object.fromEntries(Object.entries(serviceStatus.operations || {}).map(([id, value]) => [id, {
+          state:['available', 'unsupported', 'unavailable', 'not-qualified'].includes(value?.state) ? value.state : 'unknown',
+          source:['live-runtime', 'static-analysis', 'captured-memory'].includes(value?.source) ? value.source : null,
+          unit:typeof value?.unit === 'string' ? value.unit : null,
+          owner:typeof value?.owner === 'string' ? value.owner : null,
+          reason:typeof value?.reason === 'string' ? value.reason : null,
+        }])) : null;
       const document = {
         schema:'telos-debugger-inspection/2', exportedAt:new Date().toISOString(),
         session,
         source:'Observed session events and previously captured guest memory',
-        target:descriptor?.target?.profile || descriptor?.guestId || null,
+        target:descriptor?.target || descriptor?.guestId || null,
         backend:descriptor?.backend?.id || null, release:descriptor?.backend?.version || null,
         executionBoundary:descriptor?.executionBoundary || null,
         observation:observed ? {
@@ -456,17 +603,24 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
         } : null,
         capabilityQualification:qualification(),
         operationProjection:{ schema:'telos-inspection-operations/1', scope:'runtime-handshake',
-          entries:Object.keys(operationLabels).map(key => ({
-            id:key, kind:'runtime-operation', enabled:null,
-            state:['available', 'unsupported', 'unavailable', 'not-qualified'].includes(operations?.[key]?.state) ? operations[key].state : 'unknown',
-            unit:typeof operations?.[key]?.unit === 'string' ? operations[key].unit : null,
-          })),
+          entries:Object.entries(DEBUG_OPERATIONS).map(([id]) => {
+            const capability = operations?.[runtimeOperationAliases[id] || id];
+            return {
+              id, kind:'runtime-operation', enabled:null,
+              state:['available', 'unsupported', 'unavailable', 'not-qualified'].includes(capability?.state) ? capability.state : 'unknown',
+              unit:typeof capability?.unit === 'string' ? capability.unit : null,
+            };
+          }),
         },
         backendDetails:{ browserRuntime:{
           capabilitySchema:descriptor?.debugger?.schema || null,
+          inputKeys:boundedInputKeys(descriptor?.inputKeys),
+          inputAdmission:['quiescent-pause-and-consumption', 'quiescent-pause', 'pre-input-present-baseline', 'legacy-render-drain'].includes(descriptor?.inputAdmission) ? descriptor.inputAdmission : null,
+          debugRequestService:serviceOperations ? { schema:'telos.debug-adapter-status/v1', operations:serviceOperations } : null,
           renderedImages:Number.isSafeInteger(observed?.presents) ? observed.presents : null,
           activeWorkers:Number.isSafeInteger(observed?.activeThreads) ? observed.activeThreads : null,
           parkedWorkers:Number.isSafeInteger(observed?.parkedThreads) ? observed.parkedThreads : null,
+          threadStateCounts:boundedThreadLifecycle(observed?.threadStateCounts),
         } },
         advertisedCapabilities:Object.fromEntries(Object.keys(operationLabels).map(key => [key, typeof descriptor?.capabilities?.[key] === 'boolean' ? descriptor.capabilities[key] : null])),
         activityOrder:'newest-first', activityLimit:40,
@@ -492,6 +646,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
   const render = () => {
     if (!isEnabled()) return;
     syncSession();
+    showAdapterMatch();
     exportInspection.disabled = !session || (!descriptor && !activityRecords.length && !capturedMemory);
     const candidate = window.__telosRuntimeDiagnostics;
     const status = session && candidate?.session === session ? candidate : null;
@@ -509,6 +664,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
     badge.dataset.state = terminal ? 'stopped' : fresh ? status.state : 'waiting';
     const debug = descriptor?.debugger;
     const operations = debug?.schema === 'telos.debug-capabilities/v1' ? debug.operations : null;
+    const serviceOperations = debugRuntime?.capabilities?.().operations || {};
     const qualified = qualification();
     const qualificationText = JSON.stringify(qualified);
     if (qualificationText !== lastQualificationText) {
@@ -537,10 +693,14 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
     }
     const renderBoundary = descriptor?.executionBoundary === 'render-present';
     const memoryReason = !session ? 'Unavailable: no active game session.' :
-      descriptor?.backend?.id !== 'boxedwine-wasm' ? 'Unavailable: waiting for the game session to connect.' :
+      !descriptor ? 'Unavailable: waiting for the selected runtime capability handshake.' :
+      descriptor.backend?.id !== 'boxedwine-wasm' ? 'Unavailable: this browser memory bridge supports BoxedWine guest processes only.' :
       operations?.memoryRead?.state !== 'available' ? `Memory read: ${operations?.memoryRead?.state || 'not reported'}. The selected runtime must advertise this operation.` :
-      typeof game.getGuestProcesses !== 'function' || typeof game.readGuestMemory !== 'function' ? 'Unavailable: this page does not provide the guest-memory bridge.' :
-      !status || terminal ? 'Unavailable: waiting for a runtime pause acknowledgement.' :
+      descriptor.capabilityReports != null && qualified.operations['memory.read']?.state !== 'available' ?
+        `Memory read is blocked by session qualification: ${qualified.operations['memory.read']?.reason || 'No matching capability evidence.'}` :
+      typeof debugRuntime?.request !== 'function' || serviceOperations['memory.read']?.state !== 'available' ? 'Unavailable: the shared debugger runtime has no qualified guest-memory route.' :
+      terminal ? 'Unavailable: the selected runtime stopped or reported an error. Reconnect using the game controls, then pause and refresh processes.' :
+      !status ? 'Unavailable: waiting for a runtime pause acknowledgement.' :
       status.state !== 'paused' ? 'Pause the game before listing processes or reading guest memory.' :
       !Number.isSafeInteger(status.activeThreads) || status.activeThreads <= 0 || status.parkedThreads !== status.activeThreads ? 'Unavailable: waiting for all guest workers to park.' : '';
     memoryReady = !memoryReason;
@@ -551,7 +711,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
       set(memoryStatus, 'Request discarded because the runtime stopped.');
     }
     memoryControls.disabled = !memoryReady || memoryBusy;
-    readMemory.disabled = !processSelect.value || !/^\d+$/.test(processSelect.value);
+    readMemoryButton.disabled = !processSelect.value || !/^\d+$/.test(processSelect.value);
     set(memoryAvailability, memoryReason || (fresh
       ? 'Pause acknowledged. The runtime revalidates that all workers are paused when processing each request.'
       : 'Last acknowledgement: all guest workers paused. Status is stale; each request requires the runtime to revalidate the pause before capturing data.'));
@@ -565,6 +725,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
         const state = states[operation?.state] || 'Not reported';
         const unit = typeof operation?.unit === 'string' && operation.unit.trim() ? ` · ${operation.unit}` : '';
         const value = make('dd', '', `${state}${unit}`);
+        if (typeof operation?.reason === 'string') value.append(make('p', 'dw-note', operation.reason));
         value.dataset.state = operation?.state || 'unknown';
         row.append(make('dt', '', label), value);
         return row;
@@ -572,16 +733,32 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
       lastSupportText = supportText;
     }
     set(boundaryNote, renderBoundary ? 'A render step advances to the next presented image. It is not a CPU instruction step. Runtime snapshot and restore support is listed separately from score history.' : '');
-    set(fields.get('Session'), descriptor ? 'KOTOR browser player' : 'Not connected');
+    set(fields.get('Session'), session || 'Not connected');
     set(fields.get('Target'), identity(descriptor?.target?.profile || descriptor?.guestId));
+    set(fields.get('Executable'), identity(descriptor?.target?.executable));
+    set(fields.get('Build SHA-256'), identity(descriptor?.target?.sha256));
+    set(fields.get('Backend'), identity(descriptor?.backend?.id));
+    set(fields.get('Release'), identity(descriptor?.backend?.version));
     set(fields.get('Format'), identity(descriptor?.target?.format));
     set(fields.get('Architecture'), identity(descriptor?.target?.architecture));
     set(fields.get('OS / ABI'), identity(descriptor?.target?.osAbi));
+    const pointerBits = descriptor?.target?.pointerBits, byteOrder = descriptor?.target?.byteOrder;
+    set(fields.get('Pointer width'), [8,16,32,64,128].includes(pointerBits) ? `${pointerBits} bits` : 'Unavailable');
+    set(fields.get('Byte order'), byteOrder === 'little' ? 'Little endian' : byteOrder === 'big' ? 'Big endian' : 'Unavailable');
     set(fields.get('Execution boundary'), renderBoundary ? 'Render presentation' : typeof descriptor?.executionBoundary === 'string' ? descriptor.executionBoundary : 'Not qualified');
+    const inputKeys = boundedInputKeys(descriptor?.inputKeys);
+    const admissionLabels = new Map([['quiescent-pause-and-consumption','Complete worker pause; native consumption then next GL presentation'], ['quiescent-pause','Complete worker pause'], ['pre-input-present-baseline','Pre-input render baseline'], ['legacy-render-drain','Legacy render drain']]);
+    set(fields.get('Input admission'), admissionLabels.get(descriptor?.inputAdmission) || 'Unavailable');
+    set(fields.get('Score keys'), inputKeys ? inputKeys.join(' ') : 'Unavailable');
     fields.get('Rendered images').parentElement.hidden = !renderBoundary;
     fields.get('Parked workers').parentElement.hidden = debug ? operations?.threadCounts?.state !== 'available' : !renderBoundary;
     set(fields.get('Rendered images'), fresh && !terminal ? count(status.presents) : '—');
     set(fields.get('Parked workers'), fresh && !terminal ? `${count(status.parkedThreads)} / ${count(status.activeThreads)}` : '—');
+    const lifecycle = fresh && !terminal ? boundedThreadLifecycle(status?.threadStateCounts) : null;
+    fields.get('Worker lifecycle snapshot').parentElement.hidden = !lifecycle;
+    set(fields.get('Worker lifecycle snapshot'), lifecycle
+      ? `Starting ${lifecycle.starting} · Running ${lifecycle.running} · Kernel wait ${lifecycle.kernelWait} · Paused ${lifecycle.paused} · Exiting ${lifecycle.exiting} · Total ${lifecycle.total}` : '—');
+    fields.get('Worker lifecycle snapshot').title = 'One backend lifecycle snapshot. Counts do not identify guest threads, instruction locations or wait causes. The parked-worker counters are sampled separately.';
     const caps = descriptor?.capabilities || {};
     const labels = [];
     if (operations) {
@@ -629,7 +806,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
     memoryStatus.textContent = 'Revalidating the runtime pause and listing guest processes…';
     render();
     try {
-      const processes = await game.getGuestProcesses();
+      const processes = (await requestDebug('processes.list', {}))?.processes;
       render();
       if (request !== memoryRequest || selectedSession !== session) return;
       if (!Array.isArray(processes) || processes.length > 4096 || processes.some(value => !Number.isSafeInteger(value?.pid) || value.pid <= 0 || value.pid > 0xffffffff)) throw new Error('The runtime returned an invalid process list.');
@@ -647,7 +824,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
       memoryCapture.textContent = '';
       memoryStatus.textContent = pids.length ? `${pids.length} guest processes. Select a PID and address to read.` : 'No guest processes were returned.';
     } catch (error) {
-      if (request === memoryRequest) memoryStatus.textContent = `Could not list processes: ${error.message || 'request failed'}`;
+      if (request === memoryRequest) memoryStatus.textContent = `Could not list processes: ${error.message || 'request failed'}. Confirm the game is paused, then refresh processes again.`;
     } finally {
       if (request === memoryRequest) { memoryBusy = false; render(); }
     }
@@ -694,7 +871,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
     memoryStatus.textContent = 'Revalidating the runtime pause and capturing guest memory…';
     render();
     try {
-      const bytes = await game.readGuestMemory(pid, address, length);
+      const bytes = await readMemory(pid, address, length);
       render();
       if (request !== memoryRequest || selectedSession !== session) return;
       if (!(bytes instanceof Uint8Array) || bytes.length !== length) throw new Error('The runtime returned an incomplete or invalid memory read.');
@@ -718,7 +895,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
       memoryCapture.textContent = `Received ${capturedAt.toLocaleTimeString()} · ${captureIdentity.target} · session ${captureIdentity.session} · PID ${pid} · 0x${address.toString(16)} · ${length} bytes`;
       memoryStatus.textContent = 'Memory captured.';
     } catch (error) {
-      if (request === memoryRequest) memoryStatus.textContent = `Could not read guest memory: ${error.message || 'request failed'}`;
+      if (request === memoryRequest) memoryStatus.textContent = `Could not read guest memory: ${error.message || 'request failed'}. Confirm the pause, refresh the PID list and check that this address range is readable.`;
     } finally {
       if (request === memoryRequest) { memoryBusy = false; render(); }
     }
@@ -739,6 +916,20 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
     }
     render();
   });
+  listen('telos:wasm-release', event => {
+    syncSession();
+    const value = event.detail;
+    if (!descriptor || !session || value?.schema !== 'telos.input-release-observation/v1' || value.session !== session
+        || !Number.isSafeInteger(value.sequence) || value.sequence < 1) return;
+    const meanings = {
+      'input-dispatch':'Release dispatched; native consumption was not reported.',
+      'queued-native-events':'Release events queued; native consumption is pending.',
+      'consumed-native-events':'Release events consumed; a following presentation was not qualified.',
+      'no-held-input-events':'Release generated no held-input events; this is not a neutral gameplay tick.',
+    };
+    if (value.boundary !== null && !Object.hasOwn(meanings, value.boundary)) return;
+    record('Input release', `Sequence ${value.sequence} · ${meanings[value.boundary] || 'Runtime acknowledged release; its consumption boundary was not reported.'}`);
+  });
   listen('telos:wasm-ack', event => {
     syncSession();
     const value = event.detail;
@@ -747,13 +938,33 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
     set(inputFields.get('Score tick'), count(value.tick));
     set(inputFields.get('Render present'), count(value.present));
     set(inputFields.get('Consumed events'), count(value.eventsConsumed));
+    const requested = value.requestedInput;
+    const allowedKeys = new Set(['w','a','s','d','q','e','space','tab','esc','enter','up','down','left','right','1','2','3','4','5','6','7','8','9','i']);
+    const validRequested = requested?.schema === 'telos.requested-input/v1' && requested.source === 'workspace-request'
+      && Array.isArray(requested.keys) && requested.keys.length <= 24
+      && Array.from(requested.keys).every(key => allowedKeys.has(key)) && new Set(requested.keys).size === requested.keys.length
+      && Array.isArray(requested.buttons) && requested.buttons.length <= 2
+      && Array.from(requested.buttons).every(button => ['lmb','rmb'].includes(button))
+      && new Set(requested.buttons).size === requested.buttons.length
+      && (requested.mouse === null || [requested.mouse?.x,requested.mouse?.y].every(n => Number.isSafeInteger(n) && n >= 0 && n <= 9999));
+    set(inputFields.get('Requested keys'), validRequested ? requested.keys.join(' ') || 'None' : 'Unavailable');
+    set(inputFields.get('Requested buttons'), validRequested ? requested.buttons.join(' ') || 'None' : 'Unavailable');
+    set(inputFields.get('Requested mouse'), validRequested ? requested.mouse ? `${requested.mouse.x},${requested.mouse.y} canvas pixels` : 'No position update' : 'Unavailable');
+    set(inputFields.get('GL presentations during input'), Number.isSafeInteger(value.presentsAdvanced) ? count(value.presentsAdvanced) : '—');
+    const r = value.presentationReceipt;
+    const validReceipt = r?.schema === 'telos.input-consumption-present/v1' && Number.isSafeInteger(r.total)
+      && r.total >= 1 && r.total <= 4096 && r.requiresConsumption === true
+      && Number.isSafeInteger(r.beforeConsumption) && r.beforeConsumption >= 0 && r.afterConsumption === 1
+      && r.total === r.beforeConsumption + 1;
+    set(inputFields.get('GL presentations before consumption'), validReceipt ? count(r.beforeConsumption) : '—');
+    set(inputFields.get('GL presentations after consumption'), validReceipt ? '1' : '—');
     set(inputFields.get('Round trip'), Number.isFinite(value.latencyMs) && value.latencyMs >= 0 ? `${value.latencyMs.toFixed(1)} ms` : '—');
     const received = new Date();
     inputTime.dateTime = received.toISOString();
     inputTime.textContent = `Received ${received.toLocaleTimeString()}`;
     inputWatch.hidden = false;
     const latency = Number.isFinite(value.latencyMs) && value.latencyMs >= 0 ? ` · ${value.latencyMs.toFixed(1)} ms` : '';
-    record('Input acknowledged', `Score tick ${count(value.tick)} · present ${count(value.present)} · ${count(value.eventsConsumed)} events consumed${latency}`);
+    record('Input acknowledged', `Score tick ${count(value.tick)} · present ${count(value.present)} · ${count(value.eventsConsumed)} events consumed${validRequested ? ` · requested keys ${requested.keys.join(' ') || 'None'}, buttons ${requested.buttons.join(' ') || 'None'}, mouse ${requested.mouse ? `${requested.mouse.x},${requested.mouse.y}` : 'unchanged'}` : ''}${validReceipt ? ` · GL presents ${r.total} (${r.beforeConsumption} before consumption, 1 after)` : ''}${latency}`);
   });
   listen('telos:wasm-transport-error', event => {
     syncSession();
@@ -778,6 +989,7 @@ export function mountDebuggerWorkbench(game, { isEnabled = () => true } = {}) {
   const timer = setInterval(refresh, 500);
   render();
   return { destroy() {
+    adapterInspection++;
     inspection++;
     memoryRequest++;
     clearInterval(timer);

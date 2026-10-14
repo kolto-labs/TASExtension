@@ -14,6 +14,8 @@ typedef struct __attribute__((packed)) rec_hdr {
     u8 hash[16];
 } rec_hdr;
 
+static const u8 null_key[16] = {0};
+
 static int writable(u16 prot) {
     if (prot & PAGE_GUARD) return 0;
     switch (prot & 0xFF) {
@@ -39,6 +41,7 @@ static const char *apply_one(const rec_hdr *h, const u8 *data, kst_restore_stats
     if (!e->mclass || e->mclass != h->mclass) return "memory class does not match the region";
     if (form != KST_F_DATA && form != KST_F_ZERO && form != KST_F_DECOMMIT) return "PAGE needs one form";
     if (form == KST_F_DATA && h->dlen != KST_PAGE) return "DATA page without 4096 bytes";
+    if (form != KST_F_DATA && h->dlen != 0) return "ZERO or DECOMMIT page has payload bytes";
     st->records++;
     if (form == KST_F_DECOMMIT) {
         if (!e->present) { st->skipped++; return 0; }
@@ -81,18 +84,44 @@ static const char *apply_one(const rec_hdr *h, const u8 *data, kst_restore_stats
 }
 
 /* Apply the records in buf; returns the bytes consumed (whole records only). */
-static u32 apply_buf(const u8 *buf, u32 len, kst_restore_stats *st, int final) {
+static u32 apply_buf(const u8 *buf, u32 len, kst_restore_stats *st, int final, u64 target) {
     u32 off = 0;
     const char *err = 0;
     while (off < len && !err) {
         if (len - off < 40) { if (final) err = "truncated record header"; break; }
         const rec_hdr *h = (const rec_hdr *)(buf + off);
         if (h->magic[0] != 'S' || h->magic[1] != 'R') { err = "bad record magic"; break; }
-        u32 size = 40 + ((h->dlen + 7) & ~7u);
+        if (h->kind != KST_REC_PAGE) {
+            err = h->kind >= KST_REC_TICK_END && h->kind <= KST_REC_JOURNAL
+                ? "restore set may contain only PAGE records" : "unknown record kind";
+            break;
+        }
+        const u16 allowed_flags = KST_F_DATA | KST_F_ZERO | KST_F_DECOMMIT | KST_F_SWEEP;
+        if (h->flags & (u16)~allowed_flags) { err = "PAGE has unknown flag bits"; break; }
+        if (h->tick != target) { err = "PAGE tick does not match restore target"; break; }
+        u32 form = h->flags & (KST_F_DATA | KST_F_ZERO | KST_F_DECOMMIT);
+        if (form != KST_F_DATA && form != KST_F_ZERO && form != KST_F_DECOMMIT) { err = "PAGE needs one form"; break; }
+        if (form == KST_F_DATA ? h->dlen != KST_PAGE : h->dlen != 0) { err = "invalid PAGE payload length"; break; }
+        if (form == KST_F_ZERO && memcmp(h->hash, KST_ZERO_KEY, 16)) { err = "ZERO page has an invalid hash"; break; }
+        if (form == KST_F_DECOMMIT && (h->prot != 0 || memcmp(h->hash, null_key, 16))) {
+            err = "DECOMMIT page has invalid protection or hash"; break;
+        }
+        if (h->dlen > ~0u - 7u) { err = "record payload length overflows padding"; break; }
+        u32 padded = (h->dlen + 7u) & ~7u;
+        if (padded > ~0u - 40u) { err = "record size overflows header addition"; break; }
+        u32 size = 40u + padded;
         if (size > len - off) { if (final) err = "truncated record data"; break; }
-        if (h->kind == KST_REC_PAGE) err = apply_one(h, buf + off + 40, st);
-        else if (h->kind != KST_REC_JOURNAL && h->kind != KST_REC_TICK_END && h->kind != KST_REC_WRAP)
-            err = "unknown record kind";
+        for (u32 i = h->dlen; i < padded; i++) {
+            if (buf[off + 40u + i]) { err = "PAGE padding is not zero"; break; }
+        }
+        if (err) break;
+        const u8 *data = buf + off + 40;
+        if (form == KST_F_DATA) {
+            u8 key[16];
+            kst_page_key(data, key);
+            if (memcmp(key, h->hash, 16)) { err = "DATA page hash does not match payload"; break; }
+        }
+        err = apply_one(h, data, st);
         off += size;
     }
     if (err) kst_fatal(err);   /* memory is partly written: never continue */
@@ -106,7 +135,7 @@ int kst_restore_records(const u8 *buf, u32 len, u64 target, const u8 expect_root
     st->target = target;
     if (!K->in_gate) kst_fatal("restore outside the gate");
     u64 t0 = kst_qpc();
-    apply_buf(buf, len, st, 1);
+    apply_buf(buf, len, st, 1, target);
     return restore_finish(target, expect_root, st, t0);
 }
 
@@ -129,7 +158,7 @@ int kst_restore_file(const WCHAR *path, u64 target, const u8 expect_root[32], ks
         if (!ReadFile(h, buf + have, CAP - have, &got, 0)) { CloseHandle(h); kst_fatal("restore set read failed"); }
         have += got;
         int final = got == 0;
-        u32 used = apply_buf(buf, have, st, final);
+        u32 used = apply_buf(buf, have, st, final, target);
         memmove(buf, buf + used, have - used);
         have -= used;
         if (final) break;

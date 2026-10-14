@@ -292,10 +292,13 @@ class _Seek:
         out["warm"] = target
 
     def write_set(self, want: PageMap, t: int) -> list[StagingRecord]:
-        """W: pages where the live map differs from want, plus decommits. After a semantic write the live
-        map is stale, so every page of want is written."""
+        """W: pages where the live map differs from want, plus decommits.
+
+        A semantic write or failed restore leaves the map unusable as a diff
+        base, so write every target page and reconcile every known extra page.
+        """
         live, lt = self.live.map, t - self.sup.offset
-        full = self.live.via == "semantic"
+        full = self.live.via == "semantic" or not self.live.ok
         out = []
         for r in want.refs():
             if full or live.get(r.vaddr) != r:
@@ -324,13 +327,13 @@ class _Seek:
         sup = self.sup
         self.put_files(t)
         rc = sup.backend.restore(t - sup.offset, want.root(), W)
-        self.live.restored(t, W)
-        sup.tick, sup.carry, sup.alive = t, [], True
         if rc.result != "pass" or rc.state_root != want.root().hex():
             self.live.ok = False
             raise _Mismatch(t, "state_root after restore",
                             [f"restore to tick {t}: backend root {rc.state_root or '-'}, recorded {want.root().hex()}"])
+        self.live.restored(t, W)
         self.live.map, self.live.ok = PageMap(want.refs()), True
+        sup.tick, sup.carry, sup.alive = t, [], True
         return len(W)
 
     def journal_fields(self, t: int) -> list[str]:

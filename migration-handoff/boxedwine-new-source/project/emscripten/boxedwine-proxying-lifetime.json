@@ -1,0 +1,10 @@
+{
+  "schema": "telos.downstream-sdk-backport/v1",
+  "sdk": "emscripten4.0.14",
+  "source": "system/lib/pthread/proxying.c",
+  "originalSha256": "cbae5a9736353234d3991e19ca74ce5779fe0f7eb45a35e10f7cc2b2622b8c00",
+  "patchedSha256": "6b0c590bc641e021fc9507d00d285ca237d02a011dbfe9cb64033707c459052a",
+  "upstream": "https://github.com/emscripten-core/emscripten/pull/26582",
+  "changes": "Signal sync DONE and CANCELED contexts before unlocking their mutex; do not replace SDK cache.",
+  "qualification": "production build only; actual K1 reload pending"
+}

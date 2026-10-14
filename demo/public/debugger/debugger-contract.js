@@ -13,16 +13,27 @@ export const DEBUG_CAPABILITY_STATES = Object.freeze([
   'available', 'unsupported', 'not-qualified', 'unavailable',
 ]);
 export const DEBUG_EVIDENCE_SOURCES = Object.freeze([
-  'live-runtime', 'recorded-journal', 'simulator',
+  'live-runtime', 'recorded-journal', 'simulator', 'static-analysis', 'captured-memory',
 ]);
 
 // Stable cross-host vocabulary. Legacy backend names remain backend details.
 export const DEBUG_OPERATIONS = Object.freeze({
   'input.apply':'Input', 'execution.pause':'Pause', 'execution.resume':'Resume',
   'execution.step':'Step', 'execution.seek':'Seek', 'execution.rewind':'Rewind',
-  'threads.count':'Thread counts', 'threads.list':'Thread list',
-  'memory.read':'Memory read', 'registers.read':'Registers',
-  'code.disassemble':'Disassembly', 'breakpoints.manage':'Breakpoints',
+  'processes.list':'Processes', 'threads.count':'Thread counts', 'threads.list':'Thread list',
+  'modules.list':'Modules', 'memory.map':'Memory map', 'memory.mapping':'Address backing file', 'memory.read':'Memory read',
+  'memory.search':'Search captured memory', 'memory.write':'Memory write',
+  'memory.watch.list':'Memory watches', 'memory.watch.add':'Add memory watch',
+  'memory.watch.remove':'Remove memory watch', 'registers.read':'Registers', 'stack.read':'Stack',
+  'code.disassemble':'Disassembly', 'code.decompile':'Decompilation',
+  'code.references':'Code references', 'code.functions':'Functions',
+  'symbols.list':'Symbols', 'symbols.resolve':'Resolve symbol', 'source.resolve':'Source location',
+  'breakpoints.list':'Breakpoints', 'breakpoints.add':'Add breakpoint',
+  'breakpoints.remove':'Remove breakpoint', 'breakpoints.manage':'Manage breakpoints',
+  'expressions.evaluate':'Evaluate expression',
+  'trace.read':'Execution trace', 'events.read':'Runtime events', 'input.timeline':'Input timeline',
+  'binary.identity':'File headers', 'binary.sections':'File sections', 'binary.dependencies':'File dependencies',
+  'binary.bytes':'File bytes',
   'state.snapshot':'Snapshot', 'state.restore':'Restore',
 });
 
@@ -135,11 +146,14 @@ function normalizeOperationReport(operation, reportLayer, operationId) {
   const owner = boundedText(operation.owner, 'Capability owner', 128);
   const reason = boundedText(operation.reason, 'Capability reason', 512);
   const evidenceId = boundedText(operation.evidenceId, 'Capability evidenceId', 256);
+  if (evidenceId === 'none') throw new TypeError('Capability evidenceId must identify owner-authored evidence.');
   const unit = operation.unit == null ? null : boundedText(operation.unit, 'Capability unit', 80);
+  const scope = operation.scope === undefined ? 'process' : operation.scope;
+  if (!['process', 'target'].includes(scope)) throw new TypeError('Capability scope must be process or target.');
   if (operationId === 'execution.step' && operation.state === 'available' && unit === null) {
     throw new TypeError('Available execution.step must name its actual step unit.');
   }
-  return freeze({ state:operation.state, owner, reason, evidenceId, unit });
+  return freeze({ state:operation.state, owner, reason, evidenceId, unit, scope });
 }
 
 /** Validate one owner-authored, session-scoped capability assertion. */
@@ -221,12 +235,16 @@ export function resolveDebuggerCapabilities({ session, revision, target, reports
       states.includes('not-qualified') ? 'not-qualified' : 'unavailable';
     const units = [...new Set(Object.values(layers).filter(item => item.state === 'available' && item.unit).map(item => item.unit))];
     const unitConflict = units.length > 1;
+    const scopes = [...new Set(Object.values(layers).filter(item => item.state === 'available').map(item => item.scope || 'process'))];
+    const scopeConflict = scopes.length > 1;
     operations[id] = freeze({
-      state:unitConflict && allAvailable ? 'not-qualified' : state,
-      reason:unitConflict ? 'Capability owners disagree on the operation boundary unit.' :
+      state:(unitConflict || scopeConflict) && allAvailable ? 'not-qualified' : state,
+      reason:scopeConflict ? 'Capability owners disagree on the operation capture scope.' :
+        unitConflict ? 'Capability owners disagree on the operation boundary unit.' :
         allAvailable ? 'All required owners report this operation available.' :
         Object.values(layers).find(item => item.state === state)?.reason || 'One or more required owners did not qualify this operation.',
       unit:unitConflict ? null : units[0] || null,
+      scope:scopeConflict ? null : scopes[0] || 'process',
       layers,
     });
   }
@@ -252,6 +270,8 @@ function normalizeAdapterManifest(value) {
     || !Array.isArray(value.interprets) || value.interprets.length > 128) {
     throw new TypeError('Invalid debugger target-adapter manifest.');
   }
+  const mode = value.mode === undefined ? 'runtime' : value.mode;
+  if (!['runtime', 'file-inspection'].includes(mode)) throw new TypeError('Invalid debugger adapter mode.');
   const targets = value.targets.map((constraint) => {
     if (!record(constraint)) throw new TypeError('Target adapter constraints must be objects.');
     const match = {};
@@ -271,8 +291,8 @@ function normalizeAdapterManifest(value) {
         match[field] = boundedText(candidate, `Adapter target ${field}`, 256);
       }
     }
-    if (!match.format || !match.architecture || !match.osAbi) {
-      throw new TypeError('Each target adapter match must declare format, architecture, and OS ABI.');
+    if (!match.format || (mode === 'runtime' && (!match.architecture || !match.osAbi))) {
+      throw new TypeError('Adapter matches require a format; runtime matches also require architecture and OS ABI.');
     }
     return freeze(match);
   });
@@ -284,6 +304,7 @@ function normalizeAdapterManifest(value) {
   return freeze({
     schema:DEBUG_TARGET_ADAPTER_SCHEMA,
     id:value.id,
+    mode,
     version:value.version,
     api:{ id:'telos.game-adapter', major:1, minor:value.api.minor },
     targets,
@@ -351,10 +372,11 @@ export class DebugTargetAdapterRegistry {
     const exactBuild = adapter.targets.some(constraint => Array.isArray(constraint.sha256)
       && matchConstraint(constraint, target).state === 'matched');
     return freeze({
-      state:exactBuild ? 'matched-exact-build' : 'matched-profile',
+      state:adapter.mode === 'file-inspection' ? 'matched-inspection' : exactBuild ? 'matched-exact-build' : 'matched-profile',
       adapter,
       exactBuild,
-      reason:exactBuild ? 'Executable digest matches an explicit adapter target.' :
+      reason:adapter.mode === 'file-inspection' ? 'Declared file metadata matches; runtime compatibility is unqualified.'
+        : exactBuild ? 'Executable digest matches an explicit adapter target.' :
         'Profile fields match; exact executable build identity is not established.',
     });
   }
@@ -362,7 +384,7 @@ export class DebugTargetAdapterRegistry {
 
 /** Check a matched adapter's prerequisites without granting them or activating code. */
 export function evaluateAdapterRequirements(targetMatch, effectiveCapabilities) {
-  if (!record(targetMatch) || !['matched-profile', 'matched-exact-build'].includes(targetMatch.state)
+  if (!record(targetMatch) || !['matched-profile', 'matched-exact-build', 'matched-inspection'].includes(targetMatch.state)
     || !targetMatch.adapter) {
     return freeze({ state:'unavailable', missing:Object.freeze([]), reason:'No target adapter matches the uploaded binary identity.' });
   }
@@ -375,7 +397,9 @@ export function evaluateAdapterRequirements(targetMatch, effectiveCapabilities) 
   return freeze({
     state:missing.length ? 'requirements-unmet' : 'requirements-satisfied',
     missing,
-    reason:missing.length ? 'The adapter requires runtime capabilities that are not all available.' :
+    reason:manifest.mode === 'file-inspection'
+      ? missing.length ? 'Required file inspection capabilities are unavailable.' : 'Inspection prerequisites are available; execution remains unqualified.'
+      : missing.length ? 'The adapter requires runtime capabilities that are not all available.' :
       'All declared runtime prerequisites are available; this does not activate adapter code.',
   });
 }
