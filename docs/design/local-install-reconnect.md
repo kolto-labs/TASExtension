@@ -5,3 +5,7 @@ The initial local-install timeout previously left folder selection or a workspac
 Connection and launch activity disable retry. The current restore generation owns pending status and error display; obsolete responses cannot clear a newer attempt. An explicit failed retry retains connected files and saved folder permissions and does not invoke remembered-folder staging. An initial failure keeps its existing remembered-folder fallback. Successful validation continues the configured automatic local launch.
 
 Source only. The retained browser has not adopted or exercised this action. No tests, probes, syntax checks, runtime rebuild, staging, deployment or profile mutation. Backup: WASM artifacts/original-game-before-local-retry-20261014.js. Coupled dirty original-game.js remains uncommitted.
+
+## Retain pending-state ownership
+
+A folder drop or picker can supersede an automatic connection attempt by advancing restoreGeneration. The first reconnect implementation returned on stale generation before clearing its own pending indicator. The attempt now owns a separate localInstallAttemptGeneration; completion clears only that owner's indicator, then the existing generation guard prevents stale launch/fallback/error work. A newer attempt is never cleared by an older continuation. Selected files remain owned by their staging generation. Source-only, no tests/probes. Pre-edit backup original-game-before-local-attempt-ownership-20261014.js retained.
