@@ -1,0 +1,99 @@
+{
+  "schema": "kptas.cloud-runtime-transfer-inventory/v1",
+  "release": "4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360",
+  "qualified": false,
+  "descriptor": "demo/public/original-game/runtime-candidates/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360.json",
+  "entries": [
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/boxedwine-shell.js",
+      "expectedSha256": "b1c560bb2ea1770ed28c962fd15e2436660ba10f30f87bf24adc000c7d8f88fd",
+      "bytes": 115994,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/boxedwine.css",
+      "expectedSha256": "f3548956400f61c2d7f400e34166a5119c5167f4a3215e07c95c5cf95eea69a3",
+      "bytes": 4885,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/boxedwine.js",
+      "expectedSha256": "fab2178ab7e298a487a6c0a7cdf8149d1c59de9969555b021442d70bb9b31ac9",
+      "bytes": 422849,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/boxedwine.symbols",
+      "expectedSha256": "06d2dee440818eb59b1a75f56aaf38d6777805da0eb9ab44f6a6d77f2569aa5a",
+      "bytes": 1229638,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/boxedwine.wasm",
+      "expectedSha256": "dad1f1cd5fe580bf7090e3a9b4ce41bf12e502f18e403a920b08082088fe586c",
+      "bytes": 5277839,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/embedded.css",
+      "expectedSha256": "542e009aa7039c63a8655695afda60b3f1d79a019ea437695472cc09e34e0fe4",
+      "bytes": 1446,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/game-recording-writer.js",
+      "expectedSha256": "abd625123c5beda4dbb7941acf9ddf309120ed1cd588707082bbcd0c5c5e0e31",
+      "bytes": 4067,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/game-recording.js",
+      "expectedSha256": "0276ef7f1a5b8e9992f6408c713f55903323d913f6e7ba8aaba885173f1e5636",
+      "bytes": 24680,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/game-runtime.html",
+      "expectedSha256": "c646b53f30459dd862ceec671dd137f38a64864599ba199d6fbd136b9f1d829c",
+      "bytes": 2724,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/GL4ES-LICENSE.txt",
+      "expectedSha256": "69a3049c77abd88658f6ad7cf6a5b6ceb5cf03b80e60f7c4657d90322cfab7bd",
+      "bytes": 1105,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/NOTICE.txt",
+      "expectedSha256": "a4b3b1548c5f7e37180b20def5806dc5e484f7121b0bc1aedad582b64d11ace3",
+      "bytes": 588,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/owned-install.js",
+      "expectedSha256": "3c999146dfa1f2fab37fd56e9117ce61f7f101145daa5788d57783f4c9366970",
+      "bytes": 29925,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/runtime-releases/4eff1068467a752c75fa2cfa2c016da493fe2c8ef9c67091562afda0da999360/telos-tas-bridge.js",
+      "expectedSha256": "0baca81d062b126a5dbe1fac5cda7d65f193c2d4c62aecf4bfeb7674ac192546",
+      "bytes": 70031,
+      "exists": true
+    },
+    {
+      "path": "demo/public/original-game/wine-roots/a14446b27adbaccd4fac25dfb4e951da2dd4978fecfbf6e16aa718871fe4b0c5/chunks.json",
+      "bytes": 2217,
+      "exists": true,
+      "symlink": false
+    },
+    {
+      "path": "demo/public/original-game/wine-roots/a14446b27adbaccd4fac25dfb4e951da2dd4978fecfbf6e16aa718871fe4b0c5/.local-root.zip",
+      "bytes": 99450694,
+      "exists": true,
+      "symlink": true
+    }
+  ],
+  "boundary": "Filesystem metadata and descriptor-declared hashes only; no content rehash or gameplay qualification. Excludes game installation/assets, compiled K1 JIT modules, recordings, saves, credentials and live VM memory. Nothing in this inventory was uploaded."
+}

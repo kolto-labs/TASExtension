@@ -1,35 +1,35 @@
 {
-  "created_utc": "2026-10-14T03:43:58.571533+00:00",
-  "harness_base": "131b6f3e18cc8d000d7a13c389ebfe1f41554af5",
-  "boxedwine_base": "509f6a7545e0827a27ed1b4ebab66ac1da4b1ea7",
+  "schema": "kptas.cloud-source-handoff/v2",
+  "captured_utc": "2026-10-14T04:16:40.210799+00:00",
+  "source_parent_commit": "e72dd28985f918af75310986658e1ae49736ba6b",
   "files": {
+    "CLOUD-RUNTIME.md": {
+      "bytes": 2065,
+      "sha256": "e41cf92f46da6355ed4bbdfdb1b49559ce6da5e000f2d1a92219bcf83ccf316f"
+    },
     "KPHarness-working-tree.patch": {
       "bytes": 523013,
       "sha256": "4870fd21e8914a65e753cd913da0307e88ce37e9885ca2c23e9877f5f99e8b1f"
     },
-    "boxedwine-working-tree.patch": {
-      "bytes": 418295,
-      "sha256": "4e12463bd15d9991b873f6e254bddf1be09deb83410e5f85b623b0a41b8d7571"
+    "NATIVE-SOURCE.md": {
+      "bytes": 593,
+      "sha256": "069c2260609087e37fc04ca68de69a1c74b7bfd9d5fcbc9c5add5faf062bfd74"
     },
-    "canonical-outstanding-execution-plan.md": {
-      "bytes": 1079056,
-      "sha256": "9359133bbdb3093f3c2e8eaad108862006207b33ccfdf10dc4cb51f034c3f975"
+    "README.md": {
+      "bytes": 4122,
+      "sha256": "159826eee3fcee06a344aa9d7cbab070ad3a56b73b2deacc2b1050b76558a6fb"
     },
-    "original-product-plan.md": {
-      "bytes": 457313,
-      "sha256": "729d418fc576e2268f603a644ffcb943cdfbde07a94975a99bdf8cb12dffa45b"
+    "boxedwine-new-source/project/emscripten/boxedwine-proxying-lifetime.c": {
+      "bytes": 20958,
+      "sha256": "6b0c590bc641e021fc9507d00d285ca237d02a011dbfe9cb64033707c459052a"
     },
-    "native-telos/memory_scan_capture.py": {
-      "bytes": 9382,
-      "sha256": "9766e9c6a9c78ab221cf64dd13200990c2033ee07db7e4a125c541e3cf28e9c7"
+    "boxedwine-new-source/project/emscripten/boxedwine-proxying-lifetime.json": {
+      "bytes": 555,
+      "sha256": "e26f2d9b3e2f7fef8acd9134e6a121840a7d34a58818a30eee033159c10a735e"
     },
-    "native-telos/debugger_widget.py": {
-      "bytes": 35343,
-      "sha256": "5d0076789b21ed573e2cff73b8339d70ba98b35cfff2456d4ea86c0d9661accc"
-    },
-    "native-telos/shared_presentation.py": {
-      "bytes": 6911,
-      "sha256": "c799614dfde148be26d6f8a1b7c17cb74ab65c0849567b4ebc04c5cf67ddd923"
+    "boxedwine-new-source/project/emscripten/emscripten-proxying-LICENSE.txt": {
+      "bytes": 5093,
+      "sha256": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86"
     },
     "boxedwine-new-source/source/kernel/timerschedulerlock.h": {
       "bytes": 356,
@@ -47,118 +47,990 @@
       "bytes": 8507,
       "sha256": "bb1b78da350fd68241d61197e5bdecfa8deb605bc7868410e47d6d1fbcddb328"
     },
-    "boxedwine-new-source/project/emscripten/boxedwine-proxying-lifetime.c": {
-      "bytes": 20958,
-      "sha256": "6b0c590bc641e021fc9507d00d285ca237d02a011dbfe9cb64033707c459052a"
+    "boxedwine-working-tree.patch": {
+      "bytes": 418295,
+      "sha256": "4e12463bd15d9991b873f6e254bddf1be09deb83410e5f85b623b0a41b8d7571"
     },
-    "boxedwine-new-source/project/emscripten/boxedwine-proxying-lifetime.json": {
-      "bytes": 555,
-      "sha256": "e26f2d9b3e2f7fef8acd9134e6a121840a7d34a58818a30eee033159c10a735e"
+    "canonical-outstanding-execution-plan.md": {
+      "bytes": 1081464,
+      "sha256": "bce5b085cadae81d34fa307cfab3f0c85f0942a68cf8e037e5f7d8442fb10595"
     },
-    "boxedwine-new-source/project/emscripten/emscripten-proxying-LICENSE.txt": {
-      "bytes": 5093,
-      "sha256": "620a78084fc7ca97c0b5dea9abf891f3ffcadfdbf305276f099c9c4e12fc1d86"
+    "harness-index-before.patch": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
     },
-    "harness-new-source/docs/design/community-observation-correspondence.md": {
-      "bytes": 1761,
-      "sha256": "585df915dc07a5a96822a5ca389ec385754a60ba8dd24aed0141f770f162dcd3"
+    "harness-status-before.z": {
+      "bytes": 3847,
+      "sha256": "cf2c4c0888379037f831f4956f2ef2af85bd45c8cfce6594409b1fbbc0203bdf"
     },
-    "harness-new-source/docs/design/compiled-input-key-negotiation.md": {
-      "bytes": 2118,
-      "sha256": "419146425908771e6152ca57cc89dd3883bd19e686a73108c03589b0a2905580"
+    "native-product-source/README.md": {
+      "bytes": 11670,
+      "sha256": "43614a0811ce070685d3d6aa09e867a7437fae3141fb4110587aa716482d6942"
     },
-    "harness-new-source/docs/design/debugger-reader-navigation.md": {
-      "bytes": 1753,
-      "sha256": "f028e3acc01d31230b01cbadae5500acc9c6b9ea46fb42913de5f34d64ef43c1"
+    "native-product-source/README_REALLY.txt": {
+      "bytes": 34109,
+      "sha256": "c5b1eedbf140db311d283f87b0fcb7a6fd82ce4e2e43a725cce8c217d5305f9f"
     },
-    "harness-new-source/docs/design/full-paused-gl-count-capture.md": {
-      "bytes": 3453,
-      "sha256": "6b85c7873e7c68b3a5dc736a32607a584ceeaff7f35b7196da76f41aefd31630"
+    "native-product-source/STRATEGY.md": {
+      "bytes": 6897,
+      "sha256": "6503099ea630ccce7dd2390ae4232b39da09f700a3c32bd1169d32e364404836"
     },
-    "harness-new-source/docs/design/input-consumption-present-boundary.md": {
-      "bytes": 3840,
-      "sha256": "194edaedd3fdcc35c0cba2383b0381006e473fe0389273fe852c46da8c22d1d3"
+    "native-product-source/docs/browser-holorecords.md": {
+      "bytes": 2225,
+      "sha256": "531937da42a9c99309c66345fbcfcabc7035f299f6493d96d38a4d77cc48f32b"
     },
-    "harness-new-source/docs/design/published-dispatch-progress.md": {
-      "bytes": 2358,
-      "sha256": "5d82abd17b27fc8f16d4d11f0cf262eac5d9414b170d538bde946f8dd010d75b"
+    "native-product-source/docs/controls.md": {
+      "bytes": 5107,
+      "sha256": "44014eede594ed5d0d339eb096809c4d7a09382f980b3ef3fd1094eb076c43ed"
     },
-    "harness-new-source/docs/design/quiescent-score-input-admission.md": {
-      "bytes": 1942,
-      "sha256": "7cc2bcbf721caeb25b2196ebf366d96d189298c357545a087f9d3b6ce207eb27"
+    "native-product-source/docs/design/contract.md": {
+      "bytes": 102148,
+      "sha256": "519512d10bb4a634bdcf102ad6fdfcad8095440496550cf14b54c0ff18c74744"
     },
-    "harness-new-source/docs/design/requested-input-provenance.md": {
-      "bytes": 1650,
-      "sha256": "a1333cff861b90ab324cf1e65c156a97061516327b01a615d8055c415aebb237"
+    "native-product-source/docs/design/frame-precision.md": {
+      "bytes": 3669,
+      "sha256": "36d27c4bf84d3a45ff5223418f968798ea947ec1704022f30dcbd57f0766bbdb"
     },
-    "harness-new-source/docs/design/runtime-fault-symbol-provenance.md": {
-      "bytes": 3719,
-      "sha256": "2d8c16063d69c45d7cc1153348d594ceff71557156c69219e565370cd24639be"
+    "native-product-source/docs/design/telos-core-integration-next.md": {
+      "bytes": 6507,
+      "sha256": "eacced046ac62ba75c3abc111939a7942fc19293e8d77ac50ce818c18b3677f7"
     },
-    "harness-new-source/docs/design/score-transport-draft-commit.md": {
-      "bytes": 1259,
-      "sha256": "08abb6ae7cda9e6a3ff841ecbfc381266b95c182f8d4ff7af62232c9b25b41c1"
+    "native-product-source/docs/glossary.md": {
+      "bytes": 6243,
+      "sha256": "cfcf129a65c18f38038ce48eb3bde54cd7dd69585b56cfe8e098de53b194f538"
     },
-    "harness-new-source/docs/design/scored-input-workspace-focus.md": {
-      "bytes": 1417,
-      "sha256": "9a90bbbe09f757130f98000c20f0ca0ea6ebb399a096f4b59af86f3ea4597c84"
+    "native-product-source/docs/holorecord.md": {
+      "bytes": 24074,
+      "sha256": "734cf793318c4e968c7aa4914212e4963b55fdc6aa9f18a4433155fd94f5e91a"
     },
-    "harness-new-source/demo/tools/runtime-attempt-report.mjs": {
-      "bytes": 3382,
-      "sha256": "3fbb1e28807bf02a8291270ba91a791514044c3ee163a52f1f014fbd72d7c0a7"
+    "native-product-source/docs/install.md": {
+      "bytes": 1403,
+      "sha256": "0ebc11dc72b5075b368a53d11fb3ef9d5825a1b509094eeeec657ba8d08dc847"
     },
-    "harness-new-source/demo/tools/stage-runtime-range-optimization.mjs": {
-      "bytes": 6509,
-      "sha256": "43421b367ba5eedc56c337b4a59166808ef8a4cff98094fd278eca5c50c24e06"
+    "native-product-source/docs/knowledgebase/README.md": {
+      "bytes": 5088,
+      "sha256": "b1be54431eae4c7297d5f8470368e217d80d00f0c31c0d312b2870ae081084ac"
     },
-    "harness-new-source/demo/public/debugger/debugger-backend-registry.js": {
-      "bytes": 5041,
-      "sha256": "cf2eb38b90e3d5b46faf81407393f4a153b9dbb642edd14fd1f47bc02db46939"
+    "native-product-source/docs/knowledgebase/conventions.md": {
+      "bytes": 15228,
+      "sha256": "4362826925a6bc02f0d39d10643990502077ed32f53693b72b1d1197a3b70000"
     },
-    "harness-new-source/demo/public/debugger/debugger-operation-broker.js": {
-      "bytes": 14939,
-      "sha256": "eb8680db5bb02bad4d80b1c42b298b1edd581809195054088f1aeed7bdc431ee"
+    "native-product-source/docs/knowledgebase/gap-analysis.md": {
+      "bytes": 24933,
+      "sha256": "69b452c07c27cf79511c2ae9af42d8dc91e3e3cb02d0b3f9671411b0f90cfa83"
     },
-    "harness-new-source/demo/public/debugger/static-binary-backend.js": {
-      "bytes": 8691,
-      "sha256": "a681af72bbb5274368acac4c96cd4d3a55d96d7de1bfc544d14ab49618f2cec6"
+    "native-product-source/docs/knowledgebase/movie-formats.md": {
+      "bytes": 11676,
+      "sha256": "8933831346fa502d9de64c5721d9a730eec3e06cdf768f24dec5fcb6c6296a33"
     },
-    "harness-new-source/demo/public/debugger/static-file-owner.js": {
-      "bytes": 6552,
-      "sha256": "6f3aad9ca2be413746bb992894a5dfeb8ced7ad01697dbd9d500f1dc26b5b320"
+    "native-product-source/docs/knowledgebase/pc-tas-determinism.md": {
+      "bytes": 13803,
+      "sha256": "5dedc24434c7839061c9cbfa6ef7306c29bb7bc9ecc695ce48abe52802dadaa5"
     },
-    "harness-new-source/demo/public/js/debugger-capability-directory.js": {
-      "bytes": 9972,
-      "sha256": "0e0470c0813358a9e04b9ec5f6fab2e60db1fde7f6523d2e424f5a6807f11d59"
+    "native-product-source/docs/knowledgebase/systems.md": {
+      "bytes": 24174,
+      "sha256": "c79218af6b6d5992def8b8b2dc47f065f6bb5f66442bf5583a5739cb90ea7e61"
     },
-    "harness-new-source/demo/public/original-game/game-recording-writer.js": {
-      "bytes": 4067,
-      "sha256": "abd625123c5beda4dbb7941acf9ddf309120ed1cd588707082bbcd0c5c5e0e31"
+    "native-product-source/docs/knowledgebase/ux-patterns.md": {
+      "bytes": 12386,
+      "sha256": "878e8925cdb5a82ddbbd9cb6c70d82fe08540891a16ec67a0bdd4cc798f437b3"
     },
-    "harness-new-source/demo/public/original-game/game-recording.js": {
-      "bytes": 24680,
-      "sha256": "0276ef7f1a5b8e9992f6408c713f55903323d913f6e7ba8aaba885173f1e5636"
+    "native-product-source/docs/m5-controls.md": {
+      "bytes": 4995,
+      "sha256": "091df1f276d792ea2ce5829b4d43b13dc4869242e26203a6c5ef9447969acde7"
     },
-    "harness-new-source/demo/public/original-game/recordings-host.html": {
-      "bytes": 770,
-      "sha256": "130a4430c08e5d132f831ac536b5e51af8668d05a9b854fa91b46e625286db21"
+    "native-product-source/docs/planning-inputs/execution/ecosystem-design/2026-10-02-telos-architecture-review.md": {
+      "bytes": 4703,
+      "sha256": "5ce2cb8168c0538164ceb38cc7fab3242f3281e2c796dda3daba711c0005f0ef"
     },
-    "harness-new-source/demo/public/original-game/recordings.css": {
-      "bytes": 1024,
-      "sha256": "1d6511a6e9304302ae7610c241e55442cbe77b48de3331aebfc4b18dbef62c06"
+    "native-product-source/docs/planning-inputs/execution/ecosystem-doc-review/2026-10-02-2022-feat-kptas-complete-product-plan.before.md": {
+      "bytes": 102028,
+      "sha256": "1dfe9b5b7fc827addcc1f33849640c0d851a7b9388d417a67faeffa68e9ed538"
     },
-    "harness-new-source/demo/public/packages/debug-runtime/broker-adapter.js": {
-      "bytes": 5682,
-      "sha256": "c5ea7d948eef597a9a911ccfc3d8b41260d4c8758797d99f9552d5b33e81500f"
+    "native-product-source/docs/planning-inputs/execution/ecosystem-doc-review/2026-10-02-2022-feat-kptas-complete-product-plan.diff": {
+      "bytes": 48639,
+      "sha256": "9de9ce262af90e2bc0114484b90b18d9b7e981997e75275502db7f5f767e80a6"
     },
-    "harness-new-source/demo/public/packages/debug-runtime/execution-completion.js": {
-      "bytes": 2522,
-      "sha256": "73bfa78042c612604e1ecf6475a8082e378cf33aef684a8e955b1fa75f31a630"
+    "native-product-source/docs/planning-inputs/execution/ecosystem-doc-review/STRATEGY.before.md": {
+      "bytes": 6093,
+      "sha256": "a223d854530df44d355f1d570c5ef12b4507ce94af4c780e4f8fa0b6a5fe9e8e"
     },
-    "harness-new-source/demo/public/packages/debug-runtime/selected-runtime.js": {
-      "bytes": 3824,
-      "sha256": "8ae4f0ee8058753e8bc7c9d241284ff946eff663e8a289425c4a6e92ef889fdc"
+    "native-product-source/docs/planning-inputs/execution/ecosystem-doc-review/STRATEGY.diff": {
+      "bytes": 5719,
+      "sha256": "eebd0bf04605646d659b4a18b01c9d0a60f26b04c89858c4a021366d72c3982e"
+    },
+    "native-product-source/docs/planning-inputs/execution/ecosystem-doc-review/document-hashes.json": {
+      "bytes": 426,
+      "sha256": "b89e349362cbe2b6ae68cfb69241e8c2d34eb7c444d4f0bbe6c64412d611ce85"
+    },
+    "native-product-source/docs/planning-inputs/execution/ecosystem-doc-review/review.md": {
+      "bytes": 9010,
+      "sha256": "c3bce9fa185a8d9f805c36661cba4c7c4a1a65229f7f35c2c33552fcfe599219"
+    },
+    "native-product-source/docs/plans/2026-10-02-2022-feat-kptas-complete-product-plan.md": {
+      "bytes": 457313,
+      "sha256": "729d418fc576e2268f603a644ffcb943cdfbde07a94975a99bdf8cb12dffa45b"
+    },
+    "native-product-source/docs/release-status.md": {
+      "bytes": 1956,
+      "sha256": "3ba2b743c24f81a356862fc24fbaf37536a2a92bc6e8cda6b40624e6557a6820"
+    },
+    "native-product-source/docs/score.md": {
+      "bytes": 17425,
+      "sha256": "79b1c822fbde79ef70bb4c05e1d0b3d1753f9c3e8facc5586297c7dfaccc8003"
+    },
+    "native-product-source/docs/semantic-control.md": {
+      "bytes": 10360,
+      "sha256": "6e71525f8e128cc6bdf5c37da2b1936ab42291b1730d37b9eb67448d14bf9e8a"
+    },
+    "native-product-source/docs/showcase-amg.md": {
+      "bytes": 1920,
+      "sha256": "5f5e087bd5f4223efef976e1d0317b69194561e00dced3c4a1f300f7cd8e86a9"
+    },
+    "native-product-source/docs/tiers.md": {
+      "bytes": 10890,
+      "sha256": "7a18038b0bb29ee7d1a64d48d3de516390d8e9607b4bfe138603c05f82a8dbf9"
+    },
+    "native-product-source/docs/ui-preferences.md": {
+      "bytes": 12635,
+      "sha256": "23a973fd2db9b3431263bd6639728c24326f942bff153d64d64abf9091e9dfa3"
+    },
+    "native-product-source/kptas/__init__.py": {
+      "bytes": 91,
+      "sha256": "a2653938bc599a6b04e4e2b862ce0b73c070e23de1ca042bf4e76fd626a139bd"
+    },
+    "native-product-source/kptas/__main__.py": {
+      "bytes": 115,
+      "sha256": "4361a90b5fcdf5f604ece196cdff946d1cd07f6146f91c53d0eb1f3cb02abac1"
+    },
+    "native-product-source/kptas/_verified_blob.py": {
+      "bytes": 2796,
+      "sha256": "6b517a6922ae91ce5f55e9ba78d5cf6649e54e1a5c66007695eb21fda5092cec"
+    },
+    "native-product-source/kptas/_verified_page.py": {
+      "bytes": 2649,
+      "sha256": "09bb40e6557d785cca307a360ca4e6d102d9810372d9bb74e66313909aa27cd2"
+    },
+    "native-product-source/kptas/analysis/__init__.py": {
+      "bytes": 425,
+      "sha256": "a3a2c633a1b2d60b260bb3d85b33a6961870465731ec26519e87a9a4c1742deb"
+    },
+    "native-product-source/kptas/analysis/cli.py": {
+      "bytes": 7696,
+      "sha256": "87cfec34b068be6c0a008946bdf1c81f3c33053cf28804ec678019c2b8d5190b"
+    },
+    "native-product-source/kptas/analysis/jobs.py": {
+      "bytes": 20796,
+      "sha256": "1d854b9784a5863ffb75c57278ac86f8c0cb6c8f5c949745466a2c9f5885a8c7"
+    },
+    "native-product-source/kptas/analysis/predicate.py": {
+      "bytes": 8184,
+      "sha256": "c595ee22053bcae017e7088ad61677fd8835e87ccd8eb25387153d40357dbd9d"
+    },
+    "native-product-source/kptas/analysis/search.py": {
+      "bytes": 6138,
+      "sha256": "a4225513ba93539a49cd87bc285384d3b7cc0f39564cb0443b67d11d08383e00"
+    },
+    "native-product-source/kptas/analysis/span.py": {
+      "bytes": 6651,
+      "sha256": "ea172e573f319a4a4cb6b91907aa8eb8b9a542b905bbf5243a25abccab331d46"
+    },
+    "native-product-source/kptas/analysis/window.py": {
+      "bytes": 7911,
+      "sha256": "c7ee823c1cafefdf5690a1d4862bb98ee0fd69c20834ae13a46fba9f241a32e7"
+    },
+    "native-product-source/kptas/backend/__init__.py": {
+      "bytes": 1730,
+      "sha256": "ad28a4cff9060ec91e05dab9a48a6cdb1499e90df20e837646d707593ff91ad7"
+    },
+    "native-product-source/kptas/backend/handsoff.py": {
+      "bytes": 23496,
+      "sha256": "3e5325b5513b261645534ebdb50e8aa757ae95563dda3d6335c3b414c8f57193"
+    },
+    "native-product-source/kptas/backend/handsoff_provenance.py": {
+      "bytes": 15023,
+      "sha256": "f225387a96243555e9b7301132ef2a41e401928d0cd7fa6bbd0becabb6abddc4"
+    },
+    "native-product-source/kptas/backend/phasor.py": {
+      "bytes": 26058,
+      "sha256": "68b96804a842e72b415e684a2d06b9db69ebf43d7800faa145027f75c03ba688"
+    },
+    "native-product-source/kptas/backend/pysim.py": {
+      "bytes": 50109,
+      "sha256": "3a1a8caf13063872df4a01122758349a58193fe5a38e89532de5d112d2a3aeb5"
+    },
+    "native-product-source/kptas/backend/rig.py": {
+      "bytes": 35524,
+      "sha256": "da5a839a83037ee30786d3e1de49f5618b897ed1360efb8ded7305e353521f70"
+    },
+    "native-product-source/kptas/backend/shim.py": {
+      "bytes": 126353,
+      "sha256": "bf91d5af95285455d655ba6b2b8e03c8067f3e24f366ccd6caa99043cc1427e9"
+    },
+    "native-product-source/kptas/backend/staging.py": {
+      "bytes": 12280,
+      "sha256": "5bd1f63f3aa55047807187440adeffba2e41507e962910288187988901ce9be8"
+    },
+    "native-product-source/kptas/config.py": {
+      "bytes": 35376,
+      "sha256": "aeafe219b3526880635a89b3eec59a3031803f69ca7a116ac88387309ae3c768"
+    },
+    "native-product-source/kptas/durability.py": {
+      "bytes": 18950,
+      "sha256": "f30f116aaced9642767dd4e602acc116c7cdeed2aa40a434e82fa7aff23dc8a0"
+    },
+    "native-product-source/kptas/engine_control.py": {
+      "bytes": 4413,
+      "sha256": "5b6d8776dad5491230abcb777d25384c15a643f86f45b15d638e6ad50e5423d7"
+    },
+    "native-product-source/kptas/filetree.py": {
+      "bytes": 4714,
+      "sha256": "6c5c71621d81460a151106557f422f8509c4b97290479a9273972c31845ae1de"
+    },
+    "native-product-source/kptas/frames.py": {
+      "bytes": 31942,
+      "sha256": "7479ecc3d155bf705d98412e5444797c95e0e2c801927f1b617cad97a123eaec"
+    },
+    "native-product-source/kptas/gym.py": {
+      "bytes": 9732,
+      "sha256": "ab4c0d5a49af8c8c86a14c97c2c21e8f47c6f68ff9a6afa4bee27fe0e9336704"
+    },
+    "native-product-source/kptas/holo/__init__.py": {
+      "bytes": 708,
+      "sha256": "06f988afd8f40fc519453987ce8a805baae33afd4635cb95162f3399b7ae26d1"
+    },
+    "native-product-source/kptas/holo/authoring.py": {
+      "bytes": 5394,
+      "sha256": "6831ec90a62fb1f5dea57dedea272ab0f30d9728b516867d245cb0ab48afc956"
+    },
+    "native-product-source/kptas/holo/branch.py": {
+      "bytes": 1977,
+      "sha256": "ef6c95eb209b1698f336d9eced2e0f2a32c7a4724e941007c41ca89994d052fe"
+    },
+    "native-product-source/kptas/holo/bundle.py": {
+      "bytes": 71088,
+      "sha256": "df92377b760687548b8edc46f9edae652af783e12b6d203bd0d16823172a11ae"
+    },
+    "native-product-source/kptas/holo/canary_frames.py": {
+      "bytes": 2768,
+      "sha256": "3d1dc1f548db88b1d7b4293e6c65fdc262e5587343e886eae27570e7ba8070f0"
+    },
+    "native-product-source/kptas/holo/index.py": {
+      "bytes": 4199,
+      "sha256": "dc1b85b885ed184435e5b6777cf275a00826791ab755f168a2817e93e3750197"
+    },
+    "native-product-source/kptas/holo/journal.py": {
+      "bytes": 12003,
+      "sha256": "b668c90d69ae10af1bc03292afc1ddd93049286beb16bb09b912631b21ea179b"
+    },
+    "native-product-source/kptas/holo/pages.py": {
+      "bytes": 46772,
+      "sha256": "f752a42347bc77b4d13c414ed48de4a1a05d9fe2048f545f90fb3ef6448b98ce"
+    },
+    "native-product-source/kptas/holo/repack.py": {
+      "bytes": 12289,
+      "sha256": "96089cbb1a783f0d1cc0661bf5252276b2b325da74fe7d2b4770a05478b8a6f1"
+    },
+    "native-product-source/kptas/holo/seek.py": {
+      "bytes": 68415,
+      "sha256": "99bbf42a2634170338a00fee4be1259d3b7f09c6e07f0482acea65401eb2076e"
+    },
+    "native-product-source/kptas/holo/verify.py": {
+      "bytes": 10273,
+      "sha256": "c9ccf75dbf178948763d3ddb7fcf2dfda2bd7ea81914f7f3d52abfc9fd2217e8"
+    },
+    "native-product-source/kptas/input_source.py": {
+      "bytes": 3348,
+      "sha256": "5b4476f056956d42df281f5424a036fd508142f7dff60e61c6282b3195bfa59b"
+    },
+    "native-product-source/kptas/linux_native_profile.py": {
+      "bytes": 4691,
+      "sha256": "dcd094b43a3a0f5cbcc99861f5f375f0dfa8b10a85ee9f9e30b9e9ccf6bf138f"
+    },
+    "native-product-source/kptas/native_profile.py": {
+      "bytes": 5680,
+      "sha256": "d6ec2dec9b80d85e046ff7b1d257cfcb1bfbdbd35c4c773dd9353b390713cc01"
+    },
+    "native-product-source/kptas/platform_sync.py": {
+      "bytes": 3518,
+      "sha256": "0127a5dde01a26f2d5bcc8758e87ff85c98e54aebf8a0fee56f6dd08e105de6d"
+    },
+    "native-product-source/kptas/score/__init__.py": {
+      "bytes": 478,
+      "sha256": "f4b3b975e36d20607b26e9e20383ab39602e3849fb3ba442e05ce3c0b61cc990"
+    },
+    "native-product-source/kptas/score/assertion.py": {
+      "bytes": 8040,
+      "sha256": "65ec43ce32f5a7d270799a61cad177e5a74ba9064ced389703f7ed84fdfd5a9b"
+    },
+    "native-product-source/kptas/score/ast.py": {
+      "bytes": 3992,
+      "sha256": "d3dfd04b763d7f9e77815a54ad56b9ad207c87ae736e7f49efaa65a7631283ac"
+    },
+    "native-product-source/kptas/score/compile.py": {
+      "bytes": 8831,
+      "sha256": "b7d4d4346d41fc8d459567fe593d67edee5e2a42b6b70525f7ad6c60ce04337c"
+    },
+    "native-product-source/kptas/score/fmt.py": {
+      "bytes": 3909,
+      "sha256": "b6d67132551a82493bc186a6f431a06a12ab2dd13d4d48ebfc533e3db98ae75b"
+    },
+    "native-product-source/kptas/score/include.py": {
+      "bytes": 1620,
+      "sha256": "6655fe3533d869fb72135b7d16d9fec69cba046d2c2bca459d73b50058262dee"
+    },
+    "native-product-source/kptas/score/keys.py": {
+      "bytes": 4603,
+      "sha256": "96fb60cd7367e1150ac98d43d7a0331520aa1fd78f9199431bf2bfdf676e2ece"
+    },
+    "native-product-source/kptas/score/lexer.py": {
+      "bytes": 2333,
+      "sha256": "eaa6efc4a475c9d93246256db86de8618eb9488c234d455107ae5fa6b8a1340a"
+    },
+    "native-product-source/kptas/score/parser.py": {
+      "bytes": 19425,
+      "sha256": "77cb2347e292ac72377f44b11461df873ed1865a94ed4c51911c72f99c868c8c"
+    },
+    "native-product-source/kptas/semantic/__init__.py": {
+      "bytes": 141,
+      "sha256": "a915f0672130a7974ab4c072b7717e8d81066d91f8a320cb2d022e4c0f9437bb"
+    },
+    "native-product-source/kptas/semantic/plan.py": {
+      "bytes": 2284,
+      "sha256": "a231319e5365135dfde3cefff075afa912482d291611542f253d3fb58708fd0a"
+    },
+    "native-product-source/kptas/semantic/runner.py": {
+      "bytes": 3181,
+      "sha256": "ae63be491e6334e60baf7d54baa071331d6641bfca8cfcba192364ab7fc1d1d9"
+    },
+    "native-product-source/kptas/supervisor.py": {
+      "bytes": 69188,
+      "sha256": "7846434215dd9a3636452c2ca628345f31581452c7df668ba23801cef7d5a219"
+    },
+    "native-product-source/kptas/telos/__init__.py": {
+      "bytes": 192,
+      "sha256": "7a4503b62ef03a8e84ef02e959e9f8df3e0a5b10e509389deeed2b909a9b6545"
+    },
+    "native-product-source/kptas/telos/actions.py": {
+      "bytes": 11800,
+      "sha256": "ebcff2a8079a5f5b5c9108b6923b25e7faa118b676c45e46d581af7c415d8b66"
+    },
+    "native-product-source/kptas/telos/cli.py": {
+      "bytes": 40442,
+      "sha256": "84fb3c18a94a76cf1921a8e6d87a0461f2146b48185114cb1431effbca6daf59"
+    },
+    "native-product-source/kptas/telos/cockpit.py": {
+      "bytes": 7488,
+      "sha256": "e46af315545e5dd909a60967f029d1c43d206f5c99003761fa8b10a47c1a0ca2"
+    },
+    "native-product-source/kptas/telos/control.py": {
+      "bytes": 33292,
+      "sha256": "350d7c3c38a469c0301682776825bcfa677ab67020b059185a6ebf4e42e25110"
+    },
+    "native-product-source/kptas/telos/debugger_widget.py": {
+      "bytes": 35343,
+      "sha256": "5d0076789b21ed573e2cff73b8339d70ba98b35cfff2456d4ea86c0d9661accc"
+    },
+    "native-product-source/kptas/telos/draft_store.py": {
+      "bytes": 6355,
+      "sha256": "aea6312117148dcb41e18e3d77b88fbbeffec6e324b18f80a7ccefbc0d141140"
+    },
+    "native-product-source/kptas/telos/frame_preview.py": {
+      "bytes": 6142,
+      "sha256": "8ca016842fa882fd10addb06877f3eeec48137bc9525faf9fa9f03070a903f2c"
+    },
+    "native-product-source/kptas/telos/game_focus.py": {
+      "bytes": 9232,
+      "sha256": "4bcd306b841adddd30f46b1cc57f4fb44c4dc1a4cdc991a93087207751d0f1ef"
+    },
+    "native-product-source/kptas/telos/input_edits.py": {
+      "bytes": 9225,
+      "sha256": "78aec7e126ceb1ac51b165658f3f8a9cea77e477aee7c9bd26f71eb8af93c269"
+    },
+    "native-product-source/kptas/telos/input_view.py": {
+      "bytes": 3085,
+      "sha256": "1c7e8c671e16d962b4a5ec1e8aa9d0232dbf6f3cd2100c6a3d3c26a1ac6e897b"
+    },
+    "native-product-source/kptas/telos/interaction_controls.py": {
+      "bytes": 15170,
+      "sha256": "23b2e56513f941beb824a66b9a4ae65347aa4265464582eebb9835828b182a0b"
+    },
+    "native-product-source/kptas/telos/keymap.py": {
+      "bytes": 16938,
+      "sha256": "d96243c494d9ed11383deb43b457aa88ac9843efbf7b2b0e0f664b07eb418022"
+    },
+    "native-product-source/kptas/telos/live.py": {
+      "bytes": 11992,
+      "sha256": "f624fcb70351861febe7ac5176d3855b14b4ac68fb57d9a775c7cc5680747c32"
+    },
+    "native-product-source/kptas/telos/live_workspace.py": {
+      "bytes": 1360,
+      "sha256": "0bedc36ba2c2b44e45ac5cb5dcaeb677b132a881aa88163bb78cc12e5af19ef9"
+    },
+    "native-product-source/kptas/telos/mechanic_sequence_widget.py": {
+      "bytes": 6582,
+      "sha256": "4ac3bede5febd9be9cda6708881495d2876c23f5cb587529f5def00259c5a9b7"
+    },
+    "native-product-source/kptas/telos/mechanic_sequences.py": {
+      "bytes": 15891,
+      "sha256": "10df6a1b18016b76027f5612a246045295548f100e5d3310609aefbe168555c4"
+    },
+    "native-product-source/kptas/telos/memory.py": {
+      "bytes": 27015,
+      "sha256": "4e6caec2202671e9c61ef1086606eb2d228546d6945f90d95d7440a72a777c48"
+    },
+    "native-product-source/kptas/telos/memory_scan_capture.py": {
+      "bytes": 9382,
+      "sha256": "9766e9c6a9c78ab221cf64dd13200990c2033ee07db7e4a125c541e3cf28e9c7"
+    },
+    "native-product-source/kptas/telos/memory_widget.py": {
+      "bytes": 22628,
+      "sha256": "925cbab42654cf644d6aea603418e054fb30866a02c79f16a2cbc56614e4e5c7"
+    },
+    "native-product-source/kptas/telos/native_surface.py": {
+      "bytes": 9675,
+      "sha256": "ba56a9cd4062084940141a947c378716376bc1f78fc59ab06ab7daae4cadd180"
+    },
+    "native-product-source/kptas/telos/overlay.py": {
+      "bytes": 140155,
+      "sha256": "38d29f6762cc66841573d35736a5facf378a1be273763a98d73579d7d54b6359"
+    },
+    "native-product-source/kptas/telos/panel_controls.py": {
+      "bytes": 19038,
+      "sha256": "bd08d0b967224edae6807ccdc30e281e0445ae38c338ecdd13df19492e5ddf68"
+    },
+    "native-product-source/kptas/telos/preview_channel.py": {
+      "bytes": 10945,
+      "sha256": "542f8b50e9ba7f41a586e0dac1128018fb1dce9f57507a5b0c90df1f699c3317"
+    },
+    "native-product-source/kptas/telos/recording_library.py": {
+      "bytes": 4457,
+      "sha256": "690355f221a559dbb1fdfd1f1dd5ca1a35ee8ab14dabcc0cec9f0797e65b6220"
+    },
+    "native-product-source/kptas/telos/repl.py": {
+      "bytes": 6077,
+      "sha256": "3f64a0436f7e821b08a1fc73ddd77288c71186b7e65ec349d3f15b564abcc445"
+    },
+    "native-product-source/kptas/telos/run_cli.py": {
+      "bytes": 8301,
+      "sha256": "e2dca5ccf5e194fe0379ad8321acd77ff2cc2f719304e7a86bdf5cd39476e73b"
+    },
+    "native-product-source/kptas/telos/run_queue.py": {
+      "bytes": 15090,
+      "sha256": "c288a021916d3cde814810cbfc5c1d4f7b5af7abf36645a019555a61b002af86"
+    },
+    "native-product-source/kptas/telos/save_packs.py": {
+      "bytes": 22711,
+      "sha256": "b926ce07f6711f9fc7a47623e2dd056fba0b2fc2ea04b955d1c2bb4ed8eed708"
+    },
+    "native-product-source/kptas/telos/score_control.py": {
+      "bytes": 7923,
+      "sha256": "284b67fef69ee288ef25574a79bda73dc93ec198f64677b949c9c55ffae886f7"
+    },
+    "native-product-source/kptas/telos/session.py": {
+      "bytes": 151795,
+      "sha256": "4cf138aa2983a810f8aa5d8f11639a3d1a725efeddeb6ec16e12c31275a4d12b"
+    },
+    "native-product-source/kptas/telos/settings_dialog.py": {
+      "bytes": 31960,
+      "sha256": "04f0d2b36ec0b4399756904894254c003ca1e4a7f063633191640d8dcc111522"
+    },
+    "native-product-source/kptas/telos/shared_presentation.py": {
+      "bytes": 6911,
+      "sha256": "c799614dfde148be26d6f8a1b7c17cb74ab65c0849567b4ebc04c5cf67ddd923"
+    },
+    "native-product-source/kptas/telos/shortcut_binder.py": {
+      "bytes": 13902,
+      "sha256": "1cd119bd0c27d925d49f2cd7dd665beaee02cc3866c7c1e7a0d8c7f7ea7b74fa"
+    },
+    "native-product-source/kptas/telos/speedrun_catalog.py": {
+      "bytes": 15873,
+      "sha256": "470eb5e6209f18d2a4244283295700ecce777cf74245739e193da30e9abcfbb3"
+    },
+    "native-product-source/kptas/telos/speedrun_cli.py": {
+      "bytes": 7373,
+      "sha256": "32bd5021c7fc3df02aece4ed057952926aae8a687212735799f36a2baee5c321"
+    },
+    "native-product-source/kptas/telos/speedrun_widget.py": {
+      "bytes": 13634,
+      "sha256": "8298b4662e72ae6c9e6a924420066f29a9e494ab20595f2e6efa841ddcd364c9"
+    },
+    "native-product-source/kptas/telos/textview.py": {
+      "bytes": 8884,
+      "sha256": "2aa2b31d5e819bbf33d099d90637ba013e9ff535d01f825212505851b4496268"
+    },
+    "native-product-source/kptas/telos/timeline.py": {
+      "bytes": 15579,
+      "sha256": "63e79235b36a186d4d73b5f8239dcee3bee3b03a06dae8a6e2509fec4ebc65bb"
+    },
+    "native-product-source/kptas/telos/timeline_future.py": {
+      "bytes": 19089,
+      "sha256": "72f9d8cb52dfb908b150d2496ba904e84ae3fbe6ff8e480b790ba0bf9c98f134"
+    },
+    "native-product-source/kptas/telos/timeline_markers.py": {
+      "bytes": 18506,
+      "sha256": "47df5cbbb077c35fbcf5f74b038f96bb557a0502e4f26a9a3e3fcece2b170f43"
+    },
+    "native-product-source/kptas/telos/timeline_rail.py": {
+      "bytes": 14601,
+      "sha256": "c2617cb98794c7baed197856118fe08abea1001786924beda58bd9f01f861991"
+    },
+    "native-product-source/kptas/telos/timeline_tools.py": {
+      "bytes": 56616,
+      "sha256": "477806c320057008f2e9e1da95ee4046c706cb9c77b0e76f6308659da8c0c44a"
+    },
+    "native-product-source/kptas/telos/trainer.py": {
+      "bytes": 46275,
+      "sha256": "b013d2c2bb57c329fa20885f76e33579194b725c754f0d64587a86fddc4619bf"
+    },
+    "native-product-source/kptas/telos/trainer_widget.py": {
+      "bytes": 77963,
+      "sha256": "b227173a1314074a31c57af37204d999a8c56ef67d8c2ca97e565496545c8fc4"
+    },
+    "native-product-source/kptas/telos/ui_preferences.py": {
+      "bytes": 20086,
+      "sha256": "579892cbea5f35fb18f38d2048100f4ffcee9b9fa1748048ee750939adbce2cb"
+    },
+    "native-product-source/kptas/telos/ui_profiles.py": {
+      "bytes": 7012,
+      "sha256": "9ecb4ae87e185b6699d647169715c977d96deed92f5149c35ef54f9cecef6a1a"
+    },
+    "native-product-source/kptas/telos/ui_settings.py": {
+      "bytes": 5553,
+      "sha256": "7dbdaf953cf45f75482cc0741d973a98aaaa93b57906b38c867d8f0e9bcc482b"
+    },
+    "native-product-source/kptas/telos/ui_theme.py": {
+      "bytes": 2383,
+      "sha256": "ce96f681973611039a8adf456919ce5ef93f99fd8d5158824e5f947a3116eaa1"
+    },
+    "native-product-source/kptas/telos/ui_tokens.json": {
+      "bytes": 970,
+      "sha256": "0db9c9f859ac0ba02ee79c424efa772fd0be489e710332b5e19d7ab04bf45de1"
+    },
+    "native-product-source/kptas/telos/window_finder_widget.py": {
+      "bytes": 6992,
+      "sha256": "ba446513378e7ddd6cb5bb1d5cbdd4ce1fb2c8e0bf863239b1e075fff3ef8e9f"
+    },
+    "native-product-source/kptas/telos/workspace_protocol.py": {
+      "bytes": 6035,
+      "sha256": "599738403493f7b9e760ed0dbb8abdd8035964d89228e2d3ccbf427f9970c1fa"
+    },
+    "native-product-source/kptas/telos/workspace_session.py": {
+      "bytes": 91197,
+      "sha256": "7e04fb247556dd05e4ebf6c29dd68f800b00f8c02292a4a3a05a9bf5cc52834b"
+    },
+    "native-product-source/kptas/telos/workspace_window.py": {
+      "bytes": 135850,
+      "sha256": "d4f324e985544751511d33675e07fd11782de0262f382815e64bbaa46cc1be17"
+    },
+    "native-product-source/kptas/telos/xhotkeys.py": {
+      "bytes": 6099,
+      "sha256": "798f9b0cb6371a53d3cfb0442cd7a8c82a931521f568f58086b3a637f17b44e4"
+    },
+    "native-product-source/kptas/tier/__init__.py": {
+      "bytes": 251,
+      "sha256": "bb2f6bcfbce7ac5641b890d55d5749ec50550c953e5f25a66e92834a42373196"
+    },
+    "native-product-source/kptas/tier/envpin.py": {
+      "bytes": 27674,
+      "sha256": "42f78a610df76f4487a2dacddffb94499ef081c7653a6a50908ba865e6b94ec1"
+    },
+    "native-product-source/kptas/tier/policy.py": {
+      "bytes": 18139,
+      "sha256": "2d28a0a4e6bc518b529157f2850c24a14327fcabdf046dc7f28f18a83bc1d323"
+    },
+    "native-product-source/kptas/tier/qualification.py": {
+      "bytes": 2260,
+      "sha256": "5c492eeb2ebf2f554569daaa14bc656abe9df706dd463bff943c18c68b90e67e"
+    },
+    "native-product-source/kptas/types.py": {
+      "bytes": 61322,
+      "sha256": "b1ec857c23571d102c3580031f400d05223ae4eb6af113b89219a628fdde7d69"
+    },
+    "native-product-source/native/core/PORT.md": {
+      "bytes": 1293,
+      "sha256": "ffd743bbb1857013d5d3d9617db3dde9002693b636a2a558a3d889cc3ac7b8ac"
+    },
+    "native-product-source/native/cpp-migration.md": {
+      "bytes": 3337,
+      "sha256": "4a3ab247e9cb3766458647a296102cc7beb55aa04eda7ef823ff88eae21c81cb"
+    },
+    "native-product-source/native/portable/build.sh": {
+      "bytes": 1683,
+      "sha256": "532b609d73b7d24804901ac0b8044ac9409f6db3701f0d5c331dcd81ee6cbe1b"
+    },
+    "native-product-source/native/portable/math_sites.toml": {
+      "bytes": 12398,
+      "sha256": "cccdad5fd30d81d726dfe431ebacaaa425a7c79d9405d444d34f85e1add486a5"
+    },
+    "native-product-source/native/portable/refmath.cpp": {
+      "bytes": 34367,
+      "sha256": "3d4aaed8555165a1763075067983ba6a01db86800eecf504a59b956749b13751"
+    },
+    "native-product-source/native/portable/refmath.h": {
+      "bytes": 4446,
+      "sha256": "8605187153052be07bfaa4417bf28791d3cb467d3bdd057de3636a38f6ac9782"
+    },
+    "native-product-source/native/portable/refmath_pow.cpp": {
+      "bytes": 30028,
+      "sha256": "03a5672d95f9ea2bb5213bcde6a921e691a3b53cb91450d607ee6361352cc117"
+    },
+    "native-product-source/native/portable/tools/audit_refmath.py": {
+      "bytes": 4560,
+      "sha256": "41ca01ecfca8cf800255e177c672b79c256643e7e0e08fa86c42f46cee314e9c"
+    },
+    "native-product-source/native/portable/tools/gen_math_patches.py": {
+      "bytes": 11522,
+      "sha256": "8f07e7e5da579c764d2771c2e3b8f99f7d7babe9251f58af371b56c5644992f0"
+    },
+    "native-product-source/native/portable/tools/inventory_math_sites.py": {
+      "bytes": 6096,
+      "sha256": "0f8709a0ec3c365964e0f948d68892096513466f596b2c0798e0c6ff853236ab"
+    },
+    "native-product-source/native/probes/arena.cpp": {
+      "bytes": 11218,
+      "sha256": "25cc75326f87d6659270e02b3276f9eaffe51d40072807fa65a46f3e66edd4f9"
+    },
+    "native-product-source/native/probes/build.sh": {
+      "bytes": 991,
+      "sha256": "92e34e8eb2c873ae066857356f805602ea15e5ed4f5ae2095d52503023c3e763"
+    },
+    "native-product-source/native/probes/dinput8.def": {
+      "bytes": 51,
+      "sha256": "7e6ece8e382e409bc33dcea12430f3c078fdeeee9db04dec7f6529f36663f8ae"
+    },
+    "native-product-source/native/probes/dinput8_proxy.cpp": {
+      "bytes": 7483,
+      "sha256": "3d86b5b5d421890edf4e1adcfb422733fae53a6c1025deaf3197ce7f2e4511e2"
+    },
+    "native-product-source/native/probes/fiber.cpp": {
+      "bytes": 7771,
+      "sha256": "9ae1a0aaf32a019a7d5b4a10c7af8a18e448ff0d5136c25341fde76e90704d4d"
+    },
+    "native-product-source/native/probes/miles.cpp": {
+      "bytes": 4849,
+      "sha256": "fe8116b169ff2b756a648591895301d49c389623ba8504a4154efc7916d10f58"
+    },
+    "native-product-source/native/shim/build.sh": {
+      "bytes": 8122,
+      "sha256": "29169ef362cf61ae1afbc0dfe6d819e99571c877be83e92ee134ea376531d10c"
+    },
+    "native-product-source/native/shim/dinput8.def": {
+      "bytes": 51,
+      "sha256": "7e6ece8e382e409bc33dcea12430f3c078fdeeee9db04dec7f6529f36663f8ae"
+    },
+    "native-product-source/native/shim/src/alloc.cpp": {
+      "bytes": 1403,
+      "sha256": "784a0670ce92bb613864ee35c56de1c4929b2d76d9ac7df48ef7b127da00ecaf"
+    },
+    "native-product-source/native/shim/src/audio.cpp": {
+      "bytes": 50777,
+      "sha256": "05261b7e1a011c379508730829323244d09b5da55d3c5fd27ac47eb6b70fdb7c"
+    },
+    "native-product-source/native/shim/src/bound.cpp": {
+      "bytes": 41834,
+      "sha256": "d7f797fe8b96cc2d9e86fe2b7948b227fcf98e52ee44945d0462e3a7bc306673"
+    },
+    "native-product-source/native/shim/src/btrace.cpp": {
+      "bytes": 17963,
+      "sha256": "840751af02020f04aa29d6571448a339625a8e3201c64e2042a6dcff0eba2f3e"
+    },
+    "native-product-source/native/shim/src/clock.cpp": {
+      "bytes": 15522,
+      "sha256": "76783730c0158a452ad6fa18733f428cbb92c09422fff610093dcf2ccee9ef83"
+    },
+    "native-product-source/native/shim/src/diag.cpp": {
+      "bytes": 2664,
+      "sha256": "f69ff19602e1abbd00b0e5a586de168203930084c8a7cd78cd4557d178b4efbd"
+    },
+    "native-product-source/native/shim/src/dinput.cpp": {
+      "bytes": 15299,
+      "sha256": "059076db7bf50ec050590801a7d3b000ed3d30ef90585323ca8bde374a55b05d"
+    },
+    "native-product-source/native/shim/src/exe_profile.hpp": {
+      "bytes": 1283,
+      "sha256": "c3a8e07aec4ecee718662c89403863cb5c18f5e164bb20f0fb9980f7a0a1f39d"
+    },
+    "native-product-source/native/shim/src/frames.cpp": {
+      "bytes": 20890,
+      "sha256": "74187e903835bbd46a94549bde8650feb9cdaaa156504f7e6a99398843819e1a"
+    },
+    "native-product-source/native/shim/src/gate.cpp": {
+      "bytes": 17530,
+      "sha256": "e8ead776db6ebbb4e2694adba3967b67062ebcc506e6570717e02f6d14edd8aa"
+    },
+    "native-product-source/native/shim/src/geo.cpp": {
+      "bytes": 18598,
+      "sha256": "1f86863fc1bcef1c891fa4e68e7cc0785ae9e3bdb90650c638b4ae45dea7ded9"
+    },
+    "native-product-source/native/shim/src/gl.cpp": {
+      "bytes": 31804,
+      "sha256": "0bff0c4664804bd00506062f5299eae7095a54346b1ed68547ed17e8ba3f082f"
+    },
+    "native-product-source/native/shim/src/glati.cpp": {
+      "bytes": 16353,
+      "sha256": "5abbc3556847ead293d4cd0f2205b91c50376a717831963c9aeebd96f12a2e9d"
+    },
+    "native-product-source/native/shim/src/glati.hpp": {
+      "bytes": 891,
+      "sha256": "51bed7b2ee2f17f21db46b19fc9d83ea501e5a24d4ca3ebe66ced0438ae5bb2c"
+    },
+    "native-product-source/native/shim/src/glbuffers.cpp": {
+      "bytes": 17688,
+      "sha256": "8aa47fde54ea1fbc5c76b7768402689bd006947497fbb0028249daac22d63680"
+    },
+    "native-product-source/native/shim/src/glbuffers.hpp": {
+      "bytes": 683,
+      "sha256": "f8a298a4ca6be79adf45c763828e260131c177adb371d22f717fd2f151c71725"
+    },
+    "native-product-source/native/shim/src/gldraw.cpp": {
+      "bytes": 5816,
+      "sha256": "b940ef4997cd8b424b47bee30e0f1ffb3a746a281c6ce858559f8bdd4a1b589f"
+    },
+    "native-product-source/native/shim/src/gldraw.hpp": {
+      "bytes": 624,
+      "sha256": "92db994631b0bd7eaac651873cd3b16bb02ffb508f533e7b2aaaaebfa45fa74e"
+    },
+    "native-product-source/native/shim/src/glenv.cpp": {
+      "bytes": 22146,
+      "sha256": "d25d9c120ab398a2590bb444b3f4408154b0ef223202a1a1bd5e8dda8ae03d65"
+    },
+    "native-product-source/native/shim/src/glenv.hpp": {
+      "bytes": 1120,
+      "sha256": "2493a16682b911a57baa1a8e2cfbf3c0ee10f2e5b0c6b364ca00e291580d7450"
+    },
+    "native-product-source/native/shim/src/glframe.inc": {
+      "bytes": 35942,
+      "sha256": "251b3b0c08d34ef1571527edc57b76a1efa804c3481fd8f8b23ff90289dcee0e"
+    },
+    "native-product-source/native/shim/src/gllists.cpp": {
+      "bytes": 12711,
+      "sha256": "5f204b06507df9cefe99c5eeaf5662135352d5fc9158b4a354365def7fc790ea"
+    },
+    "native-product-source/native/shim/src/gllists.hpp": {
+      "bytes": 874,
+      "sha256": "4397445386ee0426ce351e76c5bebea80e2cd25cd26ff13937c6e69a34ca02bb"
+    },
+    "native-product-source/native/shim/src/glsync.cpp": {
+      "bytes": 101288,
+      "sha256": "8d7fff4b82e043992f30d24fc863f040bb61ce4d5e472bb83cd7160f2876357f"
+    },
+    "native-product-source/native/shim/src/hash.cpp": {
+      "bytes": 7684,
+      "sha256": "27a0823b90bc39a15008f2ee56f29cde853982ccb87f4394657e6d0d194b0894"
+    },
+    "native-product-source/native/shim/src/hud.cpp": {
+      "bytes": 14772,
+      "sha256": "b432c03b767cdb27e859ae3e4590507af3ff48b08193a4a1c23f8d0c6d5322ef"
+    },
+    "native-product-source/native/shim/src/journal.cpp": {
+      "bytes": 13929,
+      "sha256": "5e065a4f8a44fab491e074699e68f37955a6ab821ac8f6ed67cafa5dd0cdbf05"
+    },
+    "native-product-source/native/shim/src/json.cpp": {
+      "bytes": 5603,
+      "sha256": "a9d8a15130454419702f34550f565f1a4951262350a2350e65c6e86bc78bc546"
+    },
+    "native-product-source/native/shim/src/main.cpp": {
+      "bytes": 10858,
+      "sha256": "8164ec0ab3551a0ad1770b62012c81986de74b67dcd465a38f73b3b707db60ea"
+    },
+    "native-product-source/native/shim/src/math.cpp": {
+      "bytes": 15025,
+      "sha256": "d56dad908089a265a374a521a58c843ebe9d1efdd1fbb31c8a159711c2cbf40d"
+    },
+    "native-product-source/native/shim/src/math_sites.inc": {
+      "bytes": 15879,
+      "sha256": "d5023c67d85d66541e5fedd016420e463274e936d43f8a4331c98c27d8f09122"
+    },
+    "native-product-source/native/shim/src/msg.cpp": {
+      "bytes": 25669,
+      "sha256": "672e10be1cb614178911517445f10476a6863b7170181d3bcfca13671acde01f"
+    },
+    "native-product-source/native/shim/src/patch.cpp": {
+      "bytes": 10210,
+      "sha256": "c3c9af25cffd76a8e9badc09c4b3a14f4999e32797ed33bcad9d16d23d6be6d5"
+    },
+    "native-product-source/native/shim/src/physical_input.cpp": {
+      "bytes": 9219,
+      "sha256": "5fcbd6f48cd6db3c46cb4eeb9afdab705492698605bb257232892f05fa0bf458"
+    },
+    "native-product-source/native/shim/src/physical_input.hpp": {
+      "bytes": 2130,
+      "sha256": "1be33eda1918ba7bd5e596242497cd4265d74af1e4c2cde4ece06ed5dd891a31"
+    },
+    "native-product-source/native/shim/src/render.cpp": {
+      "bytes": 15178,
+      "sha256": "89d33b17ef5ee1d2d763616019a7687d974e5fdbc60100802aa61fb2ae7fc417"
+    },
+    "native-product-source/native/shim/src/rt.cpp": {
+      "bytes": 7672,
+      "sha256": "e793c405306800bfdfa2cb09a21068715178c6c63c124d0289ccaa8c108cfdc7"
+    },
+    "native-product-source/native/shim/src/shim.hpp": {
+      "bytes": 30731,
+      "sha256": "7db6f42a7eb73bf229624a239c64553e05bd609ce5099786926ce7f290c327bf"
+    },
+    "native-product-source/native/shim/src/state.cpp": {
+      "bytes": 21952,
+      "sha256": "1f1773e85c42a4ecb064edef6144d3a507fa989978ce056e6a1eda137f92ff3e"
+    },
+    "native-product-source/native/shim/src/threads.cpp": {
+      "bytes": 16447,
+      "sha256": "dfe242678c6c152e5fcf9b27f72feca48f5393c2405ba80545a11e5790ef91e7"
+    },
+    "native-product-source/native/shim/src/vhandle.cpp": {
+      "bytes": 16055,
+      "sha256": "aae2acbc428ca13450436c10e43687a46f11c984e4092e6822ca0b7fb35883e8"
+    },
+    "native-product-source/native/shim/src/vmem.cpp": {
+      "bytes": 12130,
+      "sha256": "9a6f671ab5668faf0220f418728f5c42f1dfb27f3e63d221bba6c41dad8e36e4"
+    },
+    "native-product-source/native/shim/src/winhandles.cpp": {
+      "bytes": 74063,
+      "sha256": "fa2c203086896b14ed0467badeff3b5e0f345f1393891cae1fdbe898043391a5"
+    },
+    "native-product-source/native/shim/src/winhandles.hpp": {
+      "bytes": 2311,
+      "sha256": "908b1e3cb08aa91671fbadc4049947e8cdd0e75bd239ee08597973d18ea4fb58"
+    },
+    "native-product-source/native/shim/src/wire.cpp": {
+      "bytes": 89709,
+      "sha256": "16830ae0ae27f48175f6fd3171fa8f1bd69dd62a39687850d5cc6c05f5dcb01b"
+    },
+    "native-product-source/native/shim/src/xtrace.cpp": {
+      "bytes": 12645,
+      "sha256": "09b263379a81ca6404309a7db5e7af44bfbb2f0a0666ef01be68de8f063c009d"
+    },
+    "native-product-source/native/shim/tools/hud_badge.py": {
+      "bytes": 889,
+      "sha256": "461669c76b92719d742466c78af6d7d08921082f184e2b4c64fd019b2ac3aeea"
+    },
+    "native-product-source/native/simgame/build.sh": {
+      "bytes": 1273,
+      "sha256": "ba793cc14f2a6f1ae9d139b98bf70965ffc5b2c75d4f4decabd465c42c042ae5"
+    },
+    "native-product-source/native/simgame/hist.cpp": {
+      "bytes": 6380,
+      "sha256": "213b7a1d4d361d6a139f18dc7ecc761e311ab324b9f75926653b1115342de040"
+    },
+    "native-product-source/native/simgame/hist.hpp": {
+      "bytes": 411,
+      "sha256": "12cb95944e4e2a32ac690fa4ca529e8d04a71e310248bab14d8790f8b5c7763e"
+    },
+    "native-product-source/native/simgame/simgame.cpp": {
+      "bytes": 25378,
+      "sha256": "bcfa539cda55c63d8d58206e7312882025b952027b7c61edad3dc1802fcb2646"
+    },
+    "native-product-source/native/state/kst.h": {
+      "bytes": 10389,
+      "sha256": "aeb51c5db71761f31050029459e4471ba3fc0e97fd0f6d6f243ad2adc79cde40"
+    },
+    "native-product-source/native/state/kst_arena.cpp": {
+      "bytes": 14179,
+      "sha256": "8245f0b635f07278d4039c0cef42f6410fe4d07860fe24de9672f37ee4df5e86"
+    },
+    "native-product-source/native/state/kst_capture.cpp": {
+      "bytes": 23400,
+      "sha256": "7e86ff1ff414f653659ee2748123bc4c66769c7fb290087a1d9e1e264f98bac4"
+    },
+    "native-product-source/native/state/kst_ctx.cpp": {
+      "bytes": 12667,
+      "sha256": "582f43440c8060d24a533a3074ff40458bca932392b244320b93e4f8e316af78"
+    },
+    "native-product-source/native/state/kst_hash.cpp": {
+      "bytes": 10825,
+      "sha256": "88c7e2c4fbca45d6f1814a1fbb98a9d1d422f76ac41953c49a8b5918311d3657"
+    },
+    "native-product-source/native/state/kst_int.hpp": {
+      "bytes": 3524,
+      "sha256": "0e13276f65b9aecd222f2a3cd12ffd7e033a985cab94d773a6a81a81abb6eab0"
+    },
+    "native-product-source/native/state/kst_restore.cpp": {
+      "bytes": 10428,
+      "sha256": "f6c6892e73bcd1fea2fe7696432653ed21e308227805011e4b69136ad8a20bed"
+    },
+    "native-product-source/native/state/kst_rt.cpp": {
+      "bytes": 6628,
+      "sha256": "db07d04a082ecb6da3c30c006d890909fb5bb737396c00d96b1072fb3b77bfe4"
+    },
+    "native-product-source/native/tools/kptas_m1.py": {
+      "bytes": 23923,
+      "sha256": "557da5a783abfab48930666d896730c33b06f396dc74ab70cf1802b84ebecd12"
+    },
+    "native-product-source/native/tools/kptas_m2.py": {
+      "bytes": 44849,
+      "sha256": "06305ec89284de443a302bb07830d38c9daf8c8737c293c6eb66100914d23277"
+    },
+    "native-product-source/pyproject.toml": {
+      "bytes": 577,
+      "sha256": "ded889b264522d4f62ad1f45ce067f3ee6b7854085ab6b1b23c0a288d8d18c0d"
+    },
+    "native-product-source/telos_core/README.md": {
+      "bytes": 10045,
+      "sha256": "f1e58eafe934e03f8720b763d9355b8de2811cadb77cba6a6f65b125eb7591e3"
+    },
+    "native-product-source/telos_core/__init__.py": {
+      "bytes": 480,
+      "sha256": "e830e681417a46d15e5e4f446879d3e180156d29bfba3ef1ed4850f3c1b39608"
+    },
+    "native-product-source/telos_core/artifact_cache.py": {
+      "bytes": 8555,
+      "sha256": "16c3f243498b9ef83d0b3085e95cdb024957f7cc24f58d7ee30690f6b2aabfe4"
+    },
+    "native-product-source/telos_core/contracts.py": {
+      "bytes": 3561,
+      "sha256": "b93d31bd8cf190e43cc599ffb847de940b025274c28d3ed5e00098a181534cec"
+    },
+    "native-product-source/telos_core/debugger.py": {
+      "bytes": 16516,
+      "sha256": "e0136ca8e3343691e2dfc2c45704ab15dcdc0985104c5f371ddcc7300d00fa9a"
+    },
+    "native-product-source/telos_core/profile.py": {
+      "bytes": 11329,
+      "sha256": "ab70aaf7ffc4ec190cd4ab3b8ab81a7bad5eb4e4c9c817b69a7d7b0d49dc8f49"
+    },
+    "native-product-source/telos_core/profile_admission.py": {
+      "bytes": 5232,
+      "sha256": "6fb1d43038a35aff77ea8c2176abfcc91d05442fffb92fa92d847dfe8f723eed"
+    },
+    "native-product-source/telos_core/pyproject.toml": {
+      "bytes": 430,
+      "sha256": "e8c76bd86f7c26c61694fa349529b9140d8af5f98c16d16eb67daaecffdecfe4"
+    },
+    "native-product-source/telos_core/registry.py": {
+      "bytes": 8339,
+      "sha256": "d2d4458035ab025aacbbd39d9647e22382a52d8254cc247a5d0bbac624c953d7"
+    },
+    "native-product-source/telos_core/release_manifest.py": {
+      "bytes": 13060,
+      "sha256": "216aa4786d3f12d4bc4365ba8759da0ef43e027c292bbc6e1012fad158a56841"
+    },
+    "native-source-manifest.json": {
+      "bytes": 35344,
+      "sha256": "a782960c587d78405495508598b8ce14f90874f2dfd10203b3e79b942baacd74"
+    },
+    "native-telos/debugger_widget.py": {
+      "bytes": 35343,
+      "sha256": "5d0076789b21ed573e2cff73b8339d70ba98b35cfff2456d4ea86c0d9661accc"
+    },
+    "native-telos/memory_scan_capture.py": {
+      "bytes": 9382,
+      "sha256": "9766e9c6a9c78ab221cf64dd13200990c2033ee07db7e4a125c541e3cf28e9c7"
+    },
+    "native-telos/shared_presentation.py": {
+      "bytes": 6911,
+      "sha256": "c799614dfde148be26d6f8a1b7c17cb74ab65c0849567b4ebc04c5cf67ddd923"
+    },
+    "original-product-plan.md": {
+      "bytes": 459721,
+      "sha256": "f9f31f7071849066705ee40c5bc6fb4422dad5ce9720d663cdf11bd89242c64e"
+    },
+    "runtime-transfer-inventory.json": {
+      "bytes": 4780,
+      "sha256": "7a3eee4c0941fdb64b76b8e939d8f161c7806a7b6687ad1bd35feff9ac640b61"
     }
   },
-  "scope": "Source/plan handoff; excludes game installation, game assets, browser memory, recordings, credentials. Native source contains selected parity files, not complete native product."
+  "scope": "Exact branch migration-handoff blobs; manifest excludes itself. Root KPHarness source is the branch tree. Native authored source exclusions and private runtime transfer boundary are documented separately. No private game assets or credentials included."
 }
