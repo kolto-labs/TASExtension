@@ -13,3 +13,7 @@ No tests, probes, synthetic requests, guest reload, deployment or vendor edit. D
 ## Actual retained title trace
 
 Candidate9a5c8/session6dd2a90d displayed200011characters and671KPTAS_GL records with no omission banner. Artifact6dd2a90d-displayed-title-renderer-trace-20261013.txt SHA2568087d0c9397f88a35ca395505e47105067158e388fdd2457310c21aeaa28d4a3 retained locally. This qualifies retention beyond the previous64KiB window for actual startup/title output. The1MiB boundary, omission behavior and other settings remain source-only. No rendering cause or complete-history guarantee inferred.
+
+## Correct the capture-size description
+
+Earlier200011-character artifacts include the browser tool's200000-character transport limit plus[Truncated], not the full textarea value. They are retained as partial captures. The same paused9a5c8/session6dd2a90d textarea was subsequently captured in bounded chunks:236919characters/823trace records. Retention beyond64KiB is observed; the1MiB edge/omission behavior remains source-only. This correction does not make any captured log a complete runtime history.

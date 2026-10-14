@@ -11,3 +11,9 @@ The existing shader-query observation ABI remains unchanged. Other procedure poi
 Original downstream source retained as artifacts/sdlgl-before-host-texture-arguments-20261013.cpp. Production service kptas-wasm-build-host-texture-arguments-20261013 completed Result success/ExecMainStatus0. Same established multiThreadedJit flags retained with one job. New WASM SHA2567fa06fe3d18b2c05825de09bfc66ac36223b375c0715a9e2fe55fd355e348f8d; source SHA2567069f4bcf8ce5bf6bdea02a2bfabd5a21f41612472ebdd8c4e421aa4ece9b80e.
 
 Production stage --reuse-staged-root exited0 with565e34aa87288dd83d88012059d61d72a9492c6907f8743ce3e4e0f4879f082b, batching the pending parent audio-download route. Default unchanged; no installation assets copied/uploaded. Candidate unlaunched and both new paths unqualified. Existing live guests retain their immutable releases. No tests, probes, synthetic requests, vendor edits, deployment or publication. Coupled dirty source/index/data preserved. This observation is an implementation choice within P1, not a new user requirement.
+
+## Actual backend argument capture
+
+Candidate565e34/sessionab943f36 adopted the logger during normal title startup. Paused96/full49. Bounded DOM reads captured248810displayed characters and129host upload records. Observed78RGB/RGB/UNSIGNED_BYTE and51RGBA/RGBA/UNSIGNED_BYTE records. These sample results narrow the format question only; no texture binding, pixel correctness, driver acceptance or rendering cause inferred. Capability initialization may be included.
+
+The initial one-shot browser return was truncated at200000characters and added[Truncated]. It remains preserved as a partial artifact. Full displayed logs were then collected in32768-character chunks, with declared/captured length248810 and no transport marker. No new runtime or GPU query was used.
