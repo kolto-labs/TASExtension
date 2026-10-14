@@ -1,0 +1,666 @@
+# x87 transcendental sites in the exe (K1 GOG 1.03). Inventory only.
+# Produced by an agentdecompile-cli execute-script over the analyzed Ghidra program
+# (flow-followed code only), not by tools/inventory_math_sites.py. That tool reads an
+# objdump listing and writes the same rows, plus two CRT bytes at 0x0070a535/0x0070a538
+# that objdump's linear sweep decodes but that are not reachable code. The shim checks
+# the opcode at each address before redirecting.
+# fyl2x rows name the constant the site loads into st1 on its one straight-line path:
+# ln (fldln2), lg (fldlg2), l2 (fld1), or generic when a jump joins the path or st1 is
+# not a constant there. Ghidra's listing and inventory_math_sites.py agree on all 27.
+
+[[site]]
+address = 0x00423c9f
+op = "fsin"
+kind = "game"
+function_name = "Quaternion::axis"
+
+[[site]]
+address = 0x0045091a
+op = "fcos"
+kind = "game"
+function_name = "Scene::RenderStencilShadowsForThisLight"
+
+[[site]]
+address = 0x00450925
+op = "fsin"
+kind = "game"
+function_name = "Scene::RenderStencilShadowsForThisLight"
+
+[[site]]
+address = 0x004567b3
+op = "fsin"
+kind = "game"
+function_name = "Scene::DoHighlightTriggers"
+
+[[site]]
+address = 0x0045c72b
+op = "fptan"
+kind = "game"
+function_name = "Camera::RenderScene"
+
+[[site]]
+address = 0x0045c74d
+op = "fptan"
+kind = "game"
+function_name = "Camera::RenderScene"
+
+[[site]]
+address = 0x0045c76d
+op = "fptan"
+kind = "game"
+function_name = "Camera::RenderScene"
+
+[[site]]
+address = 0x0045c78b
+op = "fptan"
+kind = "game"
+function_name = "Camera::RenderScene"
+
+[[site]]
+address = 0x0045cf92
+op = "fptan"
+kind = "game"
+function_name = "Camera::MouseDir"
+
+[[site]]
+address = 0x0045d179
+op = "fptan"
+kind = "game"
+function_name = "Camera::MapToScreen"
+
+[[site]]
+address = 0x0045d288
+op = "fcos"
+kind = "game"
+function_name = "Camera::Animate"
+
+[[site]]
+address = 0x0045d2a9
+op = "fcos"
+kind = "game"
+function_name = "Camera::Animate"
+
+[[site]]
+address = 0x0045d2be
+op = "fsin"
+kind = "game"
+function_name = "Camera::Animate"
+
+[[site]]
+address = 0x0046064f
+op = "fsin"
+kind = "game"
+function_name = "ArturoTextureController::Init"
+
+[[site]]
+address = 0x0048e01a
+op = "fcos"
+kind = "game"
+function_name = "Particle::randomDirection"
+
+[[site]]
+address = 0x004a9eb0
+op = "fsin"
+kind = "game"
+function_name = "slerp"
+
+[[site]]
+address = 0x004a9ec6
+op = "fsin"
+kind = "game"
+function_name = "slerp"
+
+[[site]]
+address = 0x004a9ee3
+op = "fsin"
+kind = "game"
+function_name = "slerp"
+
+[[site]]
+address = 0x004aa013
+op = "fpatan"
+kind = "game"
+function_name = "Yaw"
+
+[[site]]
+address = 0x004aa0d9
+op = "fpatan"
+kind = "game"
+function_name = "Pitch"
+
+[[site]]
+address = 0x004aa121
+op = "fpatan"
+kind = "game"
+function_name = "Yaw"
+
+[[site]]
+address = 0x004aa14e
+op = "fpatan"
+kind = "game"
+function_name = "Pitch"
+
+[[site]]
+address = 0x004ac9b6
+op = "fcos"
+kind = "game"
+function_name = "Quaternion::Quaternion"
+
+[[site]]
+address = 0x004ac9c7
+op = "fsin"
+kind = "game"
+function_name = "Quaternion::Quaternion"
+
+[[site]]
+address = 0x004acc94
+op = "fpatan"
+kind = "game"
+function_name = "Roll"
+
+[[site]]
+address = 0x004be05a
+op = "fcos"
+kind = "game"
+function_name = "CSWSArea::ComputeAwayVector"
+
+[[site]]
+address = 0x004be060
+op = "fsin"
+kind = "game"
+function_name = "CSWSArea::ComputeAwayVector"
+
+[[site]]
+address = 0x004cbafe
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CSWSObject::CalculateLastSpellProjectileTime"
+
+[[site]]
+address = 0x004cbdcc
+op = "fpatan"
+kind = "game"
+function_name = "CSWSObject::CalculateSpellRangedMissTarge"
+
+[[site]]
+address = 0x004cbe4d
+op = "fcos"
+kind = "game"
+function_name = "CSWSObject::CalculateSpellRangedMissTarge"
+
+[[site]]
+address = 0x004cbe53
+op = "fsin"
+kind = "game"
+function_name = "CSWSObject::CalculateSpellRangedMissTarge"
+
+[[site]]
+address = 0x004d2096
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWSCombatAttackData::SetDamage"
+
+[[site]]
+address = 0x004d20e6
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWSCombatAttackData::AddDamage"
+
+[[site]]
+address = 0x004eeb31
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWSCreature::ApplyPoisonDamage"
+
+[[site]]
+address = 0x004f465b
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWSCreature::GetTotalEffectBonus"
+
+[[site]]
+address = 0x004f4c53
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWSCreature::GetTotalEffectBonus"
+
+[[site]]
+address = 0x004f4efd
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWSCreature::GetTotalEffectBonus"
+
+[[site]]
+address = 0x0050165c
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWSCreature::GetFilteredEffectList"
+
+[[site]]
+address = 0x0051cb9e
+op = "fcos"
+kind = "game"
+function_name = "CSWSCreature::WalkUpdateLocation_QuickWalk_FollowLeader"
+
+[[site]]
+address = 0x0051e7d1
+op = "fcos"
+kind = "game"
+function_name = "CSWSCreature::AIActionDrive"
+
+[[site]]
+address = 0x0051e7ef
+op = "fsin"
+kind = "game"
+function_name = "CSWSCreature::AIActionDrive"
+
+[[site]]
+address = 0x0051f46e
+op = "fpatan"
+kind = "game"
+function_name = "CSWSCreature::AIActionDrive"
+
+[[site]]
+address = 0x00522537
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CSWSMessage::HandlePlayerToServerCheatMessage"
+
+[[site]]
+address = 0x00531c5c
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandEffectDamage"
+
+[[site]]
+address = 0x00538097
+op = "fpatan"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandGetFacing"
+
+[[site]]
+address = 0x0053f466
+op = "fcos"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandLocation"
+
+[[site]]
+address = 0x0053f474
+op = "fsin"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandLocation"
+
+[[site]]
+address = 0x0053f543
+op = "fpatan"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandLocationAccess"
+
+[[site]]
+address = 0x0053f65a
+op = "fcos"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandMath"
+
+[[site]]
+address = 0x0053f66f
+op = "fsin"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandMath"
+
+[[site]]
+address = 0x0053f684
+op = "fptan"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandMath"
+
+[[site]]
+address = 0x0053f6f5
+op = "fpatan"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandMath"
+
+[[site]]
+address = 0x0053f721
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandMath"
+
+[[site]]
+address = 0x005428bd
+op = "fcos"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandSetFacing"
+
+[[site]]
+address = 0x005428cb
+op = "fsin"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandSetFacing"
+
+[[site]]
+address = 0x005452d2
+op = "fcos"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandVectorConversions"
+
+[[site]]
+address = 0x005452de
+op = "fsin"
+kind = "game"
+function_name = "CSWVirtualMachineCommands::ExecuteCommandVectorConversions"
+
+[[site]]
+address = 0x0056d062
+op = "fpatan"
+kind = "game"
+function_name = "CSWSMessage::SendServerToPlayerArea_ClientArea"
+
+[[site]]
+address = 0x00591deb
+op = "fsin"
+kind = "game"
+function_name = "CSWSEncounter::SpawnCreatureFromSpawnList"
+
+[[site]]
+address = 0x00591df8
+op = "fcos"
+kind = "game"
+function_name = "CSWSEncounter::SpawnCreatureFromSpawnList"
+
+[[site]]
+address = 0x0059321e
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CSWSEncounter::CalculateSpawnPool"
+
+[[site]]
+address = 0x00593228
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CSWSEncounter::CalculateSpawnPool"
+
+[[site]]
+address = 0x005ae142
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWSCreatureStats::UpdateCombatInformation"
+
+[[site]]
+address = 0x005b5930
+op = "fpatan"
+kind = "game"
+function_name = "CSWSCreature::DoCombatStep"
+
+[[site]]
+address = 0x005b5966
+op = "fcos"
+kind = "game"
+function_name = "CSWSCreature::DoCombatStep"
+
+[[site]]
+address = 0x005b5977
+op = "fsin"
+kind = "game"
+function_name = "CSWSCreature::DoCombatStep"
+
+[[site]]
+address = 0x005b599d
+op = "fpatan"
+kind = "game"
+function_name = "CSWSCreature::DoCombatStep"
+
+[[site]]
+address = 0x005b59d3
+op = "fcos"
+kind = "game"
+function_name = "CSWSCreature::DoCombatStep"
+
+[[site]]
+address = 0x005b59e4
+op = "fsin"
+kind = "game"
+function_name = "CSWSCreature::DoCombatStep"
+
+[[site]]
+address = 0x005b725a
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWSCreature::SignalRangedDamage"
+
+[[site]]
+address = 0x005b7e63
+op = "fyl2x"
+fyl2x = "lg"
+kind = "game"
+function_name = "CSWSCreature::ResolveDamageShields"
+
+[[site]]
+address = 0x005f73cb
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CClientExoAppInternal::UpdateDeathSequence"
+
+[[site]]
+address = 0x005f73f8
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CClientExoAppInternal::UpdateDeathSequence"
+
+[[site]]
+address = 0x00611e24
+op = "fcos"
+kind = "game"
+function_name = "CSWCCreature::RotateCreatureToOrientation"
+
+[[site]]
+address = 0x00611e52
+op = "fcos"
+kind = "game"
+function_name = "CSWCCreature::RotateCreatureToOrientation"
+
+[[site]]
+address = 0x00611e56
+op = "fsin"
+kind = "game"
+function_name = "CSWCCreature::RotateCreatureToOrientation"
+
+[[site]]
+address = 0x0063bcd4
+op = "fptan"
+kind = "game"
+function_name = "CSWCameraOnAStick::Control"
+
+[[site]]
+address = 0x0063bcf2
+op = "fptan"
+kind = "game"
+function_name = "CSWCameraOnAStick::Control"
+
+[[site]]
+address = 0x006418a2
+op = "fcos"
+kind = "game"
+function_name = "CSWCModule::UpdateCameraBumpAndShake"
+
+[[site]]
+address = 0x006418b4
+op = "fsin"
+kind = "game"
+function_name = "CSWCModule::UpdateCameraBumpAndShake"
+
+[[site]]
+address = 0x0064be98
+op = "fsin"
+kind = "game"
+function_name = "CSWCMessage::HandleServerToPlayerArea"
+
+[[site]]
+address = 0x0064bec9
+op = "fcos"
+kind = "game"
+function_name = "CSWCMessage::HandleServerToPlayerArea"
+
+[[site]]
+address = 0x0067cbed
+op = "fsin"
+kind = "game"
+function_name = "CSWGuiActivatedButton::Draw"
+
+[[site]]
+address = 0x006a2d66
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CSWCVisualEffectOnObject::ApplyCheat"
+
+[[site]]
+address = 0x006a4523
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CSWCVisualEffectOnObject::ApplyMirv"
+
+[[site]]
+address = 0x006d3827
+op = "fcos"
+kind = "game"
+function_name = "CSWCProjectile::SetProjectileVelAndAccel"
+
+[[site]]
+address = 0x006d382d
+op = "fsin"
+kind = "game"
+function_name = "CSWCProjectile::SetProjectileVelAndAccel"
+
+[[site]]
+address = 0x006d3873
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CSWCProjectile::SetProjectileVelAndAccel"
+
+[[site]]
+address = 0x006d39c3
+op = "fcos"
+kind = "game"
+function_name = "CSWCProjectile::SetProjectileVelAndAccel"
+
+[[site]]
+address = 0x006d39c9
+op = "fsin"
+kind = "game"
+function_name = "CSWCProjectile::SetProjectileVelAndAccel"
+
+[[site]]
+address = 0x006d3a3f
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CSWCProjectile::SetProjectileVelAndAccel"
+
+[[site]]
+address = 0x006d3ea2
+op = "fcos"
+kind = "game"
+function_name = "CSWCProjectile::SetProjectileVelAndAccel"
+
+[[site]]
+address = 0x006d3ea8
+op = "fsin"
+kind = "game"
+function_name = "CSWCProjectile::SetProjectileVelAndAccel"
+
+[[site]]
+address = 0x006d3eee
+op = "fyl2x"
+fyl2x = "ln"
+kind = "game"
+function_name = "CSWCProjectile::SetProjectileVelAndAccel"
+
+[[site]]
+address = 0x006d6c2b
+op = "fpatan"
+kind = "game"
+function_name = "CSWCProjectile::SetBehaviorListDoubleBallistic"
+
+[[site]]
+address = 0x006d6c50
+op = "fcos"
+kind = "game"
+function_name = "CSWCProjectile::SetBehaviorListDoubleBallistic"
+
+[[site]]
+address = 0x006d6c56
+op = "fsin"
+kind = "game"
+function_name = "CSWCProjectile::SetBehaviorListDoubleBallistic"
+
+[[site]]
+address = 0x006d7cdf
+op = "fsin"
+kind = "game"
+function_name = "CSWCProjectile::AIUpdate"
+
+[[site]]
+address = 0x006d7d07
+op = "fcos"
+kind = "game"
+function_name = "CSWCProjectile::AIUpdate"
+
+[[site]]
+address = 0x006fc126
+op = "fpatan"
+kind = "crt"
+function_name = "_acos"
+
+[[site]]
+address = 0x006fc29a
+op = "fyl2x"
+fyl2x = "generic"
+kind = "crt"
+function_name = "_pow_internal"
+
+[[site]]
+address = 0x006fd034
+op = "fpatan"
+kind = "crt"
+function_name = "start"
+
+[[site]]
+address = 0x00704f7d
+op = "fyl2x"
+fyl2x = "generic"
+kind = "crt"
+function_name = "-"
+
+[[site]]
+address = 0x00705011
+op = "fyl2x"
+fyl2x = "ln"
+kind = "crt"
+function_name = "-"
+
+[[site]]
+address = 0x00705035
+op = "fyl2x"
+fyl2x = "generic"
+kind = "crt"
+function_name = "-"

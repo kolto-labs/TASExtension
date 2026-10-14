@@ -1,0 +1,45 @@
+--- STRATEGY.md.before
++++ STRATEGY.md
+@@ -10,7 +10,7 @@
+ 
+ ## Positioning
+ 
+-Build Telos Core as a useful standalone platform in KPHarness, bootstrapped through KPM. TAS, Lua and community additions install into Telos Core. Ship the first-party TAS addition first as an independently usable distribution with Core bundled and KotorPhasor optional. Full-state holorecords, genuine restoration and faithful inputs establish its value through real gameplay.
++Build TelosCore as a useful standalone platform in KPHarness, bootstrapped through KPM. TAS, Lua and community additions install into TelosCore. Ship the first-party TAS addition first as an independently usable distribution with Core bundled and KotorPhasor optional. Full-state holorecords, genuine restoration and faithful inputs establish its value through real gameplay.
+ 
+ Telos Exchange is the working name for the community hub: discover what an addition makes possible, inspect its source and compatibility, install a reversible setup, and keep it useful together with other additions. Favor small composable tools, shared stable APIs and maintained combinations over a download list or compulsory dependencies.
+ 
+@@ -26,8 +26,8 @@
+ 
+ - Preserve base-game mechanics, glitches and RNG behavior; distinguish supported virtualization from changes to gameplay.
+ - Keep exact restore distinct from checkpoint replay, and TAS distinct from semantic experiments and hands-off playback.
+-- Keep the public browser demo on its restored version until new functionality is complete and tested locally; the organization website remains deferred. Local Telos Exchange design is authorized; the existing Kolto Labs site is verified, while its new hub, navigation and public release remain delivery work.
+-- Keep Telos Core and installed additions usable offline without an account. Profiles, version pins, export and reversible disable/remove preserve user choice and old recordings.
++- Keep the public browser demo on its restored version until new functionality is complete and tested locally; creating or replacing the organization website remains deferred. Local Telos Exchange design and integration with the existing Kolto Labs site are authorized; the hub, navigation and public release remain delivery work.
++- Keep TelosCore and installed additions usable offline without an account. Profiles, version pins, export and reversible disable/remove preserve user choice and old recordings.
+ - Make trust, permissions, tested compatibility, conflicts and maintenance visible. Community activity and recommendations must use real evidence; avoid fabricated popularity, artificial scarcity, deceptive urgency and destructive lock-in.
+ - The geometric-reasoning demo was canceled. KPM/platform/Lua integration remains the lowest-priority product track.
+ 
+@@ -58,18 +58,18 @@
+ 
+ ### Runs and mechanics
+ 
+-Build the clean Endar DLZ demonstration and complete the broader run portfolio while improving the TAS.
++Qualify fluid and reproducible native controls, then complete The Routine with its actual outcome and continuous video/GIF. Follow with the clean Endar DLZ demonstration and broader run portfolio while improving the TAS.
+ 
+ _Why it serves the approach:_ real mechanics and full runs expose limitations synthetic fixtures cannot.
+ 
+ ### Compatibility and community
+ 
+-Deliver independent installation, K2 and semantic testing with clear support boundaries. Telos Core provides stable services and reversible setup management; Telos Exchange helps users discover, inspect, install, discuss, combine and maintain additions, collections and shared setups.
++Deliver independent installation, K2 and semantic testing with clear support boundaries. TelosCore provides stable services and reversible setup management; Telos Exchange helps users discover, inspect, install, discuss, combine and maintain additions, collections and shared setups.
+ 
+-_Why it serves the approach:_ a community standard grows through immediately useful tools that work together, visible maintenance and safe upgrades. Core reliability and The Routine remain the immediate priorities; ecosystem implementation follows without displacing them.
++_Why it serves the approach:_ a community standard grows through immediately useful tools that work together, visible maintenance and safe upgrades. TAS control reliability and The Routine remain the immediate priorities; ecosystem implementation follows without displacing them.
+ 
+ ## Brand
+ 
+ **One-liner:** Make a KotOR run one input at a time. Keep every attempt.
+ 
+-**Key message:** bodencrouch / kolto-labs; OpenSWKotOR is the organization. Telos Core names the platform; Telos Exchange is the working hub name. Cards should show distinctive identities and concrete value immediately. The proposed Kolto Labs navigation uses a Telos Exchange button with browsing and contributor submission as separate actions; integrate locally with the verified Kolto Labs Worker site, retaining the completion/testing gate before publishing. Documentation should sound like the user, show actual capabilities, and lead to the real new Discord download destination.
++**Key message:** bodencrouch / kolto-labs; OpenSWKotOR is the organization. TelosCore names the platform; Telos Exchange is the working hub name. Cards should show distinctive identities and concrete value immediately. The proposed Kolto Labs navigation uses a Telos Exchange button with browsing and contributor submission as separate actions; integrate locally with the verified Kolto Labs Worker site, retaining the completion/testing gate before publishing. Documentation should sound like the user, show actual capabilities, and lead to the real new Discord download destination.
