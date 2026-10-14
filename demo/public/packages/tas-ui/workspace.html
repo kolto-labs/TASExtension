@@ -175,6 +175,11 @@
         <div class="timeline-head">
           <span class="timeline-label">Seek</span>
           <output class="timeline-position mono" id="timeline-position" aria-live="off">tick 0 / 0</output>
+          <label>Show <select id="timeline-density" aria-label="Timeline density">
+            <option value="editor">Editor</option>
+            <option value="timeline">Timeline</option>
+            <option value="minimal">Position only</option>
+          </select></label>
           <button type="button" class="btn small timeline-toggle" id="b-toggle-timeline" aria-expanded="false" aria-controls="timeline-tools">Expand</button>
         </div>
         <div class="timeline-tools" id="timeline-tools" role="group" aria-label="Seek controls">
@@ -221,7 +226,12 @@
 </template>
 
 <template data-tas-mount="#cockpit">
-<div class="live-tas-workspace" id="live-tas-workspace" aria-label="TAS transport and input editor"></div>
+<div class="live-tas-workspace" id="live-tas-workspace" aria-label="TAS transport and input editor">
+  <div id="timeline-minimal-hud" hidden>
+    <output id="minimal-score-position" class="mono" aria-label="Score authoring position">score tick 0 / 0</output>
+    <button type="button" class="btn small" id="b-density-timeline">Show timeline</button>
+  </div>
+</div>
 </template>
 
 <template data-tas-mount="#cockpit">

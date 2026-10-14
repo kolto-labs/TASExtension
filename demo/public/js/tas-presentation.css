@@ -87,6 +87,14 @@ body[data-tas-presentation="overlay"] .live-tas-workspace .panel-head { gap: 4px
    button/key. It must hide the dock even though the dock is positioned. */
 body.tas-ui-hidden #live-tas-workspace { display: none; }
 
+/* Density changes existing parent controls only. The guest/frame stays put.
+   Separate dock panels retain their own visibility and geometry owners. */
+#timeline-minimal-hud { align-items:center; gap:8px; }
+#timeline-minimal-hud:not([hidden]) { display:flex; }
+body[data-tas-timeline-density="minimal"] #live-tas-workspace > :is(.transport, #timeline-panel, #rs-tabs, #p-roll, #p-score) { display:none !important; }
+body[data-tas-timeline-density="timeline"] #live-tas-workspace > :is(#rs-tabs, #p-roll, #p-score) { display:none !important; }
+body[data-tas-timeline-density="timeline"] #live-tas-workspace .transport > :is(label, .transport-extra) { display:none; }
+
 @media (max-width: 640px) {
   body[data-tas-presentation="overlay"] { --tas-overlay-controls-top: 96px; }
   body[data-tas-presentation="overlay"] .game-running .original-game-controls { grid-template-columns: auto minmax(0, 1fr); }

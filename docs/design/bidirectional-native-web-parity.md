@@ -43,8 +43,8 @@ both hosts have a similarly named control.
 | Input cell/range editing, insertion/deletion, autofire | N `input_edits.py`, `timeline_tools.py` | B `js/edit.js`, `js/input-lane-pattern.js`, `packages/tas-ui/editor.js` | Browser source now has selected key/button Hold and configurable Autofire via its existing score transaction. Native period/phase arithmetic aligns on the supported subset; literal lane vocabulary/order, live authoring acceptance and runtime execution remain distinct. |
 | Clipboard and mouse input | N `input_edits.py`, `input_view.py` | B `js/edit.js`, `js/score.js` | Native wheel/relative fields must not be silently downgraded. Browser unsupported fields are refused; browser editor/dispatch parity remains open. |
 | Undo/redo, marks and follow playhead | N `draft_store.py`, `timeline_tools.py`, `actions.py` | B `js/app.js`, `js/edit.js`, `js/tas-presentation.js` | Authoring intent exists in both. Undoing an input draft is not guest rewind. Persistence and behavior require qualification. |
-| Overlay/surround mode; visibility, opacity and game collapse | N `overlay.py`, `shared_presentation.py` | B `js/shared-presentation-profile.js`, `js/dock-workspace.js`, `js/tas-presentation.js` | Shared presentation v3 carries mode, game visibility/collapse/opacity and timeline opacity. Import does not transfer game state; live round trip remains open. |
-| Timeline density, geometry and panel docking | N `overlay.py`, `panel_controls.py` | B `js/dock-workspace.js` | Native Console docking exists; browser has more individual views. Native compact/minimal rail density differs from browser whole-panel collapse. Further browser-to-native pane docking remains open. |
+| Overlay/surround mode; visibility, opacity and game collapse | N `overlay.py`, `shared_presentation.py` | B `js/shared-presentation-profile.js`, `js/dock-workspace.js`, `js/tas-presentation.js` | Shared presentation v4 carries mode, game visibility/collapse/opacity, timeline opacity and explicit density. v1–v3 imports retain receiving density. Import does not transfer game state; live round trip remains open. |
+| Timeline density, geometry and panel docking | N `overlay.py`, `panel_controls.py`, `shared_presentation.py` | B `js/dock-workspace.js`, `js/timeline-density.js`, TAS editor/templates/CSS | Editor, timeline and minimal density now have a shared explicit preference in source. Density is not inferred from dock collapse; native vertical rail geometry and individual pane docking remain host-specific/unqualified. |
 | Shortcut maps and input/focus ownership | N `actions.py`, `keymap.py`, `shortcut_binder.py`, `game_focus.py` | B `js/keymap-interchange.js`, `js/keyboard-controls.js` | Shared keymap v2 retains aliases. Global native dispatch and browser focus differ; imported shortcuts cannot grant execution. |
 | Preferences, profiles and style reload | N `ui_preferences.py`, `ui_profiles.py` | B `js/ui-hot-reload.js`, `js/dock-workspace.js` | Host storage and geometry stay host-specific; opaque shared host payload is retained, not executed. Restart persistence acceptance remains open. |
 | Memory read/search/watch | N `memory_widget.py` reads recorded take frames; H `wire.c` mem.read | B `packages/debug-ui/memory-tools.js`, `js/debugger-workbench.js` | Recorded native RAM and paused guest captures are different evidence. Browser captured scans are bounded; native record watches are not live guest watches. Writes are not inferred from reads. |
@@ -160,6 +160,51 @@ changed. Implementation is source-only. Actual context-menu/dialog behavior,
 score output, undo, sync/repeat refusal and package-disable cancellation
 require parent-owned normal UI acceptance. No tests, probes, syntax checks,
 runtime builds, staging, reload or browser actions were performed.
+
+## Transfer timeline density through the presentation owners
+
+Shared presentation exports now write `telos-shared-presentation/v4`, adding
+mandatory `panels.timeline.density`: `editor`, `timeline` or `minimal`.
+Both validators retain v1, v2 and v3. Older imports retain the receiver's current
+density, v1 also retains game collapse, and v1/v2 retain timeline opacity.
+The existing storage key and opaque host data remain intact. All shared
+profiles retain the 64 KiB bound; unknown fields/versions/densities are refused.
+
+Native density uses the actual `Overlay.set_density` owner: editor reveals the
+input editor, timeline reveals its compact seek rail, minimal reveals its HUD.
+The v4 import transaction maps that preference through this existing owner,
+then reapplies retained panel geometry and imported opacity. Failure reapplies
+the prior density/preferences and panel states. Timeline rail opacity is
+refreshed after the final panel state is set. No input controller or runtime
+operation is involved.
+
+Static **Show** offers Editor, Timeline, and Position only. Editor uses existing
+expansion; Timeline retains existing transport/seek controls with input panes
+closed; Position only shows a read-only **score tick** output and **Show
+timeline** recovery button. The output uses the existing authoring redraw, not
+a new timer or guest query. It is not a native acknowledged game position.
+Only the existing parent controls change visibility; the iframe/game remains
+in place. Separate dock panes retain their own geometry and visibility owners.
+Focused controls hidden by density recover focus within the same parent
+workspace; game/dialog focus is not taken.
+
+`timeline-density.js` retains the explicit presentation intention independently
+of TAS activation. An absent or disabled editor keeps the imported preference
+without loading, installing or enabling TAS. The next normal editor activation
+adopts it. An active editor applies the synchronous density request through its
+existing owner. Dock import captures prior density, storage and layout. Its
+rollback attempts every restoration even after an individual failure, restores
+the exact prior stored preference, and reports any incomplete rollback. Density
+never substitutes for transport dock collapse or supplies runtime capability.
+
+The dirty dock/editor baselines and native shared-profile baseline are retained
+as `artifacts/before-density-v4-20261014-*`; scoped source patches accompany
+this receipt. No tests/probes/syntax checks, runtime builds, staging, browser
+actions or live cross-host imports were performed. Parent-owned acceptance
+remains open for each density, focus recovery, resize/re-enable persistence,
+v1–v4 import/export, cancellation/storage failure rollback, and the unloaded
+TAS preference path. Native rail edge/orientation, geometry, separate-pane
+docking and full overlay/native runtime parity remain open.
 
 ## Retain the acceptance boundary
 

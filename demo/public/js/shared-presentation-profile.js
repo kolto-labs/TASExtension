@@ -1,5 +1,6 @@
-export const SHARED_PRESENTATION_FORMAT = 'telos-shared-presentation/v3';
-export const PREVIOUS_SHARED_PRESENTATION_FORMAT = 'telos-shared-presentation/v2';
+export const SHARED_PRESENTATION_FORMAT = 'telos-shared-presentation/v4';
+export const PREVIOUS_SHARED_PRESENTATION_FORMAT = 'telos-shared-presentation/v3';
+export const GAME_ONLY_SHARED_PRESENTATION_FORMAT = 'telos-shared-presentation/v2';
 export const LEGACY_SHARED_PRESENTATION_FORMAT = 'telos-shared-presentation/v1';
 export const SHARED_PROFILE_STORAGE = 'telos.shared-presentation-profile.v1';
 export function validateSharedProfile(value) {
@@ -8,15 +9,17 @@ export function validateSharedProfile(value) {
     if (!object(item) || Object.keys(item).some(key => !keys.includes(key))) throw new Error(`Unknown or invalid ${label} fields.`);
   };
   exact(value, ['format', 'presentation', 'panels', 'hostProfiles'], 'profile');
-  if (![SHARED_PRESENTATION_FORMAT, PREVIOUS_SHARED_PRESENTATION_FORMAT, LEGACY_SHARED_PRESENTATION_FORMAT].includes(value.format) || !['overlay', 'surround'].includes(value.presentation)) throw new Error('Unsupported shared presentation profile.');
+  if (![SHARED_PRESENTATION_FORMAT, PREVIOUS_SHARED_PRESENTATION_FORMAT, GAME_ONLY_SHARED_PRESENTATION_FORMAT, LEGACY_SHARED_PRESENTATION_FORMAT].includes(value.format) || !['overlay', 'surround'].includes(value.presentation)) throw new Error('Unsupported shared presentation profile.');
   const legacy = value.format === LEGACY_SHARED_PRESENTATION_FORMAT;
-  const names = value.format === SHARED_PRESENTATION_FORMAT ? ['game', 'timeline'] : ['game'];
+  const density = value.format === SHARED_PRESENTATION_FORMAT;
+  const names = [SHARED_PRESENTATION_FORMAT, PREVIOUS_SHARED_PRESENTATION_FORMAT].includes(value.format) ? ['game', 'timeline'] : ['game'];
   exact(value.panels, names, 'panels');
   for (const name of names) {
     const panel = value.panels[name];
     if (name === 'timeline') {
-      exact(panel, ['opacity'], 'timeline panel');
+      exact(panel, density ? ['opacity', 'density'] : ['opacity'], 'timeline panel');
       if (!Number.isFinite(panel.opacity) || panel.opacity < 0.55 || panel.opacity > 1) throw new Error('Timeline opacity must be 0.55–1.');
+      if (density && !['editor', 'timeline', 'minimal'].includes(panel.density)) throw new Error('Unsupported timeline density.');
       continue;
     }
     exact(panel, legacy ? ['visible', 'opacity'] : ['visible', 'opacity', 'collapsed'], `${name} panel`);
