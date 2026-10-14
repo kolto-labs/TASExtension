@@ -52,7 +52,7 @@ both hosts have a similarly named control.
 | Disassembly, decompilation, stack, symbols, source and references | N `debugger_widget.py`; H `core/debugger_core.py` | B debug-runtime widget manifest and operation broker | Vocabulary/widgets exist, but handlers and exact target evidence govern availability. Unsupported panes cannot become live features through presentation work. |
 | Breakpoints, expressions, patches and trace | Native capability owners; H debugger Core | B debugger broker and package widget providers | No complete live bidirectional implementation. Recorded/captured inspection cannot authorize mutation; generic adapters cannot install hooks. |
 | Inspection export and freshness | N `debugger_widget.py` export/observe | B `js/debugger-workbench.js` | Shared telos-debugger-inspection/2 preserves nulls, source, owner, boundary and host details. Export is not a command/capability/state import. |
-| Captured scan export and register scan preparation | Native record/search owner in N `memory_widget.py` | B `packages/debug-ui/index.js`, `memory-tools.js` | Browser source adds explicit prepare-only register ranges and local captured scan artifact. Native consumption/interchange not implemented; browser live acceptance remains open. |
+| Captured scan export and register scan preparation | N `memory_scan_capture.py`, `debugger_widget.py`; recorded search remains in `memory_widget.py` | B `packages/debug-ui/index.js`, `memory-tools.js` | Browser explicit prepare-only register ranges and captured scan exports now have a native read-only file consumer in source. Native live-memory search/register preparation remains distinct. Cross-host import and browser export acceptance remain open. |
 | Uploaded file identity and byte inspection | Native exact executable/shim profile owners | B `debugger/static-binary-backend.js`, `static-file-owner.js`, `js/binary-identity.js` | Browser handles local static files without execution. Native equivalent generic file inspector and arbitrary-game runtime adapters remain open. |
 | Core/package lifecycle | H `core/package_host.py`, `tas_package.py`; native workspace ownership | B `js/telos-core.js`, `js/extensions.js`, package manifests | Shared lifecycle vocabulary does not mean native workspace activation is wired or independently published. No native privileged hook API in generic extensions. |
 | Community run intake and mechanics | N `speedrun_widget.py`, `mechanic_sequence_widget.py` | B `js/speedrun-playground.js`, `js/footage.js` | Observation/import paths are not replay-qualified inputs. Provenance, engine-clock alignment, routes and mechanics acceptance remain open. |
@@ -80,6 +80,45 @@ This changes the native source report's default entry set. Consumers that
 display the complete map may show more unavailable rows. The external native
 application has not adopted this checkout's updated Python module. No live
 capability or overlay parity is claimed from this change.
+
+## Inspect browser captured scans in the native debugger
+
+A follow-up source slice implements an actual browser-to-native inspection
+path. N `debugger_widget.py` adds an **Imported memory scan** section with
+**Import captured scan**, **Clear imported scan**, and paginated matches.
+N `memory_scan_capture.py` reads the selected local
+`telos.memory-scan-capture/v1` file once with a 2 MiB limit. It rejects duplicate
+JSON properties and offsets, invalid schema/fields/types/integers, invalid byte
+arrays, 32-bit range overflow, unsupported value types/byte order, incompatible
+previous captures, and matches outside declared candidate bounds. Candidate
+and byte arrays remain bounded by the original 64 KiB range.
+
+The pane retains the original file bytes and SHA-256, export/capture times,
+declared session/PID/epoch/source, both target declarations, comparison
+declaration and all matched offsets. It displays current and previous typed
+values plus current raw value bytes, 200 rows at a time with next/previous
+navigation. Raw bytes retain floating-point bit patterns even when decoded
+display values are NaN or signed zero. Failed imports preserve the previous
+artifact and visible rows. Clear releases only this imported evidence.
+
+Imported matches are exporter claims; the native reader does not independently
+replay the comparison or authenticate the capture. File hashes identify bytes,
+not truth or executable identity. Target metadata remains declared metadata.
+The imported artifact never binds to the native owner, adds a memory watch,
+issues a process read, alters a score, supplies an owner acknowledgment,
+changes operation qualification, or restores state. Imports are visit-only,
+separate from live native observations and the existing inspection export.
+
+The pre-edit debugger source is retained on SSD as
+`artifacts/debugger-widget-before-scan-import-20261014.py`. The native source
+directory is not a Git checkout; a scoped patch and new-module copy are kept
+with this design receipt in the active checkout's artifacts directory. The
+actual native source is edited in place with other dirty source preserved.
+No runtime adoption or actual exported-file import was qualified. Parent-owned
+native UI acceptance remains required: select an actual browser export,
+inspect provenance and pages, retain evidence after a failed import, and clear
+the import without affecting the current game/session. No tests or probes were
+run.
 
 ## Retain the acceptance boundary
 
