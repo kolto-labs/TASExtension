@@ -40,7 +40,7 @@ both hosts have a similarly named control.
 | Native capture, digest, restore and verify | H `native/shim/src/state.c`, `native/state/kst_capture.c`, `kst_restore.c`, `wire.c` | B bridge state advertisements | Native implementation exists but full GOG qualification remains open. Whole guest CPU/memory/GPU/handle/audio snapshot, rewind and restore are absent or unqualified in the browser. |
 | Score execution, pause and step | N `session.py`, `score_control.py`; H `native/shim/src/wire.c` | B `js/app.js`, original owner, bridge | Controls share intent; native game ticks and browser render presents remain distinct units. Input dispatch does not prove deterministic replay. |
 | Seek/rewind, take and branch | N `session.py`, `timeline_tools.py` | B `js/app.js`, `holo.js` | Browser sample/editor navigation and branches are not guest VM restore or recorded native takes. Highest impact native-to-browser gap. |
-| Input cell/range editing, insertion/deletion, autofire | N `input_edits.py`, `timeline_tools.py` | B `js/edit.js`, `js/app.js` | Basic authoring exists on both; lane sets/autofire and execution semantics need exact cross-host acceptance. |
+| Input cell/range editing, insertion/deletion, autofire | N `input_edits.py`, `timeline_tools.py` | B `js/edit.js`, `js/input-lane-pattern.js`, `packages/tas-ui/editor.js` | Browser source now has selected key/button Hold and configurable Autofire via its existing score transaction. Native period/phase arithmetic aligns on the supported subset; literal lane vocabulary/order, live authoring acceptance and runtime execution remain distinct. |
 | Clipboard and mouse input | N `input_edits.py`, `input_view.py` | B `js/edit.js`, `js/score.js` | Native wheel/relative fields must not be silently downgraded. Browser unsupported fields are refused; browser editor/dispatch parity remains open. |
 | Undo/redo, marks and follow playhead | N `draft_store.py`, `timeline_tools.py`, `actions.py` | B `js/app.js`, `js/edit.js`, `js/tas-presentation.js` | Authoring intent exists in both. Undoing an input draft is not guest rewind. Persistence and behavior require qualification. |
 | Overlay/surround mode; visibility, opacity and game collapse | N `overlay.py`, `shared_presentation.py` | B `js/shared-presentation-profile.js`, `js/dock-workspace.js`, `js/tas-presentation.js` | Shared presentation v3 carries mode, game visibility/collapse/opacity and timeline opacity. Import does not transfer game state; live round trip remains open. |
@@ -119,6 +119,47 @@ native UI acceptance remains required: select an actual browser export,
 inspect provenance and pages, retain evidence after a failed import, and clear
 the import without affecting the current game/session. No tests or probes were
 run.
+
+## Carry native lane patterns into static score authoring
+
+B `js/input-lane-pattern.js` implements the native
+`input_edits.py:autofire` arithmetic on supported browser key/button lanes:
+`(scoreTick - firstIncludedTick + phase) % period < floor(period / 2)`.
+The supported period is 2–20000 score ticks, with phase 0 through period minus
+one. This is explicitly score authoring; score ticks are not automatically
+native game ticks or render presents. Odd periods hold for floor(period/2)
+ticks and release for the rest. The native helper permits a broader phase
+domain; this UI admits a bounded nonnegative phase only.
+
+B `packages/tas-ui/editor.js` adds **Hold** and **Set autofire** context actions
+for the selected key/button lane and selected tick range. Autofire asks for
+period/phase before editing. No mouse-coordinate lane is patterned. The pure
+helper accepts a validated lane list, preserves unrelated lane bits and mouse
+coordinates through `setKey`, and delegates rewriting to the existing
+`editTicks` owner. The browser's established alias removal on release and
+canonical bit-lane serialization remain unchanged. Native held-key tuples
+retain their native order; no new portable literal ordering claim is made.
+
+Tick zero is excluded; the upper range is clipped to displayed rows and the
+existing 30000-score-tick host limit. A transaction is capped at the native
+helper's 20000-frame edit bound. Existing score parsing, skipped sync rows,
+explicit repeat-unroll confirmation, source-text rewrite and undo history
+remain authoritative. The phase starts at the first included score tick,
+including the position of skipped sync rows; sync rows themselves stay intact.
+Tail rows retain the existing editor's explicit note-extension behavior.
+
+The new actions require the active TAS package and editor owner. A pending
+dialog cannot apply after package/lifecycle, branch, score or model changes.
+The repeat-unroll callback rechecks the owner; on mismatch it throws before
+the existing transaction can commit even the unrolled draft. No new playback,
+input dispatch, runtime sampling, guest seek or rewind is introduced.
+
+The dirty editor's exact baseline is preserved in
+`artifacts/tas-editor-before-autofire-20261014.js`; only this scoped slice is
+changed. Implementation is source-only. Actual context-menu/dialog behavior,
+score output, undo, sync/repeat refusal and package-disable cancellation
+require parent-owned normal UI acceptance. No tests, probes, syntax checks,
+runtime builds, staging, reload or browser actions were performed.
 
 ## Retain the acceptance boundary
 
