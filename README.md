@@ -89,8 +89,4 @@ Emulated games got save states, rewind and frame advance a long time ago. KotOR 
 
 KPHarness is free and open source. It is not a registered nonprofit. Donations are appreciated and never required: [GitHub Sponsors](https://github.com/sponsors/bodencrouch).
 
-## License
-
-MIT. See [LICENSE](LICENSE).
-
 Not affiliated with Lucasfilm, Disney, BioWare, Obsidian or Aspyr. No game files are included; bring your own copy.
